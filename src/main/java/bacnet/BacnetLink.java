@@ -17,6 +17,8 @@ import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.util.Objects;
 import org.vertx.java.core.Handler;
 
+import bacnet.BacnetConn.CovType;
+
 import com.serotonin.bacnet4j.event.DeviceEventAdapter;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.util.PropertyReferences;
@@ -60,7 +62,7 @@ public class BacnetLink {
 	
 	DeviceEventAdapter setupPoint(final BacnetPoint point, final DeviceFolder devicefold) {
 		Node child = point.node.getChild("presentValue");
-		if (point.isCov()) {
+		if (devicefold.root.covType != CovType.NONE && point.isCov()) {
 			child.getListener().setOnSubscribeHandler(null);
 			ScheduledFuture<?> fut = futures.remove(child);
 			if (fut != null) {
@@ -74,6 +76,10 @@ public class BacnetLink {
 		}
 		child.getListener().setOnSubscribeHandler(new Handler<Node>() {
 			public void handle(final Node event) {
+				if (devicefold.root.covType != CovType.NONE && point.isCov()) {
+					setupPoint(point, devicefold);
+					return;
+				}
 				if (futures.containsKey(event)) {
 					return;
 		        }

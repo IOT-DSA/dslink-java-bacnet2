@@ -1,8 +1,7 @@
 package bacnet;
 
-import java.util.HashSet;
-import java.util.Set;
-
+import java.util.ArrayList;
+import java.util.List;
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
@@ -96,6 +95,59 @@ class BacnetConn {
         act.addParameter(new Parameter("cov usage", ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED")));
         act.addParameter(new Parameter("cov lease time (minutes)", ValueType.NUMBER, new Value(60)));
         node.createChild("add device").setAction(act).build().setSerializable(false);
+        
+        act = new Action(Permission.READ, new EditHandler());
+        act.addParameter(new Parameter("broadcast ip", ValueType.STRING, node.getAttribute("broadcast ip")));
+		act.addParameter(new Parameter("port", ValueType.NUMBER, node.getAttribute("port")));
+		act.addParameter(new Parameter("local bind address", ValueType.STRING, node.getAttribute("local bind address")));
+		act.addParameter(new Parameter("local network number", ValueType.NUMBER, node.getAttribute("local network number")));
+		act.addParameter(new Parameter("timeout", ValueType.NUMBER, node.getAttribute("timeout")));
+		act.addParameter(new Parameter("segment timeout", ValueType.NUMBER, node.getAttribute("segment timeout")));
+		act.addParameter(new Parameter("segment window", ValueType.NUMBER, node.getAttribute("segment window")));
+		act.addParameter(new Parameter("retries", ValueType.NUMBER, node.getAttribute("retries")));
+		act.addParameter(new Parameter("local device id", ValueType.NUMBER, node.getAttribute("local device id")));
+		act.addParameter(new Parameter("local device name", ValueType.STRING, node.getAttribute("local device name")));
+		act.addParameter(new Parameter("local device vendor", ValueType.STRING, node.getAttribute("local device vendor")));
+		act.addParameter(new Parameter("default refresh interval", ValueType.NUMBER, node.getAttribute("default refresh interval")));
+		node.createChild("edit").setAction(act).build().setSerializable(false);
+	}
+	
+	private class EditHandler implements Handler<ActionResult> {
+		public void handle(ActionResult event) {
+			String bip = event.getParameter("broadcast ip", ValueType.STRING).getString();
+			int port = event.getParameter("port", ValueType.NUMBER).getNumber().intValue();
+			String lba = event.getParameter("local bind address", ValueType.STRING).getString();
+			int lnn = event.getParameter("local network number", ValueType.NUMBER).getNumber().intValue();
+			int timeout = event.getParameter("timeout", ValueType.NUMBER).getNumber().intValue();
+			int segtimeout = event.getParameter("segment timeout", ValueType.NUMBER).getNumber().intValue();
+			int segwin = event.getParameter("segment window", ValueType.NUMBER).getNumber().intValue();
+			int retries = event.getParameter("retries", ValueType.NUMBER).getNumber().intValue();
+			int locdevId = event.getParameter("local device id", ValueType.NUMBER).getNumber().intValue();
+			String locdevName = event.getParameter("local device name", ValueType.STRING).getString();
+			String locdevVend = event.getParameter("local device vendor", ValueType.STRING).getString();
+			long interval = event.getParameter("default refresh interval", ValueType.NUMBER).getNumber().longValue();
+			
+			node.setAttribute("broadcast ip", new Value(bip));
+			node.setAttribute("port", new Value(port));
+			node.setAttribute("local bind address", new Value(lba));
+			node.setAttribute("local network number", new Value(lnn));
+			node.setAttribute("timeout", new Value(timeout));
+			node.setAttribute("segment timeout", new Value(segtimeout));
+			node.setAttribute("segment window", new Value(segwin));
+			node.setAttribute("retries", new Value(retries));
+			node.setAttribute("local device id", new Value(locdevId));
+			node.setAttribute("local device name", new Value(locdevName));
+			node.setAttribute("local device vendor", new Value(locdevVend));
+			node.setAttribute("default refresh interval", new Value(interval));
+			
+			localDevice.terminate();
+			if (node.getChildren()!=null) {
+				for (Node child: node.getChildren().values()) {
+					if (child.getAction()!=null) node.removeChild(child);
+				}
+			}
+			init();
+		}
 	}
 	
 	private class RemoveHandler implements Handler<ActionResult> {
@@ -117,36 +169,42 @@ class BacnetConn {
 			} catch (Exception e1) {
 			}
 			int covlife =event.getParameter("cov lease time (minutes)", ValueType.NUMBER).getNumber().intValue();
-			HashSet<RemoteDevice> devs = new HashSet<RemoteDevice>();
 			String mac = event.getParameter("MAC address", ValueType.STRING).getString();
-			DiscoveryListener dl = new DiscoveryListener(devs);
-			localDevice.getEventHandler().addListener(dl);
-			try {
-				localDevice.sendUnconfirmed(new Address(new OctetString(mac)), new WhoIsRequest());
-			} catch (BACnetException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} finally {
-				int waitlength = 0; 
-				while (devs.size() < 1 && waitlength < 10000)  {
-					try {
-						waitlength += 100;
-						Thread.sleep(100);
-					} catch (InterruptedException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-				}
-				localDevice.getEventHandler().removeListener(dl);
-				setupDeviceNodes(devs, interval, covtype, covlife);
-			}
 			
+			List<RemoteDevice> devs = getDevice(mac, interval, covtype, covlife);
+			
+			setupDeviceNodes(devs, interval, covtype, covlife);
 		}
+	}
+	
+	List<RemoteDevice> getDevice(String mac, long interval, CovType covtype, int covlife) {
+		ArrayList<RemoteDevice> devs = new ArrayList<RemoteDevice>();
+		DiscoveryListener dl = new DiscoveryListener(devs);
+		localDevice.getEventHandler().addListener(dl);
+		try {
+			localDevice.sendUnconfirmed(new Address(new OctetString(mac)), new WhoIsRequest());
+		} catch (BACnetException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} finally {
+			int waitlength = 0; 
+			while (devs.size() < 1 && waitlength < 10000)  {
+				try {
+					waitlength += 100;
+					Thread.sleep(100);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+			localDevice.getEventHandler().removeListener(dl);
+		}
+		return devs;
 	}
 	
 	private class DeviceDiscoveryHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
-			HashSet<RemoteDevice> devs = new HashSet<RemoteDevice>();
+			ArrayList<RemoteDevice> devs = new ArrayList<RemoteDevice>();
 			DiscoveryListener dl = new DiscoveryListener(devs);
 			localDevice.getEventHandler().addListener(dl);
 			try {
@@ -165,7 +223,7 @@ class BacnetConn {
 		}
 	}
 	
-	private void setupDeviceNodes(Set<RemoteDevice> devices, long interval, CovType covtype, int covlife) {
+	private void setupDeviceNodes(List<RemoteDevice> devices, long interval, CovType covtype, int covlife) {
 		for (RemoteDevice d: devices) {
 			setupDeviceNode(d, interval, covtype, covlife);
 		}
@@ -197,6 +255,7 @@ class BacnetConn {
         System.out.println(d.getName());
         if (d.getName() != null) {
         	Node child = node.createChild(d.getName()).build();
+        	child.setAttribute("MAC address", new Value(d.getAddress().getMacAddress().toIpPortString()));
         	child.setAttribute("refresh interval", new Value(interval));
         	child.setAttribute("cov usage", new Value(covtype.toString()));
         	child.setAttribute("cov lease time (minutes)", new Value(covlife));
@@ -206,9 +265,9 @@ class BacnetConn {
 	
 	private static class DiscoveryListener extends DeviceEventAdapter {
 		
-		private Set<RemoteDevice> devices;
+		private List<RemoteDevice> devices;
 		
-		DiscoveryListener(Set<RemoteDevice> devs) {
+		DiscoveryListener(List<RemoteDevice> devs) {
 			devices = devs;
 		}
 		
