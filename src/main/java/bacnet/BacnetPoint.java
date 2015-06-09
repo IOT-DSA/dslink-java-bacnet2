@@ -7,16 +7,26 @@ import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
 import org.dsa.iot.dslink.node.actions.ActionResult;
+import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.vertx.java.core.Handler;
+
+import com.serotonin.bacnet4j.event.DeviceEventAdapter;
+import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 
 import bacnet.DeviceFolder.DataType;
 
 public class BacnetPoint {
 	
+	private static PointCounter numPoints = new PointCounter();
+	
+	private DeviceFolder folder;
 	private Node parent;
-	private Node node;
+	Node node;
+	ObjectIdentifier oid;
+	int id;
+	private DeviceEventAdapter listener;
 	
 	private int objectTypeId;
     private int instanceNumber;
@@ -34,9 +44,12 @@ public class BacnetPoint {
     private String referenceObjectTypeDescription;
     private int referenceInstanceNumber;
 	
-    public BacnetPoint(Node parent) {
+    public BacnetPoint(DeviceFolder folder, Node parent, ObjectIdentifier oid) {
+    	this.folder = folder;
     	this.parent = parent;
     	this.node = null;
+    	this.oid = oid;
+    	id = numPoints.increment();
     }
     
     public int getObjectTypeId() {
@@ -49,6 +62,7 @@ public class BacnetPoint {
         	Node vnode = node.getChild("objectTypeId");
         	if (vnode != null) vnode.setValue(new Value(objectTypeId));
         	else node.createChild("objectTypeId").setValueType(ValueType.NUMBER).setValue(new Value(objectTypeId)).build();
+        	System.out.println("objectTypeID updated to " + objectTypeId);
         }
     }
 
@@ -62,6 +76,7 @@ public class BacnetPoint {
         	Node vnode = node.getChild("instanceNumber");
         	if (vnode != null) vnode.setValue(new Value(instanceNumber));
         	else node.createChild("instanceNumber").setValueType(ValueType.NUMBER).setValue(new Value(instanceNumber)).build();
+        	System.out.println("instanceNumber updated to " + instanceNumber);
         }
     }
 
@@ -75,6 +90,7 @@ public class BacnetPoint {
         	Node vnode = node.getChild("objectTypeDescription");
         	if (vnode != null) vnode.setValue(new Value(objectTypeDescription));
         	else node.createChild("objectTypeDescription").setValueType(ValueType.STRING).setValue(new Value(objectTypeDescription)).build();
+        	System.out.println("objectTypeDescription updated to " + objectTypeDescription);
         }
     }
 
@@ -83,33 +99,64 @@ public class BacnetPoint {
     }
 
     public void setObjectName(String objectName) {
-    	if (this.objectName != null) parent.removeChild(this.objectName);
+    	if (this.objectName != null) {
+    		if (!this.objectName.equals(objectName)) parent.removeChild(this.objectName);
+    		else return;
+    	}
         this.objectName = objectName;
         setupNode();
         
     }
     
     private void setupNode() {
-    	this.node = parent.createChild(objectName).build();
-        node.setSerializable(false);
-        makeActions();
-        node.createChild("objectTypeId").setValueType(ValueType.NUMBER).setValue(new Value(objectTypeId)).build();
-        node.createChild("instanceNumber").setValueType(ValueType.NUMBER).setValue(new Value(instanceNumber)).build();
-        if (objectTypeDescription != null) node.createChild("objectTypeDescription").setValueType(ValueType.STRING).setValue(new Value(objectTypeDescription)).build();
-        if (presentValue != null) node.createChild("presentValue").setValueType(ValueType.STRING).setValue(new Value(presentValue)).build();
-        node.createChild("cov").setValueType(ValueType.BOOL).setValue(new Value(cov)).build();
-        if (engineeringUnits != null) node.createChild("engineeringUnits").setValueType(ValueType.STRING).setValue(new Value(engineeringUnits)).build();
-    	if (dataType != null) node.createChild("dataType").setValueType(ValueType.STRING).setValue(new Value(dataType.toString())).build();
-    	if (unitsDescription != null) node.createChild("unitsDescription").setValueType(ValueType.STRING).setValue(new Value(unitsDescription.toString())).build();
-        node.createChild("referenceDeviceId").setValueType(ValueType.NUMBER).setValue(new Value(referenceDeviceId)).build();
-        node.createChild("referenceObjectTypeId").setValueType(ValueType.NUMBER).setValue(new Value(referenceObjectTypeId)).build();
-        if (referenceObjectTypeDescription != null) node.createChild("referenceObjectTypeDescription").setValueType(ValueType.STRING).setValue(new Value(referenceObjectTypeDescription)).build();
-        node.createChild("referenceInstanceNumber").setValueType(ValueType.NUMBER).setValue(new Value(referenceInstanceNumber)).build();
+    	if (node == null) {
+    		node = parent.createChild(objectName).build();
+    		node.setSerializable(false);
+    	}
+    	clearActions();
+    	makeActions();
+        setObjectTypeId(objectTypeId);
+        setInstanceNumber(instanceNumber);
+        setObjectTypeDescription(objectTypeDescription);
+        if (presentValue != null) setPresentValue(presentValue);
+        else node.createChild("presentValue").setValueType(ValueType.STRING).setValue(new Value(" ")).build();
+        setCov(cov);
+        setEngineeringUnits(engineeringUnits);
+        setDataType(dataType);
+        setUnitsDescription(unitsDescription);
+        setReferenceDeviceId(referenceDeviceId);
+        setReferenceObjectTypeId(referenceObjectTypeId);
+        setReferenceObjectTypeDescription(referenceObjectTypeDescription);
+        setReferenceInstanceNumber(referenceInstanceNumber);
+        
+        if (listener!=null) folder.conn.localDevice.getEventHandler().removeListener(listener);
+        
+        listener = folder.conn.link.setupPoint(this, folder.root);
     }
     
     private void makeActions() {
     	Action act = new Action(Permission.READ, new RemoveHandler());
     	node.createChild("remove").setAction(act).build().setSerializable(false);
+    	
+    	act = new Action(Permission.READ, new EditHandler());
+    	act.addParameter(new Parameter("cov", ValueType.BOOL, new Value(cov)));
+    	node.createChild("edit").setAction(act).build().setSerializable(false);
+    }
+    
+    private void clearActions() {
+    	if (node == null || node.getChildren() == null) return;
+    	for (Node child: node.getChildren().values()) {
+    		if (child.getAction() != null) {
+    			node.removeChild(child);
+    		}
+    	}
+    }
+    
+    private class EditHandler implements Handler<ActionResult> {
+    	public void handle(ActionResult event) {
+    		cov = event.getParameter("cov", ValueType.BOOL).getBool();
+    		setupNode();
+    	}
     }
     
     private class RemoveHandler implements Handler<ActionResult> {
@@ -129,6 +176,7 @@ public class BacnetPoint {
         	Node vnode = node.getChild("dataType");
         	if (vnode != null) vnode.setValue(new Value(dataType.toString()));
         	else node.createChild("dataType").setValueType(ValueType.STRING).setValue(new Value(dataType.toString())).build();
+        	System.out.println("dataType updated to " + dataType);
         }
     }
 
@@ -142,6 +190,7 @@ public class BacnetPoint {
         	Node vnode = node.getChild("unitsDescription");
         	if (vnode != null) vnode.setValue(new Value(unitsDescription.toString()));
         	else node.createChild("unitsDescription").setValueType(ValueType.STRING).setValue(new Value(unitsDescription.toString())).build();
+        	System.out.println("unitsDescription updated to " + unitsDescription);
         }
     }
 
@@ -155,6 +204,7 @@ public class BacnetPoint {
         	Node vnode = node.getChild("presentValue");
         	if (vnode != null) vnode.setValue(new Value(presentValue));
         	else node.createChild("presentValue").setValueType(ValueType.STRING).setValue(new Value(presentValue)).build();
+        	System.out.println("presentValue updated to " + presentValue);
         }
     }
 
@@ -168,6 +218,7 @@ public class BacnetPoint {
         	Node vnode = node.getChild("cov");
         	if (vnode != null) vnode.setValue(new Value(cov));
         	else node.createChild("cov").setValueType(ValueType.BOOL).setValue(new Value(cov)).build();
+        	System.out.println("cov updated to " + cov);
         }
     }
 
@@ -181,6 +232,7 @@ public class BacnetPoint {
         	Node vnode = node.getChild("engineeringUnits");
         	if (vnode != null) vnode.setValue(new Value(engineeringUnits));
         	else node.createChild("engineeringUnits").setValueType(ValueType.STRING).setValue(new Value(engineeringUnits)).build();
+        	System.out.println("engineeringUnits updated to " + engineeringUnits);
         }
     }
 
@@ -194,6 +246,7 @@ public class BacnetPoint {
         	Node vnode = node.getChild("referenceDeviceId");
         	if (vnode != null) vnode.setValue(new Value(referenceDeviceId));
         	else node.createChild("referenceDeviceId").setValueType(ValueType.NUMBER).setValue(new Value(referenceDeviceId)).build();
+        	System.out.println("referenceDeviceId updated to " + referenceDeviceId);
         }
     }
 
@@ -207,6 +260,7 @@ public class BacnetPoint {
         	Node vnode = node.getChild("referenceObjectTypeId");
         	if (vnode != null) vnode.setValue(new Value(referenceObjectTypeId));
         	else node.createChild("referenceObjectTypeId").setValueType(ValueType.NUMBER).setValue(new Value(referenceObjectTypeId)).build();
+        	System.out.println("referenceObjectTypeId updated to " + referenceObjectTypeId);
         }
     }
 
@@ -220,6 +274,7 @@ public class BacnetPoint {
         	Node vnode = node.getChild("referenceObjectTypeDescription");
         	if (vnode != null) vnode.setValue(new Value(referenceObjectTypeDescription));
         	else node.createChild("referenceObjectTypeDescription").setValueType(ValueType.STRING).setValue(new Value(referenceObjectTypeDescription)).build();
+        	System.out.println("referenceObjectTypeDescription updated to " + referenceObjectTypeDescription);
         }
     }
 
@@ -233,6 +288,7 @@ public class BacnetPoint {
         	Node vnode = node.getChild("referenceInstanceNumber");
         	if (vnode != null) vnode.setValue(new Value(referenceInstanceNumber));
         	else node.createChild("referenceInstanceNumber").setValueType(ValueType.NUMBER).setValue(new Value(referenceInstanceNumber)).build();
+        	System.out.println("referenceInstanceNumber updated to " + referenceInstanceNumber);
         }
     }
     
@@ -261,5 +317,13 @@ public class BacnetPoint {
         return true;
     }
 
+    private static class PointCounter {
+    	private int count = 0;
+    	int increment() {
+    		int r = count;
+    		count += 1;
+    		return r;
+    	}
+    }
 	
 }
