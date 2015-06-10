@@ -13,7 +13,17 @@ import org.dsa.iot.dslink.node.value.ValueType;
 import org.vertx.java.core.Handler;
 
 import com.serotonin.bacnet4j.event.DeviceEventAdapter;
+import com.serotonin.bacnet4j.exception.BACnetException;
+import com.serotonin.bacnet4j.obj.ObjectProperties;
+import com.serotonin.bacnet4j.service.confirmed.WritePropertyRequest;
+import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.enumerated.BinaryPV;
+import com.serotonin.bacnet4j.type.enumerated.LifeSafetyState;
+import com.serotonin.bacnet4j.type.enumerated.ObjectType;
+import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
+import com.serotonin.bacnet4j.type.primitive.Real;
+import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 
 import bacnet.DeviceFolder.DataType;
 
@@ -25,6 +35,7 @@ public class BacnetPoint {
 	private Node parent;
 	Node node;
 	ObjectIdentifier oid;
+	private PropertyIdentifier pid;
 	int id;
 	private DeviceEventAdapter listener;
 	
@@ -113,12 +124,10 @@ public class BacnetPoint {
     		node = parent.createChild(objectName).build();
     		node.setSerializable(false);
     	}
-    	clearActions();
-    	makeActions();
         setObjectTypeId(objectTypeId);
         setInstanceNumber(instanceNumber);
         setObjectTypeDescription(objectTypeDescription);
-        if (presentValue != null) setPresentValue(presentValue);
+        if (presentValue != null) setPresentValue(presentValue, pid);
         else node.createChild("presentValue").setValueType(ValueType.STRING).setValue(new Value(" ")).build();
         setCov(cov);
         setEngineeringUnits(engineeringUnits);
@@ -128,6 +137,8 @@ public class BacnetPoint {
         setReferenceObjectTypeId(referenceObjectTypeId);
         setReferenceObjectTypeDescription(referenceObjectTypeDescription);
         setReferenceInstanceNumber(referenceInstanceNumber);
+        clearActions();
+    	makeActions();
         
         if (listener!=null) folder.conn.localDevice.getEventHandler().removeListener(listener);
         
@@ -141,6 +152,7 @@ public class BacnetPoint {
     	act = new Action(Permission.READ, new EditHandler());
     	act.addParameter(new Parameter("cov", ValueType.BOOL, new Value(cov)));
     	node.createChild("edit").setAction(act).build().setSerializable(false);
+    
     }
     
     private void clearActions() {
@@ -149,6 +161,19 @@ public class BacnetPoint {
     		if (child.getAction() != null) {
     			node.removeChild(child);
     		}
+    	}
+    }
+    
+    private class SetHandler implements Handler<ActionResult> {
+    	public void handle(ActionResult event) {
+    		String newval = event.getParameter("value", ValueType.STRING).getString();
+    		Encodable enc = valueToEncodable(newval, oid.getObjectType(), pid);
+    		try {
+				folder.conn.localDevice.send(folder.root.device, new WritePropertyRequest(oid, pid, null, enc, new UnsignedInteger(1)));
+			} catch (BACnetException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
     	}
     }
     
@@ -198,13 +223,20 @@ public class BacnetPoint {
         return presentValue;
     }
 
-    public void setPresentValue(String presentValue) {
+    public void setPresentValue(String presentValue, PropertyIdentifier pid) {
+    	this.pid = pid;
         this.presentValue = presentValue;
         if (node != null && presentValue != null) {
         	Node vnode = node.getChild("presentValue");
         	if (vnode != null) vnode.setValue(new Value(presentValue));
-        	else node.createChild("presentValue").setValueType(ValueType.STRING).setValue(new Value(presentValue)).build();
+        	else vnode = node.createChild("presentValue").setValueType(ValueType.STRING).setValue(new Value(presentValue)).build();
         	System.out.println("presentValue updated to " + presentValue);
+        	
+        	vnode.removeChild("set");
+        	
+        	Action act = new Action(Permission.READ, new SetHandler());
+        	act.addParameter(new Parameter("value", ValueType.STRING, new Value(presentValue)));
+        	vnode.createChild("set").setAction(act).build().setSerializable(false);
         }
     }
 
@@ -292,6 +324,83 @@ public class BacnetPoint {
         }
     }
     
+    private Encodable valueToEncodable(String value, ObjectType objectType, PropertyIdentifier pid) {
+        Class<? extends Encodable> clazz = ObjectProperties.getPropertyTypeDefinition(objectType, pid).getClazz();
+        
+        switch (dataType) {
+        case BINARY: {
+        	boolean b = Boolean.parseBoolean(value) || Integer.parseInt(value) == 1;
+            if (clazz == BinaryPV.class) {
+                if (b)
+                    return BinaryPV.active;
+                return BinaryPV.inactive;
+            }
+
+            if (clazz == UnsignedInteger.class)
+                return new UnsignedInteger(b ? 1 : 0);
+
+            if (clazz == LifeSafetyState.class)
+                return new LifeSafetyState(b ? 1 : 0);
+
+            if (clazz == Real.class)
+                return new Real(b ? 1 : 0);
+        }
+        case NUMERIC: {
+            double d = Double.parseDouble(value);
+            if (clazz == BinaryPV.class) {
+                if (d != 0)
+                    return BinaryPV.active;
+                return BinaryPV.inactive;
+            }
+
+            if (clazz == UnsignedInteger.class)
+                return new UnsignedInteger((int) d);
+
+            if (clazz == LifeSafetyState.class)
+                return new LifeSafetyState((int) d);
+
+            if (clazz == Real.class)
+                return new Real((float) d);
+        }
+//        case ALPHANUMERIC: {
+//            String s = value;
+//            if (clazz == BinaryPV.class) {
+//                if (Boolean.parseBoolean(value) || Integer.parseInt(value) == 1)
+//                    return BinaryPV.active;
+//                return BinaryPV.inactive;
+//            }
+//
+//            if (clazz == UnsignedInteger.class)
+//                return new UnsignedInteger(MultistateValue.parseMultistate(s).getIntegerValue());
+//
+//            if (clazz == LifeSafetyState.class)
+//                return new LifeSafetyState(MultistateValue.parseMultistate(s).getIntegerValue());
+//
+//            if (clazz == Real.class)
+//                return new Real(NumericValue.parseNumeric(s).getFloatValue());
+//        }
+//        case MULTISTATE: {
+//        	int i = ((MultistateValue) value).getIntegerValue();
+//            if (clazz == BinaryPV.class) {
+//                if (i != 0)
+//                    return BinaryPV.active;
+//                return BinaryPV.inactive;
+//            }
+//
+//            if (clazz == UnsignedInteger.class)
+//                return new UnsignedInteger(i);
+//
+//            if (clazz == LifeSafetyState.class)
+//                return new LifeSafetyState(i);
+//
+//            if (clazz == Real.class)
+//                return new Real(i);
+//        }
+        default: return BinaryPV.inactive;
+        }
+
+	}
+    
     @Override
     public int hashCode() {
         final int prime = 31;
@@ -325,5 +434,6 @@ public class BacnetPoint {
     		return r;
     	}
     }
+    
 	
 }

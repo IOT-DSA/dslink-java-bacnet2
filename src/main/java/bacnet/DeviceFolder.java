@@ -157,11 +157,11 @@ public class DeviceFolder {
 		if (pid.equals(PropertyIdentifier.objectName)) {
             pt.setObjectName(PropertyValues.getString(encodable));
     	} else if (pid.equals(PropertyIdentifier.presentValue) && ObjectType.schedule.intValue() == pt.getObjectTypeId()) {
-            handleAmbiguous((AmbiguousValue) encodable, pt);
+            handleAmbiguous((AmbiguousValue) encodable, pt, pid);
     	} else if (pid.equals(PropertyIdentifier.presentValue)) {
-            pt.setPresentValue(PropertyValues.getString(encodable));
+            pt.setPresentValue(PropertyValues.getString(encodable), pid);
     	} else if (pid.equals(PropertyIdentifier.modelName)) {
-            pt.setPresentValue(PropertyValues.getString(encodable));
+            pt.setPresentValue(PropertyValues.getString(encodable), pid);
     	} else if (pid.equals(PropertyIdentifier.units)) {
             String eu = ("engUnit.abbr." + ((EngineeringUnits) encodable).intValue());
             pt.setEngineeringUnits(eu);
@@ -188,7 +188,7 @@ public class DeviceFolder {
             for (CharacterString state : states)
                 pt.getUnitsDescription().add(state.toString());
         } else if (pid.equals(PropertyIdentifier.modelName)) {
-            pt.setPresentValue(PropertyValues.getString(encodable));
+            pt.setPresentValue(PropertyValues.getString(encodable), pid);
         } else if (pid.equals(PropertyIdentifier.logDeviceObjectProperty) && encodable instanceof DeviceObjectPropertyReference) {
             DeviceObjectPropertyReference ref = (DeviceObjectPropertyReference) encodable;
             if (ref.getDeviceIdentifier() != null) {
@@ -201,7 +201,7 @@ public class DeviceFolder {
                 pt.setDataType(getDataType(ref.getObjectIdentifier().getObjectType()));
             }
         } else if (pid.equals(PropertyIdentifier.recordCount)) {
-            pt.setPresentValue(PropertyValues.getString(encodable));
+            pt.setPresentValue(PropertyValues.getString(encodable), pid);
         }
 	}
 	
@@ -288,16 +288,16 @@ public class DeviceFolder {
         }
     }
     
-    void handleAmbiguous(AmbiguousValue av, BacnetPoint pt) {
+    void handleAmbiguous(AmbiguousValue av, BacnetPoint pt, PropertyIdentifier pid) {
         Primitive primitive;
         try {
             primitive = av.convertTo(Primitive.class);
         }
         catch (BACnetException e) {
-            pt.setPresentValue(e.getMessage());
+            pt.setPresentValue(e.getMessage(), pid);
             return;
         }
-        pt.setPresentValue(PropertyValues.getString(primitive));
+        pt.setPresentValue(PropertyValues.getString(primitive), pid);
 
         if (primitive instanceof com.serotonin.bacnet4j.type.primitive.Boolean)
             pt.setDataType(DataType.BINARY);
@@ -331,5 +331,6 @@ public class DeviceFolder {
 			new DeviceFolder(conn, child, root);
 		}
 	}
+	
 
 }
