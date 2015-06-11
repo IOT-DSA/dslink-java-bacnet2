@@ -67,6 +67,7 @@ public class DeviceFolder {
 		act.addParameter(new Parameter("object type", ValueType.makeEnum("Analog Input", "Analog Output", "Analog Value", "Binary Input", "Binary Output", "Binary Value", "Calendar", "Command", "Device", "Event Enrollment", "File", "Group", "Loop", "Multi-state Input", "Multi-state Output", "Notification Class", "Program", "Schedule", "Averaging", "Multi-state Value", "Trend Log", "Life Safety Point", "Life Safety Zone", "Accumulator", "Pulse Converter", "Event Log", "Trend Log Multiple", "Load Control", "Structured View", "Access Door")));
 		act.addParameter(new Parameter("object instance number", ValueType.NUMBER, new Value(0)));
 		act.addParameter(new Parameter("use COV", ValueType.BOOL, new Value(false)));
+		act.addParameter(new Parameter("settable", ValueType.BOOL, new Value(false)));
 		node.createChild("add object").setAction(act).build().setSerializable(false);
 	}
 	
@@ -86,7 +87,8 @@ public class DeviceFolder {
 				Value ot = child.getAttribute("object type");
 		    	Value inum = child.getAttribute("object instance number");
 		    	Value cov = child.getAttribute("use COV");
-		    	if (ot!=null && inum!=null && cov!=null) {
+		    	Value sett = child.getAttribute("settable");
+		    	if (ot!=null && inum!=null && cov!=null && sett!=null) {
 		    		BacnetPoint bp = new BacnetPoint(this, node, child);
 		    		conn.link.setupPoint(bp, this);
 		    	} else {
@@ -104,11 +106,13 @@ public class DeviceFolder {
 			ObjectType ot = parseObjectType(event.getParameter("object type").getString());
 			int instNum = event.getParameter("object instance number", ValueType.NUMBER).getNumber().intValue();
 			boolean cov = event.getParameter("use COV", ValueType.BOOL).getBool();
+			boolean sett = event.getParameter("settable", ValueType.BOOL).getBool();
 			
 			Node pnode = node.createChild(name).build();
 			pnode.setAttribute("object type", new Value(ot.toString()));
 			pnode.setAttribute("object instance number", new Value(instNum));
 			pnode.setAttribute("use COV", new Value(cov));
+			pnode.setAttribute("settable", new Value(sett));
 			pnode.setAttribute("restore type", new Value("point"));
 			
 			BacnetPoint pt = new BacnetPoint(getMe(), node, pnode);
@@ -253,6 +257,7 @@ public class DeviceFolder {
         } else if (pid.equals(PropertyIdentifier.recordCount)) {
             pt.setPresentValue(PropertyValues.getString(encodable), pid);
         }
+		pt.update();
 	}
 	
 	void addObjectPoint(ObjectIdentifier oid, PropertyReferences refs, Map<ObjectIdentifier, BacnetPoint> points) {
