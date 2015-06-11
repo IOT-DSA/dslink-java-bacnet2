@@ -61,6 +61,40 @@ public class BacnetPoint {
     	this.node = null;
     	this.oid = oid;
     	id = numPoints.increment();
+    	
+    	setObjectTypeId(oid.getObjectType().intValue());
+    	setObjectTypeDescription(oid.getObjectType().toString());
+        setInstanceNumber(oid.getInstanceNumber());
+        setDataType(DeviceFolder.getDataType(oid.getObjectType()));
+
+        if (DeviceFolder.isOneOf(oid.getObjectType(), ObjectType.binaryInput, ObjectType.binaryOutput,
+                ObjectType.binaryValue)) {
+            getUnitsDescription().add("");
+            getUnitsDescription().add("");
+        }
+    }
+    
+    public BacnetPoint(DeviceFolder folder, Node parent, Node node) {
+    	this.folder = folder;
+    	this.parent = parent;
+    	this.node = node;
+    	ObjectType ot = DeviceFolder.parseObjectType(node.getAttribute("object type").getString());
+    	int instNum = node.getAttribute("object instance number").getNumber().intValue();
+    	boolean usecov = node.getAttribute("use COV").getBool();
+    	this.oid = new ObjectIdentifier(ot, instNum);
+    	
+    	setCov(usecov);
+    	setObjectTypeId(ot.intValue());
+        setObjectTypeDescription(ot.toString());
+        setInstanceNumber(instNum);
+        setDataType(DeviceFolder.getDataType(ot));
+
+        if (DeviceFolder.isOneOf(ot, ObjectType.binaryInput, ObjectType.binaryOutput,
+                ObjectType.binaryValue)) {
+            getUnitsDescription().add("");
+            getUnitsDescription().add("");
+        }
+        setupNode();
     }
     
     public int getObjectTypeId() {
@@ -110,20 +144,26 @@ public class BacnetPoint {
     }
 
     public void setObjectName(String objectName) {
-    	if (this.objectName != null) {
-    		if (!this.objectName.equals(objectName)) parent.removeChild(this.objectName);
-    		else return;
-    	}
+    	if (objectName == null) return;
         this.objectName = objectName;
-        setupNode();
-        
+        if (node != null) {
+        	Node vnode = node.getChild("objectName");
+        	if (vnode != null) vnode.setValue(new Value(objectName));
+        	else node.createChild("objectName").setValueType(ValueType.STRING).setValue(new Value(objectName)).build();
+        	System.out.println("objectName updated to " + objectName);
+        } else {
+        	setupNode();
+        }
     }
     
     private void setupNode() {
     	if (node == null) {
     		node = parent.createChild(objectName).build();
-    		node.setSerializable(false);
     	}
+    	node.setAttribute("object type", new Value(objectTypeDescription));
+    	node.setAttribute("object instance number", new Value(instanceNumber));
+    	node.setAttribute("use COV", new Value(cov));
+    	node.setAttribute("restore type", new Value("point"));
         setObjectTypeId(objectTypeId);
         setInstanceNumber(instanceNumber);
         setObjectTypeDescription(objectTypeDescription);
@@ -150,7 +190,9 @@ public class BacnetPoint {
     	node.createChild("remove").setAction(act).build().setSerializable(false);
     	
     	act = new Action(Permission.READ, new EditHandler());
-    	act.addParameter(new Parameter("cov", ValueType.BOOL, new Value(cov)));
+    	act.addParameter(new Parameter("object type", ValueType.makeEnum("Analog Input", "Analog Output", "Analog Value", "Binary Input", "Binary Output", "Binary Value", "Calendar", "Command", "Device", "Event Enrollment", "File", "Group", "Loop", "Multi-state Input", "Multi-state Output", "Notification Class", "Program", "Schedule", "Averaging", "Multi-state Value", "Trend Log", "Life Safety Point", "Life Safety Zone", "Accumulator", "Pulse Converter", "Event Log", "Trend Log Multiple", "Load Control", "Structured View", "Access Door"), node.getAttribute("object type")));
+		act.addParameter(new Parameter("object instance number", ValueType.NUMBER, node.getAttribute("object instance number")));
+		act.addParameter(new Parameter("use COV", ValueType.BOOL, node.getAttribute("use COV")));
     	node.createChild("edit").setAction(act).build().setSerializable(false);
     
     }
@@ -179,8 +221,21 @@ public class BacnetPoint {
     
     private class EditHandler implements Handler<ActionResult> {
     	public void handle(ActionResult event) {
-    		cov = event.getParameter("cov", ValueType.BOOL).getBool();
+    		cov = event.getParameter("use COV", ValueType.BOOL).getBool();
+    		ObjectType ot = DeviceFolder.parseObjectType(event.getParameter("object type", ValueType.STRING).getString());
+        	instanceNumber = event.getParameter("object instance number", ValueType.NUMBER).getNumber().intValue();
+        	oid = new ObjectIdentifier(ot, instanceNumber);
+        	setObjectTypeId(ot.intValue());
+            setObjectTypeDescription(ot.toString());
+            setDataType(DeviceFolder.getDataType(ot));
+
+            if (DeviceFolder.isOneOf(ot, ObjectType.binaryInput, ObjectType.binaryOutput,
+                    ObjectType.binaryValue)) {
+                getUnitsDescription().add("");
+                getUnitsDescription().add("");
+            }
     		setupNode();
+    		folder.conn.link.setupPoint(getMe(), folder);
     	}
     }
     
@@ -433,6 +488,10 @@ public class BacnetPoint {
     		count += 1;
     		return r;
     	}
+    }
+    
+    private BacnetPoint getMe() {
+    	return this;
     }
     
 	

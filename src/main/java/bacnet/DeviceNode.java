@@ -1,7 +1,5 @@
 package bacnet;
 
-import java.util.List;
-
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
@@ -13,14 +11,7 @@ import org.vertx.java.core.Handler;
 
 import bacnet.BacnetConn.CovType;
 
-import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.RemoteDevice;
-import com.serotonin.bacnet4j.type.Encodable;
-import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
-import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
-import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
-import com.serotonin.bacnet4j.util.RequestListener;
-import com.serotonin.bacnet4j.util.RequestUtils;
 
 public class DeviceNode extends DeviceFolder {
 	
@@ -62,37 +53,12 @@ public class DeviceNode extends DeviceFolder {
 			}
 			int covlife =event.getParameter("cov lease time (minutes)", ValueType.NUMBER).getNumber().intValue();
 			String mac = event.getParameter("MAC address", ValueType.STRING).getString();
-			List<RemoteDevice> devset = conn.getDevice(mac, interval, covtype, covlife);
-			if (devset.isEmpty()) return;
-			final RemoteDevice d = devset.get(0);
-			LocalDevice ld = conn.localDevice;
-	        if (d == null || ld == null)
-	            return;
-
-	        try {
-	            RequestUtils.getProperties(ld, d, new RequestListener() {
-	                public boolean requestProgress(double progress, ObjectIdentifier oid,
-	                        PropertyIdentifier pid, UnsignedInteger pin, Encodable value) {
-	                    if (pid.equals(PropertyIdentifier.objectName))
-	                        d.setName(value.toString());
-	                    else if (pid.equals(PropertyIdentifier.vendorName))
-	                        d.setVendorName(value.toString());
-	                    else if (pid.equals(PropertyIdentifier.modelName))
-	                        d.setModelName(value.toString());
-	                    return false;
-	                }
-	            }, PropertyIdentifier.objectName, PropertyIdentifier.vendorName,
-	                    PropertyIdentifier.modelName);
-	        }
-	        catch (Exception e) {
-	            e.printStackTrace();
-	        }
-	        System.out.println(d.getName());
-	        covType = covtype;
-	        device = d;
-	        interval = interv;
+			final RemoteDevice d = conn.getDevice(mac, interv, covtype, covlife);
+			conn.getDeviceProps(d);
+			interval = interv;
+			covType = covtype;
 	        node.setAttribute("MAC address", new Value(d.getAddress().getMacAddress().toIpPortString()));
-	        node.setAttribute("refresh interval", new Value(interv));
+	        node.setAttribute("refresh interval", new Value(interval));
 	        node.setAttribute("cov usage", new Value(covtype.toString()));
 	        node.setAttribute("cov lease time (minutes)", new Value(covlife));
 	        

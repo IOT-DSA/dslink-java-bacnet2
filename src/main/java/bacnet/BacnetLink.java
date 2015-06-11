@@ -35,12 +35,13 @@ public class BacnetLink {
 	
 	public static void start(Node parent) {
 		Node node = parent.createChild("BACNET").build();
-		node.setSerializable(false);
 		final BacnetLink link = new BacnetLink(node);
 		link.init();
 	}
 	
 	private void init() {
+		
+		restoreLastSession();
 		
 		Action act = new Action(Permission.READ, new AddConnHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING));
@@ -58,6 +59,33 @@ public class BacnetLink {
 		act.addParameter(new Parameter("default refresh interval", ValueType.NUMBER, new Value(5)));
 		node.createChild("add connection").setAction(act).build().setSerializable(false);
 		
+	}
+	
+	public void restoreLastSession() {
+		if (node.getChildren() == null) return;
+		for (Node child: node.getChildren().values()) {
+			Value bip = child.getAttribute("broadcast ip");
+			Value port = child.getAttribute("port");
+			Value lba = child.getAttribute("local bind address");
+			Value lnn = child.getAttribute("local network number");
+			Value timeout = child.getAttribute("timeout");
+			Value segtimeout = child.getAttribute("segment timeout");
+			Value segwin = child.getAttribute("segment window");
+			Value retries = child.getAttribute("retries");
+			Value locdevId = child.getAttribute("local device id");
+			Value locdevName = child.getAttribute("local device name");
+			Value locdevVend = child.getAttribute("local device vendor");
+			Value interval = child.getAttribute("default refresh interval");
+			if (bip!=null && port!=null && lba!=null && lnn!=null && timeout!=null 
+					&& segtimeout!=null && segwin!=null && retries!=null && locdevId!=null && 
+					locdevName!=null && locdevVend!=null && interval!=null) {
+				
+				BacnetConn bc = new BacnetConn(getMe(), child);
+				bc.restoreLastSession();
+			} else {
+				node.removeChild(child);
+			}
+		}
 	}
 	
 	DeviceEventAdapter setupPoint(final BacnetPoint point, final DeviceFolder devicefold) {

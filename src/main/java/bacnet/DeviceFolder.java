@@ -9,6 +9,7 @@ import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
 import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
+import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.vertx.java.core.Handler;
 
@@ -49,6 +50,7 @@ public class DeviceFolder {
 		this.conn = conn;
 		this.node = node;
 		//this.points = new HashMap<ObjectIdentifier, BacnetPoint>();
+		node.setAttribute("restore type", new Value("folder"));
 		
 		Action act = new Action(Permission.READ, new RemoveHandler());
 		node.createChild("remove").setAction(act).build().setSerializable(false);
@@ -59,11 +61,59 @@ public class DeviceFolder {
 		
 		act = new Action(Permission.READ, new ObjectDiscoveryHandler());
 		node.createChild("discover objects").setAction(act).build().setSerializable(false);
+		
+		act = new Action(Permission.READ, new AddObjectHandler());
+		act.addParameter(new Parameter("name", ValueType.STRING));
+		act.addParameter(new Parameter("object type", ValueType.makeEnum("Analog Input", "Analog Output", "Analog Value", "Binary Input", "Binary Output", "Binary Value", "Calendar", "Command", "Device", "Event Enrollment", "File", "Group", "Loop", "Multi-state Input", "Multi-state Output", "Notification Class", "Program", "Schedule", "Averaging", "Multi-state Value", "Trend Log", "Life Safety Point", "Life Safety Zone", "Accumulator", "Pulse Converter", "Event Log", "Trend Log Multiple", "Load Control", "Structured View", "Access Door")));
+		act.addParameter(new Parameter("object instance number", ValueType.NUMBER, new Value(0)));
+		act.addParameter(new Parameter("use COV", ValueType.BOOL, new Value(false)));
+		node.createChild("add object").setAction(act).build().setSerializable(false);
 	}
 	
 	DeviceFolder(BacnetConn conn, Node node, DeviceNode root) {
 		this(conn, node);
 		this.root = root;
+	}
+	
+	public void restoreLastSession() {
+		if (node.getChildren() == null) return;
+		for (Node child: node.getChildren().values()) {
+			Value restype = child.getAttribute("restore type");
+			if (restype != null && restype.getString().equals("folder")) {
+				DeviceFolder df = new DeviceFolder(conn, child, root);
+				df.restoreLastSession();
+			} else if (restype != null && restype.getString().equals("point")) {
+				Value ot = child.getAttribute("object type");
+		    	Value inum = child.getAttribute("object instance number");
+		    	Value cov = child.getAttribute("use COV");
+		    	if (ot!=null && inum!=null && cov!=null) {
+		    		BacnetPoint bp = new BacnetPoint(this, node, child);
+		    		conn.link.setupPoint(bp, this);
+		    	} else {
+		    		node.removeChild(child);
+		    	}
+			} else if (child.getAction() == null) {
+				node.removeChild(child);
+			}
+		}
+	}
+	
+	private class AddObjectHandler implements Handler<ActionResult> {
+		public void handle(ActionResult event) {
+			String name = event.getParameter("name", ValueType.STRING).getString();
+			ObjectType ot = parseObjectType(event.getParameter("object type").getString());
+			int instNum = event.getParameter("object instance number", ValueType.NUMBER).getNumber().intValue();
+			boolean cov = event.getParameter("use COV", ValueType.BOOL).getBool();
+			
+			Node pnode = node.createChild(name).build();
+			pnode.setAttribute("object type", new Value(ot.toString()));
+			pnode.setAttribute("object instance number", new Value(instNum));
+			pnode.setAttribute("use COV", new Value(cov));
+			pnode.setAttribute("restore type", new Value("point"));
+			
+			BacnetPoint pt = new BacnetPoint(getMe(), node, pnode);
+			conn.link.setupPoint(pt, getMe());
+		}
 	}
 	
 	protected class ObjectDiscoveryHandler implements Handler<ActionResult> {
@@ -112,7 +162,7 @@ public class DeviceFolder {
 			e.printStackTrace();
 		}
 	}
-	
+
 	public CovListener getNewCovListener(BacnetPoint p) {
 		return new CovListener(p);
 	}
@@ -209,17 +259,6 @@ public class DeviceFolder {
         addPropertyReferences(refs, oid);
 
         BacnetPoint pt = new BacnetPoint(this, node, oid);
-        pt.setObjectTypeId(oid.getObjectType().intValue());
-        pt.setObjectTypeDescription(oid.getObjectType().toString());
-        pt.setInstanceNumber(oid.getInstanceNumber());
-
-        pt.setDataType(getDataType(oid.getObjectType()));
-
-        if (isOneOf(oid.getObjectType(), ObjectType.binaryInput, ObjectType.binaryOutput,
-                ObjectType.binaryValue)) {
-            pt.getUnitsDescription().add("");
-            pt.getUnitsDescription().add("");
-        }
 
         points.put(oid, pt);
     }
@@ -330,6 +369,46 @@ public class DeviceFolder {
 			Node child = node.createChild(name).build();
 			new DeviceFolder(conn, child, root);
 		}
+	}
+	
+	static ObjectType parseObjectType(String otStr) {
+		switch (otStr) {
+		case "Analog Input": return ObjectType.analogInput;
+		case "Analog Output": return ObjectType.analogOutput;
+		case "Analog Value": return ObjectType.analogValue;
+		case "Binary Input": return ObjectType.binaryInput;
+		case "Binary Output": return ObjectType.binaryOutput;
+		case "Binary Value": return ObjectType.binaryValue;
+		case "Calendar": return ObjectType.calendar;
+		case "Command": return ObjectType.command;
+		case "Device": return ObjectType.device;
+		case "Event Enrollment": return ObjectType.eventEnrollment;
+		case "File": return ObjectType.file;
+		case "Group": return ObjectType.group;
+		case "Loop": return ObjectType.loop;
+		case "Multi-state Input": return ObjectType.multiStateInput;
+		case "Multi-state Output": return ObjectType.multiStateOutput;
+		case "Notification Class": return ObjectType.notificationClass;
+		case "Program": return ObjectType.program;
+		case "Schedule": return ObjectType.schedule;
+		case "Averaging": return ObjectType.averaging;
+		case "Multi-state Value": return ObjectType.multiStateValue;
+		case "Trend Log": return ObjectType.trendLog;
+		case "Life Safety Point": return ObjectType.lifeSafetyPoint;
+		case "Life Safety Zone": return ObjectType.lifeSafetyZone;
+		case "Accumulator": return ObjectType.accumulator;
+		case "Pulse Converter": return ObjectType.pulseConverter;
+		case "Event Log": return ObjectType.eventLog;
+		case "Trend Log Multiple": return ObjectType.trendLogMultiple;
+		case "Load Control": return ObjectType.loadControl;
+		case "Structured View": return ObjectType.structuredView;
+		case "Access Door": return ObjectType.accessDoor;
+		default: return null;
+		}
+	}
+	
+	public DeviceFolder getMe() {
+		return this;
 	}
 	
 
