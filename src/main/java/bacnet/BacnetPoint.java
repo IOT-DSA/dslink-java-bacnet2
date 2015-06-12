@@ -202,6 +202,7 @@ public class BacnetPoint {
     	node.createChild("remove").setAction(act).build().setSerializable(false);
     	
     	act = new Action(Permission.READ, new EditHandler());
+    	act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
     	act.addParameter(new Parameter("object type", ValueType.makeEnum("Analog Input", "Analog Output", "Analog Value", "Binary Input", "Binary Output", "Binary Value", "Calendar", "Command", "Device", "Event Enrollment", "File", "Group", "Loop", "Multi-state Input", "Multi-state Output", "Notification Class", "Program", "Schedule", "Averaging", "Multi-state Value", "Trend Log", "Life Safety Point", "Life Safety Zone", "Accumulator", "Pulse Converter", "Event Log", "Trend Log Multiple", "Load Control", "Structured View", "Access Door"), node.getAttribute("object type")));
 		act.addParameter(new Parameter("object instance number", ValueType.NUMBER, node.getAttribute("object instance number")));
 		act.addParameter(new Parameter("use COV", ValueType.BOOL, node.getAttribute("use COV")));
@@ -242,6 +243,11 @@ public class BacnetPoint {
     
     private class EditHandler implements Handler<ActionResult> {
     	public void handle(ActionResult event) {
+    		String newname = event.getParameter("name", ValueType.STRING).getString();
+    		if (newname!=null && !newname.equals(node.getName())) {
+    			parent.removeChild(node);
+    			node = parent.createChild(newname).build();
+    		}
     		settable = event.getParameter("settable", ValueType.BOOL).getBool();
     		cov = event.getParameter("use COV", ValueType.BOOL).getBool();
     		ObjectType ot = DeviceFolder.parseObjectType(event.getParameter("object type", ValueType.STRING).getString());

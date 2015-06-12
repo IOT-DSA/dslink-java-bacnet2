@@ -86,7 +86,7 @@ public class BacnetLink {
 	public void restoreLastSession() {
 		if (node.getChildren() == null) return;
 		for (Node child: node.getChildren().values()) {
-			Value isip = child.getAttribute("isip");
+			Value isip = child.getAttribute("isIP");
 			Value bip = child.getAttribute("broadcast ip");
 			Value port = child.getAttribute("port");
 			Value lba = child.getAttribute("local bind address");
