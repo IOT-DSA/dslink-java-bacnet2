@@ -17,7 +17,10 @@ import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.event.DeviceEventAdapter;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.exception.BACnetServiceException;
+import com.serotonin.bacnet4j.npdu.Network;
 import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
+import com.serotonin.bacnet4j.npdu.mstp.MasterNode;
+import com.serotonin.bacnet4j.npdu.mstp.MstpNetwork;
 import com.serotonin.bacnet4j.service.unconfirmed.WhoIsRequest;
 import com.serotonin.bacnet4j.transport.Transport;
 import com.serotonin.bacnet4j.type.constructed.Address;
@@ -29,6 +32,7 @@ import com.serotonin.bacnet4j.type.primitive.OctetString;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.RequestListener;
 import com.serotonin.bacnet4j.util.RequestUtils;
+import com.serotonin.io.serial.SerialParameters;
 
 
 class BacnetConn {
@@ -37,6 +41,7 @@ class BacnetConn {
 	LocalDevice localDevice;
 	private long defaultInterval;
 	BacnetLink link;
+	boolean isIP;
 	
 	BacnetConn(BacnetLink link, Node node) {
 		this.node = node;
@@ -45,10 +50,16 @@ class BacnetConn {
 	
 	void init() {
 		
+		isIP = node.getAttribute("isIP").getBool();
 		String bip = node.getAttribute("broadcast ip").getString();
 		int port = node.getAttribute("port").getNumber().intValue();
 		String lba = node.getAttribute("local bind address").getString();
+		String commPort = node.getAttribute("comm port id").getString();
+		int baud = node.getAttribute("baud rate").getNumber().intValue();
+		int station = node.getAttribute("this station id").getNumber().intValue();
+		int ferc = node.getAttribute("frame error retry count").getNumber().intValue();
 		int lnn = node.getAttribute("local network number").getNumber().intValue();
+		boolean strict = node.getAttribute("strict device comparisons").getBool();
 		int timeout = node.getAttribute("timeout").getNumber().intValue();
 		int segtimeout = node.getAttribute("segment timeout").getNumber().intValue();
 		int segwin = node.getAttribute("segment window").getNumber().intValue();
@@ -58,7 +69,21 @@ class BacnetConn {
 		String locdevVend = node.getAttribute("local device vendor").getString();
 		defaultInterval = node.getAttribute("default refresh interval").getNumber().longValue();
 		
-		IpNetwork network = new IpNetwork(bip, port, lba, lnn);
+		Action act = new Action(Permission.READ, new RemoveHandler());
+        node.createChild("remove").setAction(act).build().setSerializable(false);
+		
+		Network network;
+		if (isIP) {
+			network = new IpNetwork(bip, port, lba, lnn);
+		} else {
+			SerialParameters params = new SerialParameters();
+	        params.setCommPortId(commPort);
+	        params.setBaudRate(baud);
+	        params.setPortOwnerName("DSLink");
+	        
+	        MasterNode mastnode = new MasterNode(params, (byte) station, ferc);
+	        network = new MstpNetwork(mastnode, lnn);
+		}
         Transport transport = new Transport(network);
         transport.setTimeout(timeout);
         transport.setSegTimeout(segtimeout);
@@ -72,7 +97,7 @@ class BacnetConn {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
-        localDevice.setStrict(true);
+        localDevice.setStrict(strict);
         try {
         	
             localDevice.initialize();
@@ -83,9 +108,6 @@ class BacnetConn {
         } finally {
             //localDevice.terminate();
         }
-        
-        Action act = new Action(Permission.READ, new RemoveHandler());
-        node.createChild("remove").setAction(act).build().setSerializable(false);
         
         act = new Action(Permission.READ, new DeviceDiscoveryHandler());
         node.createChild("discover devices").setAction(act).build().setSerializable(false);
@@ -99,10 +121,18 @@ class BacnetConn {
         node.createChild("add device").setAction(act).build().setSerializable(false);
         
         act = new Action(Permission.READ, new EditHandler());
-        act.addParameter(new Parameter("broadcast ip", ValueType.STRING, node.getAttribute("broadcast ip")));
-		act.addParameter(new Parameter("port", ValueType.NUMBER, node.getAttribute("port")));
-		act.addParameter(new Parameter("local bind address", ValueType.STRING, node.getAttribute("local bind address")));
+        if (isIP) {
+			act.addParameter(new Parameter("broadcast ip", ValueType.STRING, node.getAttribute("broadcast ip")));
+			act.addParameter(new Parameter("port", ValueType.NUMBER, node.getAttribute("port")));
+			act.addParameter(new Parameter("local bind address", ValueType.STRING, node.getAttribute("local bind address")));
+		} else {
+			act.addParameter(new Parameter("comm port id", ValueType.STRING, node.getAttribute("comm port id")));
+			act.addParameter(new Parameter("baud rate", ValueType.NUMBER, node.getAttribute("baud rate")));
+			act.addParameter(new Parameter("this station id", ValueType.NUMBER, node.getAttribute("this station id")));
+			act.addParameter(new Parameter("frame error retry count", ValueType.NUMBER, node.getAttribute("frame error retry count")));
+		}
 		act.addParameter(new Parameter("local network number", ValueType.NUMBER, node.getAttribute("local network number")));
+		act.addParameter(new Parameter("strict device comparisons", ValueType.BOOL, node.getAttribute("strict device comparisons")));
 		act.addParameter(new Parameter("timeout", ValueType.NUMBER, node.getAttribute("timeout")));
 		act.addParameter(new Parameter("segment timeout", ValueType.NUMBER, node.getAttribute("segment timeout")));
 		act.addParameter(new Parameter("segment window", ValueType.NUMBER, node.getAttribute("segment window")));
@@ -118,10 +148,25 @@ class BacnetConn {
 	
 	private class EditHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
-			String bip = event.getParameter("broadcast ip", ValueType.STRING).getString();
-			int port = event.getParameter("port", ValueType.NUMBER).getNumber().intValue();
-			String lba = event.getParameter("local bind address", ValueType.STRING).getString();
+			if (isIP) {
+				String bip = event.getParameter("broadcast ip", ValueType.STRING).getString();
+				int port = event.getParameter("port", ValueType.NUMBER).getNumber().intValue();
+				String lba = event.getParameter("local bind address", ValueType.STRING).getString();
+				node.setAttribute("broadcast ip", new Value(bip));
+				node.setAttribute("port", new Value(port));
+				node.setAttribute("local bind address", new Value(lba));
+			} else {
+				String commPort = event.getParameter("comm port id", ValueType.STRING).getString();
+				int baud = event.getParameter("baud rate", ValueType.NUMBER).getNumber().intValue();
+				int station = event.getParameter("this station id", ValueType.NUMBER).getNumber().intValue();
+				int ferc = event.getParameter("frame error retry count", ValueType.NUMBER).getNumber().intValue();
+				node.setAttribute("comm port id", new Value(commPort));
+				node.setAttribute("baud rate", new Value(baud));
+				node.setAttribute("this station id", new Value(station));
+				node.setAttribute("frame error retry count", new Value(ferc));
+			}
 			int lnn = event.getParameter("local network number", ValueType.NUMBER).getNumber().intValue();
+			boolean strict = event.getParameter("strict device comparisons", ValueType.BOOL).getBool();
 			int timeout = event.getParameter("timeout", ValueType.NUMBER).getNumber().intValue();
 			int segtimeout = event.getParameter("segment timeout", ValueType.NUMBER).getNumber().intValue();
 			int segwin = event.getParameter("segment window", ValueType.NUMBER).getNumber().intValue();
@@ -131,10 +176,8 @@ class BacnetConn {
 			String locdevVend = event.getParameter("local device vendor", ValueType.STRING).getString();
 			long interval = event.getParameter("default refresh interval", ValueType.NUMBER).getNumber().longValue();
 			
-			node.setAttribute("broadcast ip", new Value(bip));
-			node.setAttribute("port", new Value(port));
-			node.setAttribute("local bind address", new Value(lba));
 			node.setAttribute("local network number", new Value(lnn));
+			node.setAttribute("strict device comparisons", new Value(strict));
 			node.setAttribute("timeout", new Value(timeout));
 			node.setAttribute("segment timeout", new Value(segtimeout));
 			node.setAttribute("segment window", new Value(segwin));
