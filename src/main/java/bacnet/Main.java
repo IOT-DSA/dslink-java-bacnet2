@@ -7,9 +7,13 @@ import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.NodeManager;
 import org.dsa.iot.dslink.serializer.Deserializer;
 import org.dsa.iot.dslink.serializer.Serializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class Main extends DSLinkHandler {
+	
+	private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
 	
 	public static void main(String[] args) {
 		
@@ -19,6 +23,8 @@ public class Main extends DSLinkHandler {
 	
 	@Override
 	public void onResponderConnected(DSLink link){
+		LOGGER.info("Connected");
+		
 		NodeManager manager = link.getNodeManager();
         Node superRoot = manager.getNode("/").getNode();
         Serializer copyser = new Serializer(manager);

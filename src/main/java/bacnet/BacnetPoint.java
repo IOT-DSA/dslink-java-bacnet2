@@ -13,6 +13,8 @@ import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.vertx.java.core.Handler;
 
 import com.serotonin.bacnet4j.event.DeviceEventAdapter;
@@ -31,6 +33,11 @@ import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import bacnet.DeviceFolder.DataType;
 
 public class BacnetPoint {
+	private static final Logger LOGGER;
+	
+	static {
+		LOGGER = LoggerFactory.getLogger(BacnetPoint.class);
+	}
 	
 	private static PointCounter numPoints = new PointCounter();
 	
@@ -240,7 +247,8 @@ public class BacnetPoint {
 				folder.conn.localDevice.send(folder.root.device, new WritePropertyRequest(oid, pid, null, enc, new UnsignedInteger(1)));
 			} catch (BACnetException e) {
 				// TODO Auto-generated catch block
-				e.printStackTrace();
+				//e.printStackTrace();
+				LOGGER.debug("error: ", e);
 			}
     	}
     }
@@ -516,20 +524,20 @@ public class BacnetPoint {
 			Node vnode = node.getChild("objectName");
 			if (vnode != null) vnode.setValue(new Value(objectName));
 			else node.createChild("objectName").setValueType(ValueType.STRING).setValue(new Value(objectName)).build();
-			System.out.println("objectName updated to " + objectName);
+			LOGGER.info("objectName updated to " + objectName);
 		}
 		if (dataType != null) {
         	Node vnode = node.getChild("dataType");
         	if (vnode != null) vnode.setValue(new Value(dataType.toString()));
         	else node.createChild("dataType").setValueType(ValueType.STRING).setValue(new Value(dataType.toString())).build();
-        	System.out.println("dataType updated to " + dataType);
+        	LOGGER.info("dataType updated to " + dataType);
         }
 		if (presentValue != null) {
 			String prettyVal = getPrettyPresentValue(objectTypeId, presentValue, unitsDescription, referenceObjectTypeDescription, referenceInstanceNumber, referenceDeviceId);
         	Node vnode = node.getChild("presentValue");
         	if (vnode != null) vnode.setValue(new Value(prettyVal));
         	else vnode = node.createChild("presentValue").setValueType(ValueType.STRING).setValue(new Value(prettyVal)).build();
-        	System.out.println("presentValue updated to " + presentValue);
+        	LOGGER.info("presentValue updated to " + presentValue);
         	
         	vnode.removeChild("set");
         	if (settable) makeSetAction(vnode);

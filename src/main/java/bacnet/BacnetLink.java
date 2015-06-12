@@ -26,11 +26,16 @@ import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.util.PropertyReferences;
 
 public class BacnetLink {
+//	private static final Logger LOGGER;
 	
 	private Node node;
 	private final Map<Node, ScheduledFuture<?>> futures;
 	Serializer copySerializer;
 	Deserializer copyDeserializer;
+	
+//	static {
+//		LOGGER = LoggerFactory.getLogger(BacnetLink.class);
+//	}
 	
 	private BacnetLink(Node node, Serializer ser, Deserializer deser) {
 		this.node = node;

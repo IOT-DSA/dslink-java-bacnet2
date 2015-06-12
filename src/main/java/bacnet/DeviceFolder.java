@@ -11,6 +11,8 @@ import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.vertx.java.core.Handler;
 import org.vertx.java.core.json.JsonObject;
 
@@ -42,10 +44,16 @@ import com.serotonin.bacnet4j.util.RequestListener;
 import com.serotonin.bacnet4j.util.RequestUtils;
 
 public class DeviceFolder {
+	private static final Logger LOGGER;
+	
 	protected Node node;
 	protected BacnetConn conn;
 	protected DeviceNode root;
 	//private HashMap<ObjectIdentifier, BacnetPoint> points;
+	
+	static {
+		LOGGER = LoggerFactory.getLogger(DeviceFolder.class);
+	}
 	
 	DeviceFolder(BacnetConn conn, Node node) {
 		this.conn = conn;
@@ -152,7 +160,8 @@ public class DeviceFolder {
 				});
 			} catch (BACnetException e) {
 				// TODO Auto-generated catch block
-				e.printStackTrace();
+				//e.printStackTrace();
+				LOGGER.debug("error: ", e);
 			}
 			
 			getProperties(refs, points);
@@ -174,7 +183,8 @@ public class DeviceFolder {
 			conn.localDevice.send(root.device, new SubscribeCOVRequest(id, point.oid, confirmed, lifetime));
 		} catch (BACnetException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			//e.printStackTrace();
+			LOGGER.debug("error: ", e);
 		}
 	}
 
@@ -214,7 +224,8 @@ public class DeviceFolder {
 			 });
 		} catch (BACnetException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			//e.printStackTrace();
+			LOGGER.debug("error: ", e);
 		}
 	}
 	

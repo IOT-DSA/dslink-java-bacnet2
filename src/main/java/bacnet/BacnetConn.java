@@ -10,6 +10,8 @@ import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.vertx.java.core.Handler;
 import org.vertx.java.core.json.JsonObject;
 
@@ -37,12 +39,17 @@ import com.serotonin.io.serial.SerialParameters;
 
 
 class BacnetConn {
+	private static final Logger LOGGER;
 	
 	Node node;
 	LocalDevice localDevice;
 	private long defaultInterval;
 	BacnetLink link;
 	boolean isIP;
+	
+	static {
+		LOGGER = LoggerFactory.getLogger(BacnetConn.class);
+	}
 	
 	BacnetConn(BacnetLink link, Node node) {
 		this.node = node;
@@ -124,7 +131,7 @@ class BacnetConn {
 			localDevice.getConfiguration().setProperty(PropertyIdentifier.vendorName, new CharacterString(locdevVend));
 		} catch (BACnetServiceException e1) {
 			// TODO Auto-generated catch block
-			e1.printStackTrace();
+			LOGGER.debug("error: ", e1);
 		}
         localDevice.setStrict(strict);
         try {
@@ -133,8 +140,9 @@ class BacnetConn {
             localDevice.sendGlobalBroadcast(localDevice.getIAm());
             //Thread.sleep(200000);
         } catch (Exception e) {
-        	e.printStackTrace();
+        	//e.printStackTrace();
         	//remove();
+        	LOGGER.debug("error: ", e);
         	localDevice.terminate();
         	return;
         } finally {
@@ -279,7 +287,8 @@ class BacnetConn {
 			localDevice.sendUnconfirmed(new Address(new OctetString(mac)), new WhoIsRequest());
 		} catch (BACnetException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			//e.printStackTrace();
+			LOGGER.debug("error: ", e);
 		} finally {
 			int waitlength = 0; 
 			while (devs.size() < 1 && waitlength < 10000)  {
@@ -288,7 +297,8 @@ class BacnetConn {
 					Thread.sleep(100);
 				} catch (InterruptedException e) {
 					// TODO Auto-generated catch block
-					e.printStackTrace();
+					//e.printStackTrace();
+					LOGGER.debug("error: ", e);
 				}
 			}
 			localDevice.getEventHandler().removeListener(dl);
@@ -306,10 +316,12 @@ class BacnetConn {
 				Thread.sleep(5000);
 			} catch (BACnetException e) {
 				// TODO Auto-generated catch block
-				e.printStackTrace();
+				//e.printStackTrace();
+				LOGGER.debug("error: ", e);
 			} catch (InterruptedException e) {
 				// TODO Auto-generated catch block
-				e.printStackTrace();
+				//e.printStackTrace();
+				LOGGER.debug("error: ", e);
 			} finally {
 				localDevice.getEventHandler().removeListener(dl);
 				setupDeviceNodes(devs);
@@ -344,9 +356,10 @@ class BacnetConn {
                     PropertyIdentifier.modelName);
         }
         catch (Exception e) {
-            e.printStackTrace();
+           // e.printStackTrace();
+        	LOGGER.debug("error: ", e);
         }
-        System.out.println(d.getName());
+        LOGGER.info("Got device name: "  + d.getName());
 	}
 	
 	DeviceNode setupDeviceNode(final RemoteDevice d, String name, long interval, CovType covtype, int covlife) {
@@ -374,8 +387,7 @@ class BacnetConn {
 		
 		@Override
         public void iAmReceived(RemoteDevice d) {
-                System.out.println("IAm received from " + d);
-                //System.out.println("Segmentation: " + d.getSegmentationSupported());
+                LOGGER.info("IAm received from " + d);
                 devices.add(d);
         }
 	}
