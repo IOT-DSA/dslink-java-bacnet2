@@ -11,6 +11,7 @@ import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.vertx.java.core.Handler;
+import org.vertx.java.core.json.JsonObject;
 
 import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.RemoteDevice;
@@ -37,7 +38,7 @@ import com.serotonin.io.serial.SerialParameters;
 
 class BacnetConn {
 	
-	private Node node;
+	Node node;
 	LocalDevice localDevice;
 	private long defaultInterval;
 	BacnetLink link;
@@ -71,6 +72,34 @@ class BacnetConn {
 		
 		Action act = new Action(Permission.READ, new RemoveHandler());
         node.createChild("remove").setAction(act).build().setSerializable(false);
+        
+        act = new Action(Permission.READ, new EditHandler());
+        act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
+        if (isIP) {
+			act.addParameter(new Parameter("broadcast ip", ValueType.STRING, node.getAttribute("broadcast ip")));
+			act.addParameter(new Parameter("port", ValueType.NUMBER, node.getAttribute("port")));
+			act.addParameter(new Parameter("local bind address", ValueType.STRING, node.getAttribute("local bind address")));
+		} else {
+			act.addParameter(new Parameter("comm port id", ValueType.STRING, node.getAttribute("comm port id")));
+			act.addParameter(new Parameter("baud rate", ValueType.NUMBER, node.getAttribute("baud rate")));
+			act.addParameter(new Parameter("this station id", ValueType.NUMBER, node.getAttribute("this station id")));
+			act.addParameter(new Parameter("frame error retry count", ValueType.NUMBER, node.getAttribute("frame error retry count")));
+		}
+		act.addParameter(new Parameter("local network number", ValueType.NUMBER, node.getAttribute("local network number")));
+		act.addParameter(new Parameter("strict device comparisons", ValueType.BOOL, node.getAttribute("strict device comparisons")));
+		act.addParameter(new Parameter("timeout", ValueType.NUMBER, node.getAttribute("timeout")));
+		act.addParameter(new Parameter("segment timeout", ValueType.NUMBER, node.getAttribute("segment timeout")));
+		act.addParameter(new Parameter("segment window", ValueType.NUMBER, node.getAttribute("segment window")));
+		act.addParameter(new Parameter("retries", ValueType.NUMBER, node.getAttribute("retries")));
+		act.addParameter(new Parameter("local device id", ValueType.NUMBER, node.getAttribute("local device id")));
+		act.addParameter(new Parameter("local device name", ValueType.STRING, node.getAttribute("local device name")));
+		act.addParameter(new Parameter("local device vendor", ValueType.STRING, node.getAttribute("local device vendor")));
+		act.addParameter(new Parameter("default refresh interval", ValueType.NUMBER, node.getAttribute("default refresh interval")));
+		node.createChild("edit").setAction(act).build().setSerializable(false);
+		
+//		act = new Action(Permission.READ, new CopyHandler());
+//		act.addParameter(new Parameter("name", ValueType.STRING));
+//		node.createChild("make copy").setAction(act).build().setSerializable(false);
 		
 		Network network;
 		if (isIP) {
@@ -105,6 +134,9 @@ class BacnetConn {
             //Thread.sleep(200000);
         } catch (Exception e) {
         	e.printStackTrace();
+        	//remove();
+        	localDevice.terminate();
+        	return;
         } finally {
             //localDevice.terminate();
         }
@@ -119,35 +151,14 @@ class BacnetConn {
         act.addParameter(new Parameter("cov usage", ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED")));
         act.addParameter(new Parameter("cov lease time (minutes)", ValueType.NUMBER, new Value(60)));
         node.createChild("add device").setAction(act).build().setSerializable(false);
-        
-        act = new Action(Permission.READ, new EditHandler());
-        if (isIP) {
-			act.addParameter(new Parameter("broadcast ip", ValueType.STRING, node.getAttribute("broadcast ip")));
-			act.addParameter(new Parameter("port", ValueType.NUMBER, node.getAttribute("port")));
-			act.addParameter(new Parameter("local bind address", ValueType.STRING, node.getAttribute("local bind address")));
-		} else {
-			act.addParameter(new Parameter("comm port id", ValueType.STRING, node.getAttribute("comm port id")));
-			act.addParameter(new Parameter("baud rate", ValueType.NUMBER, node.getAttribute("baud rate")));
-			act.addParameter(new Parameter("this station id", ValueType.NUMBER, node.getAttribute("this station id")));
-			act.addParameter(new Parameter("frame error retry count", ValueType.NUMBER, node.getAttribute("frame error retry count")));
-		}
-		act.addParameter(new Parameter("local network number", ValueType.NUMBER, node.getAttribute("local network number")));
-		act.addParameter(new Parameter("strict device comparisons", ValueType.BOOL, node.getAttribute("strict device comparisons")));
-		act.addParameter(new Parameter("timeout", ValueType.NUMBER, node.getAttribute("timeout")));
-		act.addParameter(new Parameter("segment timeout", ValueType.NUMBER, node.getAttribute("segment timeout")));
-		act.addParameter(new Parameter("segment window", ValueType.NUMBER, node.getAttribute("segment window")));
-		act.addParameter(new Parameter("retries", ValueType.NUMBER, node.getAttribute("retries")));
-		act.addParameter(new Parameter("local device id", ValueType.NUMBER, node.getAttribute("local device id")));
-		act.addParameter(new Parameter("local device name", ValueType.STRING, node.getAttribute("local device name")));
-		act.addParameter(new Parameter("local device vendor", ValueType.STRING, node.getAttribute("local device vendor")));
-		act.addParameter(new Parameter("default refresh interval", ValueType.NUMBER, node.getAttribute("default refresh interval")));
-		node.createChild("edit").setAction(act).build().setSerializable(false);
+	
 	}
 	
 	
 	
 	private class EditHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
+			String name = event.getParameter("name", ValueType.STRING).getString();
 			if (isIP) {
 				String bip = event.getParameter("broadcast ip", ValueType.STRING).getString();
 				int port = event.getParameter("port", ValueType.NUMBER).getNumber().intValue();
@@ -186,8 +197,13 @@ class BacnetConn {
 			node.setAttribute("local device name", new Value(locdevName));
 			node.setAttribute("local device vendor", new Value(locdevVend));
 			node.setAttribute("default refresh interval", new Value(interval));
-			
+
 			localDevice.terminate();
+			
+			if (!name.equals(node.getName())) {
+				rename(name);
+			}
+			
 			if (node.getChildren()!=null) {
 				for (Node child: node.getChildren().values()) {
 					if (child.getAction()!=null) node.removeChild(child);
@@ -199,11 +215,39 @@ class BacnetConn {
 	
 	private class RemoveHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
-			localDevice.terminate();
-			node.clearChildren();
-			node.getParent().removeChild(node);
+			remove();
 		}
 	}
+	
+	protected class CopyHandler implements Handler<ActionResult> {
+		public void handle(ActionResult event) {
+			String newname = event.getParameter("name", ValueType.STRING).getString();
+			if (newname.length() > 0 && !newname.equals(node.getName())) duplicate(newname);
+		}
+	}
+	
+	private void remove() {
+		localDevice.terminate();
+		node.clearChildren();
+		node.getParent().removeChild(node);
+	}
+	
+	protected void rename(String name) {
+		duplicate(name);
+		remove();
+	}
+	
+	protected void duplicate(String name) {
+		JsonObject jobj = link.copySerializer.serialize();
+		JsonObject parentobj = jobj.getObject("BACNET");
+		JsonObject nodeobj = parentobj.getObject(node.getName());
+		parentobj.putObject(name, nodeobj);
+		link.copyDeserializer.deserialize(jobj);
+		Node newnode = node.getParent().getChild(name);
+		BacnetConn bc = new BacnetConn(link, newnode);
+		bc.restoreLastSession();
+	}
+	
 	
 	public enum CovType {NONE, UNCONFIREMD, CONFIRMED}
 	
@@ -344,24 +388,28 @@ class BacnetConn {
 		init();
 		if (node.getChildren() == null) return;
 		for (Node child: node.getChildren().values()) {
-			Value mac = child.getAttribute("MAC address");
-			Value refint = child.getAttribute("refresh interval");
-			Value covtype = child.getAttribute("cov usage");
-			Value covlife = child.getAttribute("cov lease time (minutes)");
-			if (mac!=null && refint!=null && covtype!=null && covlife!=null) {
-				CovType ct = CovType.NONE;
-				try {
-					ct = CovType.valueOf(covtype.getString());
-				} catch (Exception e) {
-				}
-				
-				RemoteDevice dev = getDevice(mac.getString(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
-				DeviceNode dn = setupDeviceNode(dev, child.getName(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
-				if (dn!=null) dn.restoreLastSession();
-				else node.removeChild(child);
-			} else if (child.getAction() == null) {
-				node.removeChild(child);
+			restoreDevice(child);
+		}
+	}
+	
+	void restoreDevice(Node child) {
+		Value mac = child.getAttribute("MAC address");
+		Value refint = child.getAttribute("refresh interval");
+		Value covtype = child.getAttribute("cov usage");
+		Value covlife = child.getAttribute("cov lease time (minutes)");
+		if (mac!=null && refint!=null && covtype!=null && covlife!=null) {
+			CovType ct = CovType.NONE;
+			try {
+				ct = CovType.valueOf(covtype.getString());
+			} catch (Exception e) {
 			}
+			
+			RemoteDevice dev = getDevice(mac.getString(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
+			DeviceNode dn = setupDeviceNode(dev, child.getName(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
+			if (dn!=null) dn.restoreLastSession();
+			else node.removeChild(child);
+		} else if (child.getAction() == null) {
+			node.removeChild(child);
 		}
 	}
 }

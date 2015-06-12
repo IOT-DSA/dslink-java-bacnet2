@@ -12,6 +12,7 @@ import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.vertx.java.core.Handler;
+import org.vertx.java.core.json.JsonObject;
 
 import bacnet.BacnetConn.CovType;
 
@@ -69,6 +70,16 @@ public class DeviceFolder {
 		act.addParameter(new Parameter("use COV", ValueType.BOOL, new Value(false)));
 		act.addParameter(new Parameter("settable", ValueType.BOOL, new Value(false)));
 		node.createChild("add object").setAction(act).build().setSerializable(false);
+		
+		act = new Action(Permission.READ, new CopyHandler());
+		act.addParameter(new Parameter("name", ValueType.STRING));
+		node.createChild("make copy").setAction(act).build().setSerializable(false);
+	
+		if (!(this instanceof DeviceNode)) {
+			act = new Action(Permission.READ, new RenameHandler());
+			act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
+			node.createChild("rename").setAction(act).build().setSerializable(false);
+		}
 	}
 	
 	DeviceFolder(BacnetConn conn, Node node, DeviceNode root) {
@@ -363,9 +374,44 @@ public class DeviceFolder {
 		}
 	}
 	
+	protected class CopyHandler implements Handler<ActionResult> {
+		public void handle(ActionResult event) {
+			String newname = event.getParameter("name", ValueType.STRING).getString();
+			if (newname.length() > 0 && !newname.equals(node.getName())) duplicate(newname);
+		}
+	}
+	
+	protected class RenameHandler implements Handler<ActionResult> {
+		public void handle(ActionResult event) {
+			String newname = event.getParameter("name", ValueType.STRING).getString();
+			if (newname.length() > 0 && !newname.equals(node.getName())) rename(newname);
+		}
+	}
+	
 	protected void remove() {
 		node.clearChildren();
 		node.getParent().removeChild(node);
+	}
+	
+	protected void rename(String newname) {
+		duplicate(newname);
+		remove();
+	}
+
+	protected void duplicate(String name) {
+		JsonObject jobj = conn.link.copySerializer.serialize();
+		JsonObject parentobj = getParentJson(jobj, node);
+		JsonObject nodeobj = parentobj.getObject(node.getName());
+		parentobj.putObject(name, nodeobj);
+		conn.link.copyDeserializer.deserialize(jobj);
+		Node newnode = node.getParent().getChild(name);
+		DeviceFolder df = new DeviceFolder(conn, newnode, root);
+		df.restoreLastSession();
+	}
+
+	protected JsonObject getParentJson(JsonObject jobj, Node n) {
+		if (n == root.node) return root.getParentJson(jobj, n);
+		else return getParentJson(jobj, n.getParent()).getObject(n.getParent().getName());
 	}
 	
 	protected class AddFolderHandler implements Handler<ActionResult> {

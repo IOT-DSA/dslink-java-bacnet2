@@ -14,6 +14,8 @@ import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
+import org.dsa.iot.dslink.serializer.Deserializer;
+import org.dsa.iot.dslink.serializer.Serializer;
 import org.dsa.iot.dslink.util.Objects;
 import org.vertx.java.core.Handler;
 
@@ -27,15 +29,19 @@ public class BacnetLink {
 	
 	private Node node;
 	private final Map<Node, ScheduledFuture<?>> futures;
+	Serializer copySerializer;
+	Deserializer copyDeserializer;
 	
-	private BacnetLink(Node node) {
+	private BacnetLink(Node node, Serializer ser, Deserializer deser) {
 		this.node = node;
 		this.futures = new ConcurrentHashMap<Node, ScheduledFuture<?>>();
+		this.copyDeserializer = deser;
+		this.copySerializer = ser;
 	}
 	
-	public static void start(Node parent) {
+	public static void start(Node parent, Serializer ser, Deserializer deser) {
 		Node node = parent.createChild("BACNET").build();
-		final BacnetLink link = new BacnetLink(node);
+		final BacnetLink link = new BacnetLink(node, ser, deser);
 		link.init();
 	}
 	

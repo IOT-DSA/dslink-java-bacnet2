@@ -5,6 +5,8 @@ import org.dsa.iot.dslink.DSLinkFactory;
 import org.dsa.iot.dslink.DSLinkHandler;
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.NodeManager;
+import org.dsa.iot.dslink.serializer.Deserializer;
+import org.dsa.iot.dslink.serializer.Serializer;
 
 
 public class Main extends DSLinkHandler {
@@ -19,7 +21,9 @@ public class Main extends DSLinkHandler {
 	public void onResponderConnected(DSLink link){
 		NodeManager manager = link.getNodeManager();
         Node superRoot = manager.getNode("/").getNode();
-        BacnetLink.start(superRoot);
+        Serializer copyser = new Serializer(manager);
+		Deserializer copydeser = new Deserializer(manager);
+        BacnetLink.start(superRoot, copyser, copydeser);
 	}
 
 }

@@ -208,6 +208,10 @@ public class BacnetPoint {
 		act.addParameter(new Parameter("use COV", ValueType.BOOL, node.getAttribute("use COV")));
 		act.addParameter(new Parameter("settable", ValueType.BOOL, node.getAttribute("settable")));
     	node.createChild("edit").setAction(act).build().setSerializable(false);
+    	
+    	act = new Action(Permission.READ, new CopyHandler());
+    	act.addParameter(new Parameter("name", ValueType.STRING));
+    	node.createChild("make copy").setAction(act).build().setSerializable(false);
     
     }
     
@@ -244,7 +248,7 @@ public class BacnetPoint {
     private class EditHandler implements Handler<ActionResult> {
     	public void handle(ActionResult event) {
     		String newname = event.getParameter("name", ValueType.STRING).getString();
-    		if (newname!=null && !newname.equals(node.getName())) {
+    		if (newname!=null && newname.length()>0 && !newname.equals(node.getName())) {
     			parent.removeChild(node);
     			node = parent.createChild(newname).build();
     		}
@@ -271,6 +275,19 @@ public class BacnetPoint {
     	public void handle(ActionResult event) {
     		node.clearChildren();
     		parent.removeChild(node);
+    	}
+    }
+    
+    private class CopyHandler implements Handler<ActionResult> {
+    	public void handle(ActionResult event) {
+    		String name = event.getParameter("name", ValueType.STRING).getString();
+    		Node newnode = parent.createChild(name).build();
+    		newnode.setAttribute("object type", new Value(objectTypeDescription));
+        	newnode.setAttribute("object instance number", new Value(instanceNumber));
+        	newnode.setAttribute("use COV", new Value(cov));
+        	newnode.setAttribute("settable", new Value(settable));
+        	newnode.setAttribute("restore type", new Value("point"));
+        	new BacnetPoint(folder, parent, newnode);
     	}
     }
 
