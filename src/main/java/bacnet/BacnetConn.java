@@ -78,7 +78,7 @@ class BacnetConn {
 		int locdevId = node.getAttribute("local device id").getNumber().intValue();
 		String locdevName = node.getAttribute("local device name").getString();
 		String locdevVend = node.getAttribute("local device vendor").getString();
-		defaultInterval = node.getAttribute("default refresh interval").getNumber().longValue();
+		defaultInterval = node.getAttribute("default polling interval").getNumber().longValue();
 		
 		Action act = new Action(Permission.READ, new RemoveHandler());
         node.createChild("remove").setAction(act).build().setSerializable(false);
@@ -104,7 +104,7 @@ class BacnetConn {
 		act.addParameter(new Parameter("local device id", ValueType.NUMBER, node.getAttribute("local device id")));
 		act.addParameter(new Parameter("local device name", ValueType.STRING, node.getAttribute("local device name")));
 		act.addParameter(new Parameter("local device vendor", ValueType.STRING, node.getAttribute("local device vendor")));
-		act.addParameter(new Parameter("default refresh interval", ValueType.NUMBER, node.getAttribute("default refresh interval")));
+		act.addParameter(new Parameter("default polling interval", ValueType.NUMBER, node.getAttribute("default polling interval")));
 		node.createChild("edit").setAction(act).build().setSerializable(false);
 		
 //		act = new Action(Permission.READ, new CopyHandler());
@@ -158,7 +158,7 @@ class BacnetConn {
         act = new Action(Permission.READ, new AddDeviceHandler());
         act.addParameter(new Parameter("name", ValueType.STRING));
         act.addParameter(new Parameter("MAC address", ValueType.STRING, new Value("10.0.1.248:47808")));
-        act.addParameter(new Parameter("refresh interval", ValueType.NUMBER, new Value(defaultInterval)));
+        act.addParameter(new Parameter("polling interval", ValueType.NUMBER, new Value(defaultInterval)));
         act.addParameter(new Parameter("cov usage", ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED")));
         act.addParameter(new Parameter("cov lease time (minutes)", ValueType.NUMBER, new Value(60)));
         node.createChild("add device").setAction(act).build().setSerializable(false);
@@ -196,7 +196,7 @@ class BacnetConn {
 			int locdevId = event.getParameter("local device id", ValueType.NUMBER).getNumber().intValue();
 			String locdevName = event.getParameter("local device name", ValueType.STRING).getString();
 			String locdevVend = event.getParameter("local device vendor", ValueType.STRING).getString();
-			long interval = event.getParameter("default refresh interval", ValueType.NUMBER).getNumber().longValue();
+			long interval = event.getParameter("default polling interval", ValueType.NUMBER).getNumber().longValue();
 			
 			node.setAttribute("local network number", new Value(lnn));
 			node.setAttribute("strict device comparisons", new Value(strict));
@@ -207,7 +207,7 @@ class BacnetConn {
 			node.setAttribute("local device id", new Value(locdevId));
 			node.setAttribute("local device name", new Value(locdevName));
 			node.setAttribute("local device vendor", new Value(locdevVend));
-			node.setAttribute("default refresh interval", new Value(interval));
+			node.setAttribute("default polling interval", new Value(interval));
 
 			localDevice.terminate();
 			
@@ -250,7 +250,7 @@ class BacnetConn {
 	
 	protected void duplicate(String name) {
 		JsonObject jobj = link.copySerializer.serialize();
-		JsonObject parentobj = jobj.getObject("BACNET");
+		JsonObject parentobj = jobj;
 		JsonObject nodeobj = parentobj.getObject(node.getName());
 		parentobj.putObject(name, nodeobj);
 		link.copyDeserializer.deserialize(jobj);
@@ -267,7 +267,7 @@ class BacnetConn {
 			String name = null;
 			Value namev = event.getParameter("name", ValueType.STRING);
 			if (namev != null) name = namev.getString();
-			long interval = event.getParameter("refresh interval", ValueType.NUMBER).getNumber().longValue();
+			long interval = event.getParameter("polling interval", ValueType.NUMBER).getNumber().longValue();
 			CovType covtype = CovType.NONE;
 			try {
 				covtype = CovType.valueOf(event.getParameter("cov usage").getString());
@@ -351,7 +351,7 @@ class BacnetConn {
                 public boolean requestProgress(double progress, ObjectIdentifier oid,
                         PropertyIdentifier pid, UnsignedInteger pin, Encodable value) {
                     if (pid.equals(PropertyIdentifier.objectName)) {
-                    	if (value instanceof BACnetError) {
+                    	if (value instanceof BACnetError || value.toString().trim().length() < 1) {
                     		d.setName("unnamed device " + unnamedCount);
                     		unnamedCount += 1;
                     	} else {
@@ -387,7 +387,7 @@ class BacnetConn {
         		mac = Byte.toString(d.getAddress().getMacAddress().getMstpAddress());
         	}
         	child.setAttribute("MAC address", new Value(mac));
-        	child.setAttribute("refresh interval", new Value(interval));
+        	child.setAttribute("polling interval", new Value(interval));
         	child.setAttribute("cov usage", new Value(covtype.toString()));
         	child.setAttribute("cov lease time (minutes)", new Value(covlife));
         	return new DeviceNode(getMe(), child, d);
@@ -424,7 +424,7 @@ class BacnetConn {
 	
 	void restoreDevice(Node child) {
 		Value mac = child.getAttribute("MAC address");
-		Value refint = child.getAttribute("refresh interval");
+		Value refint = child.getAttribute("polling interval");
 		Value covtype = child.getAttribute("cov usage");
 		Value covlife = child.getAttribute("cov lease time (minutes)");
 		if (mac!=null && refint!=null && covtype!=null && covlife!=null) {

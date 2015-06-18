@@ -25,7 +25,7 @@ public class DeviceNode extends DeviceFolder {
 		this.device = d;
 		this.root = this;
 		
-		this.interval = node.getAttribute("refresh interval").getNumber().longValue();
+		this.interval = node.getAttribute("polling interval").getNumber().longValue();
 		this.covType = CovType.NONE;
 		try {
 			this.covType = CovType.valueOf(node.getAttribute("cov usage").getString());
@@ -39,7 +39,7 @@ public class DeviceNode extends DeviceFolder {
 		Action act = new Action(Permission.READ, new EditHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
 		act.addParameter(new Parameter("MAC address", ValueType.STRING, node.getAttribute("MAC address")));
-	    act.addParameter(new Parameter("refresh interval", ValueType.NUMBER, node.getAttribute("refresh interval")));
+	    act.addParameter(new Parameter("polling interval", ValueType.NUMBER, node.getAttribute("polling interval")));
 	    act.addParameter(new Parameter("cov usage", ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED"), node.getAttribute("cov usage")));
 	    act.addParameter(new Parameter("cov lease time (minutes)", ValueType.NUMBER, node.getAttribute("cov lease time (minutes)")));
 	    node.createChild("edit").setAction(act).build().setSerializable(false);
@@ -48,7 +48,7 @@ public class DeviceNode extends DeviceFolder {
 	private class EditHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			String name = event.getParameter("name", ValueType.STRING).getString();
-			long interv = event.getParameter("refresh interval", ValueType.NUMBER).getNumber().longValue();
+			long interv = event.getParameter("polling interval", ValueType.NUMBER).getNumber().longValue();
 			CovType covtype = CovType.NONE;
 			try {
 				covtype = CovType.valueOf(event.getParameter("cov usage").getString());
@@ -66,7 +66,7 @@ public class DeviceNode extends DeviceFolder {
         		mac = Byte.toString(d.getAddress().getMacAddress().getMstpAddress());
         	}
         	node.setAttribute("MAC address", new Value(mac));
-	        node.setAttribute("refresh interval", new Value(interval));
+	        node.setAttribute("polling interval", new Value(interval));
 	        node.setAttribute("cov usage", new Value(covtype.toString()));
 	        node.setAttribute("cov lease time (minutes)", new Value(covlife));
 	        
@@ -93,7 +93,7 @@ public class DeviceNode extends DeviceFolder {
 	}
 	
 	protected JsonObject getParentJson(JsonObject jobj, Node n) {
-		return jobj.getObject("BACNET").getObject(conn.node.getName());
+		return jobj.getObject(conn.node.getName());
 	}
 	
 }

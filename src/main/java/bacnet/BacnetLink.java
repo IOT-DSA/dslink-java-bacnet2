@@ -45,7 +45,7 @@ public class BacnetLink {
 	}
 	
 	public static void start(Node parent, Serializer ser, Deserializer deser) {
-		Node node = parent.createChild("BACNET").build();
+		Node node = parent;
 		final BacnetLink link = new BacnetLink(node, ser, deser);
 		link.init();
 	}
@@ -68,7 +68,7 @@ public class BacnetLink {
 		act.addParameter(new Parameter("local device id", ValueType.NUMBER, new Value(1212)));
 		act.addParameter(new Parameter("local device name", ValueType.STRING, new Value("DSLink")));
 		act.addParameter(new Parameter("local device vendor", ValueType.STRING, new Value("DGLogik Inc.")));
-		act.addParameter(new Parameter("default refresh interval", ValueType.NUMBER, new Value(5)));
+		act.addParameter(new Parameter("default polling interval", ValueType.NUMBER, new Value(5)));
 		node.createChild("add ip connection").setAction(act).build().setSerializable(false);
 		
 //		act = new Action(Permission.READ, new RxtxSetupHandler());
@@ -90,7 +90,7 @@ public class BacnetLink {
 		act.addParameter(new Parameter("local device id", ValueType.NUMBER, new Value(1212)));
 		act.addParameter(new Parameter("local device name", ValueType.STRING, new Value("DSLink")));
 		act.addParameter(new Parameter("local device vendor", ValueType.STRING, new Value("DGLogik Inc.")));
-		act.addParameter(new Parameter("default refresh interval", ValueType.NUMBER, new Value(5)));
+		act.addParameter(new Parameter("default polling interval", ValueType.NUMBER, new Value(5)));
 		node.createChild("add mstp connection").setAction(act).build().setSerializable(false);
 	}
 	
@@ -114,7 +114,7 @@ public class BacnetLink {
 			Value locdevId = child.getAttribute("local device id");
 			Value locdevName = child.getAttribute("local device name");
 			Value locdevVend = child.getAttribute("local device vendor");
-			Value interval = child.getAttribute("default refresh interval");
+			Value interval = child.getAttribute("default polling interval");
 			if (isip!=null && bip!=null && port!=null && lba!=null && commPort!=null 
 					&& baud!=null && station!=null && ferc!=null && lnn!=null && 
 					strict!=null && timeout!=null && segtimeout!=null && segwin!=null 
@@ -211,7 +211,7 @@ public class BacnetLink {
 			int locdevId = event.getParameter("local device id", ValueType.NUMBER).getNumber().intValue();
 			String locdevName = event.getParameter("local device name", ValueType.STRING).getString();
 			String locdevVend = event.getParameter("local device vendor", ValueType.STRING).getString();
-			long interval = event.getParameter("default refresh interval", ValueType.NUMBER).getNumber().longValue();
+			long interval = event.getParameter("default polling interval", ValueType.NUMBER).getNumber().longValue();
 			
 			Node child = node.createChild(name).build();
 			child.setAttribute("isIP", new Value(isIP));
@@ -231,7 +231,7 @@ public class BacnetLink {
 			child.setAttribute("local device id", new Value(locdevId));
 			child.setAttribute("local device name", new Value(locdevName));
 			child.setAttribute("local device vendor", new Value(locdevVend));
-			child.setAttribute("default refresh interval", new Value(interval));
+			child.setAttribute("default polling interval", new Value(interval));
 
 			BacnetConn conn = new BacnetConn(getMe(), child);
 			conn.init();

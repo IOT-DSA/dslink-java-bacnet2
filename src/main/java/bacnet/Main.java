@@ -18,7 +18,7 @@ public class Main extends DSLinkHandler {
 	public static void main(String[] args) {
 		
 		//args = new String[] { "-b", "http://localhost:8080/conn", "-l", "debug" };
-		DSLinkFactory.startResponder("bacnetResponder", args, new Main());
+		DSLinkFactory.startResponder("BACnet", args, new Main());
 	}
 	
 	@Override
