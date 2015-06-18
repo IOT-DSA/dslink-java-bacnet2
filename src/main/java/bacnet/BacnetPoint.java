@@ -22,13 +22,17 @@ import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.obj.ObjectProperties;
 import com.serotonin.bacnet4j.service.confirmed.WritePropertyRequest;
 import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.constructed.BACnetError;
+import com.serotonin.bacnet4j.type.constructed.PriorityArray;
 import com.serotonin.bacnet4j.type.enumerated.BinaryPV;
 import com.serotonin.bacnet4j.type.enumerated.LifeSafetyState;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
+import com.serotonin.bacnet4j.type.primitive.Null;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.Real;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
+import com.serotonin.bacnet4j.util.RequestUtils;
 
 import bacnet.DeviceFolder.DataType;
 
@@ -232,6 +236,10 @@ public class BacnetPoint {
     }
     
     private class SetHandler implements Handler<ActionResult> {
+    	private int priority;
+    	SetHandler(int p) {
+    		priority = p;
+    	}
     	public void handle(ActionResult event) {
     		String newval = event.getParameter("value", ValueType.STRING).getString();
     		if (dataType == DataType.BINARY) {
@@ -244,12 +252,17 @@ public class BacnetPoint {
     		}
     		Encodable enc = valueToEncodable(newval, oid.getObjectType(), pid);
     		try {
-				folder.conn.localDevice.send(folder.root.device, new WritePropertyRequest(oid, pid, null, enc, new UnsignedInteger(1)));
-			} catch (BACnetException e) {
+				folder.conn.localDevice.send(folder.root.device, new WritePropertyRequest(oid, pid, null, enc, new UnsignedInteger(priority)));
+				Thread.sleep(500);
+    		} catch (BACnetException e) {
 				// TODO Auto-generated catch block
 				//e.printStackTrace();
 				LOGGER.debug("error: ", e);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				LOGGER.debug("error: ", e);
 			}
+    		refreshPriorities();
     	}
     }
     
@@ -446,7 +459,7 @@ public class BacnetPoint {
         
         switch (dataType) {
         case BINARY: {
-        	boolean b = Boolean.parseBoolean(value) || Integer.parseInt(value) == 1;
+        	boolean b = Boolean.parseBoolean(value);
             if (clazz == BinaryPV.class) {
                 if (b)
                     return BinaryPV.active;
@@ -481,7 +494,7 @@ public class BacnetPoint {
         }
         case ALPHANUMERIC: {
             if (clazz == BinaryPV.class) {
-                if (Boolean.parseBoolean(value) || Integer.parseInt(value) == 1)
+                if (Boolean.parseBoolean(value))
                     return BinaryPV.active;
                 return BinaryPV.inactive;
             }
@@ -540,13 +553,92 @@ public class BacnetPoint {
         	LOGGER.info("presentValue updated to " + presentValue);
         	
         	vnode.removeChild("set");
-        	if (settable) makeSetAction(vnode);
+        	if (settable) {
+        		makeSetAction(vnode, 8);
+        		makeRelinquishAction(vnode, 8);
+        		Action act = new Action(Permission.READ, new RelinquishAllHandler());
+        		vnode.createChild("relinquish all").setAction(act).build().setSerializable(false);
+        		refreshPriorities();
+        	}
         }
 		
     }
     
-    private void makeSetAction(Node valnode) {
-    	Action act = new Action(Permission.READ, new SetHandler());
+    private void refreshPriorities() {
+    	Node vnode = node.getChild("presentValue");
+    	PriorityArray priorities;
+		try {
+			priorities = getPriorityArray();
+		} catch (BACnetException e) {
+			// TODO Auto-generated catch block
+			LOGGER.error("error: ", e);
+			return;
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			LOGGER.error("error: ", e);
+			return;
+		}
+		for (int i=1; i<=priorities.getCount(); i++) {
+			String p = priorities.get(i).getValue().toString();
+			Node pnode = vnode.getChild("Priority "+i);
+			if (pnode != null) pnode.setValue(new Value(p));
+			else pnode = vnode.createChild("Priority "+i).setValueType(ValueType.STRING).setValue(new Value(p)).build();
+			makeSetAction(pnode, i);
+			makeRelinquishAction(pnode, i);
+		}
+    }
+    
+    private void makeRelinquishAction(Node valnode, int priority) {
+    	Action act = new Action(Permission.READ, new RelinquishHandler(priority));
+    	valnode.createChild("relinquish").setAction(act).build().setSerializable(false);
+    }
+    
+    private PriorityArray getPriorityArray() throws Exception {
+			Encodable e = RequestUtils.getProperty(folder.conn.localDevice, folder.root.device, oid, PropertyIdentifier.priorityArray);
+			if (e instanceof BACnetError) throw new Exception("got BACnetError: " + e.toString());
+			return (PriorityArray) e;
+    }
+    
+    private class RelinquishAllHandler implements Handler<ActionResult> {
+    	public void handle(ActionResult event) {
+			try {
+				PriorityArray priorities = getPriorityArray();
+				for (int i=1; i<=priorities.getCount(); i++) {
+	    			relinquish(i);
+	    			refreshPriorities();
+	    		}
+			} catch (BACnetException e) {
+				// TODO Auto-generated catch block
+				LOGGER.error("error: ", e);
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				LOGGER.error("error: ", e);
+			}	
+    	}
+    }
+    
+    private class RelinquishHandler implements Handler<ActionResult> {
+    	private int priority;
+    	RelinquishHandler(int p) {
+    		priority = p;
+    	}
+    	public void handle(ActionResult event) {
+    		relinquish(priority);
+    		refreshPriorities();
+    	}
+    }
+    
+    private void relinquish(int priority) {
+    	try {
+    		folder.conn.localDevice.send(folder.root.device, new WritePropertyRequest(oid, pid, null, new Null(), new UnsignedInteger(priority)));
+		} catch (BACnetException e) {
+			// TODO Auto-generated catch block
+			LOGGER.error("error: ", e);
+		}
+    }
+    
+    private void makeSetAction(Node valnode, int priority) {
+    	Action act = new Action(Permission.READ, new SetHandler(priority));
     	Parameter par;
     	switch(dataType) {
     	case BINARY: {

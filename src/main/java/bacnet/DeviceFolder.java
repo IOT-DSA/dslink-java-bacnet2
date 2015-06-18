@@ -286,6 +286,11 @@ public class DeviceFolder {
         addPropertyReferences(refs, oid);
 
         BacnetPoint pt = new BacnetPoint(this, node, oid);
+        
+        boolean defaultSettable = isOneOf(oid.getObjectType(), ObjectType.analogOutput, ObjectType.analogValue, ObjectType.binaryOutput,
+                ObjectType.binaryValue, ObjectType.multiStateOutput, ObjectType.multiStateValue);
+        pt.setSettable(defaultSettable);
+        
 
         points.put(oid, pt);
     }

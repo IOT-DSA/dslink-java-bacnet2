@@ -60,7 +60,12 @@ public class DeviceNode extends DeviceFolder {
 			conn.getDeviceProps(d);
 			interval = interv;
 			covType = covtype;
-	        node.setAttribute("MAC address", new Value(d.getAddress().getMacAddress().toIpPortString()));
+        	try {
+        		mac = d.getAddress().getMacAddress().toIpPortString();
+        	} catch (Exception e) {
+        		mac = Byte.toString(d.getAddress().getMacAddress().getMstpAddress());
+        	}
+        	node.setAttribute("MAC address", new Value(mac));
 	        node.setAttribute("refresh interval", new Value(interval));
 	        node.setAttribute("cov usage", new Value(covtype.toString()));
 	        node.setAttribute("cov lease time (minutes)", new Value(covlife));

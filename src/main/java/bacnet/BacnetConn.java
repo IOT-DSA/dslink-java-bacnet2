@@ -27,6 +27,7 @@ import com.serotonin.bacnet4j.npdu.mstp.MstpNetwork;
 import com.serotonin.bacnet4j.service.unconfirmed.WhoIsRequest;
 import com.serotonin.bacnet4j.transport.Transport;
 import com.serotonin.bacnet4j.type.constructed.Address;
+import com.serotonin.bacnet4j.type.constructed.BACnetError;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
@@ -46,6 +47,7 @@ class BacnetConn {
 	private long defaultInterval;
 	BacnetLink link;
 	boolean isIP;
+	private int unnamedCount;
 	
 	static {
 		LOGGER = LoggerFactory.getLogger(BacnetConn.class);
@@ -57,6 +59,7 @@ class BacnetConn {
 	}
 	
 	void init() {
+		unnamedCount = 0;
 		
 		isIP = node.getAttribute("isIP").getBool();
 		String bip = node.getAttribute("broadcast ip").getString();
@@ -257,7 +260,7 @@ class BacnetConn {
 	}
 	
 	
-	public enum CovType {NONE, UNCONFIREMD, CONFIRMED}
+	public enum CovType {NONE, UNCONFIRMED, CONFIRMED}
 	
 	private class AddDeviceHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
@@ -289,6 +292,8 @@ class BacnetConn {
 			// TODO Auto-generated catch block
 			//e.printStackTrace();
 			LOGGER.debug("error: ", e);
+		} catch (Exception e1) {
+			LOGGER.debug("error: ", e1);
 		} finally {
 			int waitlength = 0; 
 			while (devs.size() < 1 && waitlength < 10000)  {
@@ -303,6 +308,7 @@ class BacnetConn {
 			}
 			localDevice.getEventHandler().removeListener(dl);
 		}
+		if (devs.size() < 1) return null;
 		return devs.get(0);
 	}
 	
@@ -313,15 +319,15 @@ class BacnetConn {
 			localDevice.getEventHandler().addListener(dl);
 			try {
 				localDevice.sendGlobalBroadcast(new WhoIsRequest());
-				Thread.sleep(5000);
+				Thread.sleep(10000);
 			} catch (BACnetException e) {
 				// TODO Auto-generated catch block
 				//e.printStackTrace();
-				LOGGER.debug("error: ", e);
+				LOGGER.error("error: ", e);
 			} catch (InterruptedException e) {
 				// TODO Auto-generated catch block
 				//e.printStackTrace();
-				LOGGER.debug("error: ", e);
+				LOGGER.error("error: ", e);
 			} finally {
 				localDevice.getEventHandler().removeListener(dl);
 				setupDeviceNodes(devs);
@@ -344,16 +350,21 @@ class BacnetConn {
             RequestUtils.getProperties(ld, d, new RequestListener() {
                 public boolean requestProgress(double progress, ObjectIdentifier oid,
                         PropertyIdentifier pid, UnsignedInteger pin, Encodable value) {
-                    if (pid.equals(PropertyIdentifier.objectName))
-                        d.setName(value.toString());
-                    else if (pid.equals(PropertyIdentifier.vendorName))
-                        d.setVendorName(value.toString());
-                    else if (pid.equals(PropertyIdentifier.modelName))
-                        d.setModelName(value.toString());
+                    if (pid.equals(PropertyIdentifier.objectName)) {
+                    	if (value instanceof BACnetError) {
+                    		d.setName("unnamed device " + unnamedCount);
+                    		unnamedCount += 1;
+                    	} else {
+                    		d.setName(value.toString());
+                    	}
+                    }
+//                    else if (pid.equals(PropertyIdentifier.vendorName))
+//                        d.setVendorName(value.toString());
+//                    else if (pid.equals(PropertyIdentifier.modelName))
+//                        d.setModelName(value.toString());
                     return false;
                 }
-            }, PropertyIdentifier.objectName, PropertyIdentifier.vendorName,
-                    PropertyIdentifier.modelName);
+            }, PropertyIdentifier.objectName);
         }
         catch (Exception e) {
            // e.printStackTrace();
@@ -363,12 +374,19 @@ class BacnetConn {
 	}
 	
 	DeviceNode setupDeviceNode(final RemoteDevice d, String name, long interval, CovType covtype, int covlife) {
+		if (d == null) return null;
 		getDeviceProps(d);
 		if (name == null) name = d.getName();
         if (name != null) {
         	Node child = node.getChild(name);
         	if (child == null) child = node.createChild(name).build();
-        	child.setAttribute("MAC address", new Value(d.getAddress().getMacAddress().toIpPortString()));
+        	String mac;
+        	try {
+        		mac = d.getAddress().getMacAddress().toIpPortString();
+        	} catch (Exception e) {
+        		mac = Byte.toString(d.getAddress().getMacAddress().getMstpAddress());
+        	}
+        	child.setAttribute("MAC address", new Value(mac));
         	child.setAttribute("refresh interval", new Value(interval));
         	child.setAttribute("cov usage", new Value(covtype.toString()));
         	child.setAttribute("cov lease time (minutes)", new Value(covlife));
