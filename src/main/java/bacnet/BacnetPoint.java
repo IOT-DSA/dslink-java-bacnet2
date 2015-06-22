@@ -8,10 +8,12 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
+import org.dsa.iot.dslink.node.Writable;
 import org.dsa.iot.dslink.node.actions.Action;
 import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
+import org.dsa.iot.dslink.node.value.ValuePair;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,8 +86,8 @@ public class BacnetPoint {
 
         if (DeviceFolder.isOneOf(oid.getObjectType(), ObjectType.binaryInput, ObjectType.binaryOutput,
                 ObjectType.binaryValue)) {
-            getUnitsDescription().add("");
-            getUnitsDescription().add("");
+            getUnitsDescription().add("0");
+            getUnitsDescription().add("1");
         }
     }
     
@@ -108,8 +110,8 @@ public class BacnetPoint {
 
         if (DeviceFolder.isOneOf(ot, ObjectType.binaryInput, ObjectType.binaryOutput,
                 ObjectType.binaryValue)) {
-            getUnitsDescription().add("");
-            getUnitsDescription().add("");
+            getUnitsDescription().add("0");
+            getUnitsDescription().add("1");
         }
         setupNode();
     }
@@ -246,28 +248,50 @@ public class BacnetPoint {
     	}
     	public void handle(ActionResult event) {
     		String newval = event.getParameter("value", ValueType.STRING).getString();
-    		if (dataType == DataType.BINARY) {
-    			String on = (unitsDescription.size() > 1) ? unitsDescription.get(1) : "1";
-    			newval = String.valueOf(newval.equals(on));
-    		} else if (dataType == DataType.MULTISTATE) {
-    			int i = unitsDescription.indexOf(newval);
-    			if (i == -1) return;
-    			newval = String.valueOf(i);
-    		}
-    		Encodable enc = valueToEncodable(newval, oid.getObjectType(), pid);
-    		try {
-				folder.conn.localDevice.send(folder.root.device, new WritePropertyRequest(oid, pid, null, enc, new UnsignedInteger(priority)));
-				Thread.sleep(500);
-    		} catch (BACnetException e) {
-				// TODO Auto-generated catch block
-				//e.printStackTrace();
-				LOGGER.debug("error: ", e);
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				LOGGER.debug("error: ", e);
-			}
-    		refreshPriorities();
+    		handleSet(newval, priority, false);
     	}
+    }
+    
+    private class RawSetHandler implements Handler<ValuePair> {
+    	private int priority;
+    	RawSetHandler(int p) {
+    		priority = p;
+    	}
+    	public void handle(ValuePair event) {
+    		if (!event.isFromExternalSource()) return;
+    		String newval = event.getCurrent().getString();
+    		handleSet(newval, priority, true);
+    	}
+    }
+    
+    private void handleSet(String newval, int priority, boolean raw) {
+    	if (dataType == DataType.BINARY) {
+			if (raw) {
+				newval = String.valueOf(Boolean.parseBoolean(newval) || newval.equals("1"));
+			} else {
+				String on = (unitsDescription.size() > 1) ? unitsDescription.get(1) : "1";
+				newval = String.valueOf(newval.equals(on));
+			}
+		} else if (dataType == DataType.MULTISTATE) {
+			if (!raw) {
+				int i = unitsDescription.indexOf(newval);
+				if (i == -1) return;
+				newval = String.valueOf(i);
+			}
+		}
+		Encodable enc = valueToEncodable(newval, oid.getObjectType(), pid);
+		try {
+			folder.conn.localDevice.send(folder.root.device, new WritePropertyRequest(oid, pid, null, enc, new UnsignedInteger(priority)));
+			Thread.sleep(500);
+		} catch (BACnetException e) {
+			// TODO Auto-generated catch block
+			//e.printStackTrace();
+			LOGGER.debug("error: ", e);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			LOGGER.debug("error: ", e);
+		}
+		refreshPriorities();
     }
     
     private class EditHandler implements Handler<ActionResult> {
@@ -288,8 +312,8 @@ public class BacnetPoint {
 
             if (DeviceFolder.isOneOf(ot, ObjectType.binaryInput, ObjectType.binaryOutput,
                     ObjectType.binaryValue)) {
-                getUnitsDescription().add("");
-                getUnitsDescription().add("");
+                getUnitsDescription().add("0");
+                getUnitsDescription().add("1");
             }
     		setupNode();
     		folder.conn.link.setupPoint(getMe(), folder);
@@ -463,7 +487,7 @@ public class BacnetPoint {
         
         switch (dataType) {
         case BINARY: {
-        	boolean b = Boolean.parseBoolean(value);
+        	boolean b = (Boolean.parseBoolean(value) || value.equals("1"));
             if (clazz == BinaryPV.class) {
                 if (b)
                     return BinaryPV.active;
@@ -498,7 +522,7 @@ public class BacnetPoint {
         }
         case ALPHANUMERIC: {
             if (clazz == BinaryPV.class) {
-                if (Boolean.parseBoolean(value))
+                if (Boolean.parseBoolean(value) || value.equals("1"))
                     return BinaryPV.active;
                 return BinaryPV.inactive;
             }
@@ -558,11 +582,23 @@ public class BacnetPoint {
 			String prettyVal = getPrettyPresentValue(objectTypeId, presentValue, unitsDescription, referenceObjectTypeDescription, referenceInstanceNumber, referenceDeviceId);
 			node.setValueType(ValueType.STRING);
 			node.setValue(new Value(prettyVal));
-        	if (vnode != null) vnode.setValue(new Value(prettyVal));
+			node.removeChild("units");
+        	if (vnode != null) {
+        		if (!(DeviceFolder.isOneOf(objectTypeId, ObjectType.binaryInput, ObjectType.binaryOutput,
+        				ObjectType.binaryValue, ObjectType.multiStateInput, ObjectType.multiStateOutput, 
+        				ObjectType.multiStateValue, ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone,
+        				ObjectType.trendLog)) && unitsDescription.size() > 0) {
+        			vnode.setValue(new Value(presentValue));
+        			node.createChild("units").setValueType(ValueType.STRING).setValue(new Value(unitsDescription.get(0))).build();
+        		} else {
+        			vnode.setValue(new Value(prettyVal));
+        		}
+        	}
         	else vnode = node.createChild("present value").setValueType(ValueType.STRING).setValue(new Value(prettyVal)).build();
         	LOGGER.info("presentValue updated to " + presentValue);
 		}
-        	vnode.removeChild("set");
+        	vnode.clearChildren();
+        	vnode.setWritable(Writable.NEVER);
         	if (settable) {
         		makeSetAction(vnode, 8);
         		if (pa == null) {
@@ -692,7 +728,9 @@ public class BacnetPoint {
     	}
     	}
     	act.addParameter(par);
-    	valnode.createChild("set").setAction(act).build().setSerializable(false);
+    	valnode.createChild("setPretty").setAction(act).build().setSerializable(false);
+    	valnode.setWritable(Writable.WRITE);
+    	valnode.getListener().setValueHandler(new RawSetHandler(priority));
     }
     
     public static String getPrettyPresentValue(int objectTypeId, String presentValue, List<String> unitsDescription,
