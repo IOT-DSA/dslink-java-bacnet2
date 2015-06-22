@@ -1,7 +1,7 @@
 package bacnet;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedList;
+import java.util.Queue;
 
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
@@ -283,7 +283,7 @@ class BacnetConn {
 	}
 	
 	RemoteDevice getDevice(String mac, long interval, CovType covtype, int covlife) {
-		ArrayList<RemoteDevice> devs = new ArrayList<RemoteDevice>();
+		Queue<RemoteDevice> devs = new LinkedList<RemoteDevice>();
 		DiscoveryListener dl = new DiscoveryListener(devs);
 		localDevice.getEventHandler().addListener(dl);
 		try {
@@ -295,11 +295,12 @@ class BacnetConn {
 		} catch (Exception e1) {
 			LOGGER.debug("error: ", e1);
 		} finally {
-			int waitlength = 0; 
-			while (devs.size() < 1 && waitlength < 10000)  {
+			int totaltime = 0;
+			int waittime = 500; 
+			while (devs.size() < 1 && totaltime < 10000)  {
 				try {
-					waitlength += 100;
-					Thread.sleep(100);
+					totaltime += waittime;
+					Thread.sleep(waittime);
 				} catch (InterruptedException e) {
 					// TODO Auto-generated catch block
 					//e.printStackTrace();
@@ -308,18 +309,26 @@ class BacnetConn {
 			}
 			localDevice.getEventHandler().removeListener(dl);
 		}
-		if (devs.size() < 1) return null;
-		return devs.get(0);
+		return devs.poll();
 	}
 	
 	private class DeviceDiscoveryHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
-			ArrayList<RemoteDevice> devs = new ArrayList<RemoteDevice>();
+			Queue<RemoteDevice> devs = new LinkedList<RemoteDevice>();
 			DiscoveryListener dl = new DiscoveryListener(devs);
 			localDevice.getEventHandler().addListener(dl);
 			try {
 				localDevice.sendGlobalBroadcast(new WhoIsRequest());
-				Thread.sleep(10000);
+				int totaltime = 0;
+				int waittime = 500;
+				while (totaltime <= 15000 || devs.size() > 0) {
+					Thread.sleep(waittime);
+					totaltime += waittime;
+					RemoteDevice d = devs.poll();
+					if (d != null) {
+						setupDeviceNode(d, null, defaultInterval, CovType.NONE, 60);
+					}
+				}
 			} catch (BACnetException e) {
 				// TODO Auto-generated catch block
 				//e.printStackTrace();
@@ -330,16 +339,15 @@ class BacnetConn {
 				LOGGER.error("error: ", e);
 			} finally {
 				localDevice.getEventHandler().removeListener(dl);
-				setupDeviceNodes(devs);
 			}
 		}
 	}
 	
-	private void setupDeviceNodes(List<RemoteDevice> devices) {
-		for (RemoteDevice d: devices) {
-			setupDeviceNode(d, null, defaultInterval, CovType.NONE, 60);
-		}
-	}
+//	private void setupDeviceNodes(List<RemoteDevice> devices) {
+//		for (RemoteDevice d: devices) {
+//			setupDeviceNode(d, null, defaultInterval, CovType.NONE, 60);
+//		}
+//	}
 	
 	void getDeviceProps(final RemoteDevice d) {
 		LocalDevice ld = localDevice;
@@ -397,9 +405,9 @@ class BacnetConn {
 	
 	private static class DiscoveryListener extends DeviceEventAdapter {
 		
-		private List<RemoteDevice> devices;
+		private Queue<RemoteDevice> devices;
 		
-		DiscoveryListener(List<RemoteDevice> devs) {
+		DiscoveryListener(Queue<RemoteDevice> devs) {
 			devices = devs;
 		}
 		

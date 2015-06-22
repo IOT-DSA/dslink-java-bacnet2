@@ -17,6 +17,8 @@ import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.serializer.Deserializer;
 import org.dsa.iot.dslink.serializer.Serializer;
 import org.dsa.iot.dslink.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.vertx.java.core.Handler;
 
 import bacnet.BacnetConn.CovType;
@@ -26,16 +28,16 @@ import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.util.PropertyReferences;
 
 public class BacnetLink {
-//	private static final Logger LOGGER;
+	private static final Logger LOGGER;
 	
 	private Node node;
 	private final Map<Node, ScheduledFuture<?>> futures;
 	Serializer copySerializer;
 	Deserializer copyDeserializer;
 	
-//	static {
-//		LOGGER = LoggerFactory.getLogger(BacnetLink.class);
-//	}
+	static {
+		LOGGER = LoggerFactory.getLogger(BacnetLink.class);
+	}
 	
 	private BacnetLink(Node node, Serializer ser, Deserializer deser) {
 		this.node = node;
@@ -130,7 +132,7 @@ public class BacnetLink {
 	}
 	
 	DeviceEventAdapter setupPoint(final BacnetPoint point, final DeviceFolder devicefold) {
-		Node child = point.node.getChild("presentValue");
+		Node child = point.node.getChild("present value");
 		if (devicefold.root.covType != CovType.NONE && point.isCov()) {
 			child.getListener().setOnSubscribeHandler(null);
 			ScheduledFuture<?> fut = futures.remove(child);
@@ -155,6 +157,7 @@ public class BacnetLink {
 				ScheduledThreadPoolExecutor stpe = Objects.getDaemonThreadPool();
 				ScheduledFuture<?> fut = stpe.scheduleWithFixedDelay(new Runnable() {
 					public void run() {
+						if (point.node != null) LOGGER.debug("polling " + point.node.getName());
 						getPoint(point, devicefold);
 					}	                 
 				}, 0, devicefold.root.interval, TimeUnit.SECONDS);

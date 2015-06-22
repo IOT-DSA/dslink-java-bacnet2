@@ -175,7 +175,11 @@ public class BacnetPoint {
     
     private void setupNode() {
     	if (node == null) {
-    		node = parent.createChild(objectName).build();
+    		node = parent.createChild(objectName).setValueType(ValueType.STRING).setValue(new Value("")).build();
+    	}
+    	if (node.getValue() == null) {
+    		node.setValueType(ValueType.STRING);
+    		node.setValue(new Value(""));
     	}
     	node.setAttribute("object type", new Value(objectTypeDescription));
     	node.setAttribute("object instance number", new Value(instanceNumber));
@@ -183,14 +187,14 @@ public class BacnetPoint {
     	node.setAttribute("settable", new Value(settable));
     	node.setAttribute("restore type", new Value("point"));
     	
-    	if (node.getChild("presentValue") == null) {
-    		node.createChild("presentValue").setValueType(ValueType.STRING).setValue(new Value("")).build();
+    	if (node.getChild("present value") == null) {
+    		node.createChild("present value").setValueType(ValueType.STRING).setValue(new Value("")).build();
     	}
 //        setObjectTypeId(objectTypeId);
 //        setInstanceNumber(instanceNumber);
 //        setObjectTypeDescription(objectTypeDescription);
 //        if (presentValue != null) setPresentValue(presentValue, pid);
-//        else node.createChild("presentValue").setValueType(ValueType.STRING).setValue(new Value(" ")).build();
+//        else node.createChild("present value").setValueType(ValueType.STRING).setValue(new Value(" ")).build();
 //        setCov(cov);
 //        setEngineeringUnits(engineeringUnits);
 //        setDataType(dataType);
@@ -348,9 +352,9 @@ public class BacnetPoint {
     	this.pid = pid;
         this.presentValue = presentValue;
 //        if (node != null && presentValue != null) {
-//        	Node vnode = node.getChild("presentValue");
+//        	Node vnode = node.getChild("present value");
 //        	if (vnode != null) vnode.setValue(new Value(presentValue));
-//        	else vnode = node.createChild("presentValue").setValueType(ValueType.STRING).setValue(new Value(presentValue)).build();
+//        	else vnode = node.createChild("present value").setValueType(ValueType.STRING).setValue(new Value(presentValue)).build();
 //        	System.out.println("presentValue updated to " + presentValue);
 //        	
 //        	vnode.removeChild("set");
@@ -531,6 +535,10 @@ public class BacnetPoint {
 	}
     
     void update() {
+    	update(null);
+    }
+    
+    void update(PriorityArray pa) {
     	if (node == null) return;
     	
     	if (objectName != null) {
@@ -545,39 +553,51 @@ public class BacnetPoint {
         	else node.createChild("dataType").setValueType(ValueType.STRING).setValue(new Value(dataType.toString())).build();
         	LOGGER.info("dataType updated to " + dataType);
         }
+		Node vnode = node.getChild("present value");
 		if (presentValue != null) {
 			String prettyVal = getPrettyPresentValue(objectTypeId, presentValue, unitsDescription, referenceObjectTypeDescription, referenceInstanceNumber, referenceDeviceId);
-        	Node vnode = node.getChild("presentValue");
+			node.setValueType(ValueType.STRING);
+			node.setValue(new Value(prettyVal));
         	if (vnode != null) vnode.setValue(new Value(prettyVal));
-        	else vnode = node.createChild("presentValue").setValueType(ValueType.STRING).setValue(new Value(prettyVal)).build();
+        	else vnode = node.createChild("present value").setValueType(ValueType.STRING).setValue(new Value(prettyVal)).build();
         	LOGGER.info("presentValue updated to " + presentValue);
-        	
+		}
         	vnode.removeChild("set");
         	if (settable) {
         		makeSetAction(vnode, 8);
-        		makeRelinquishAction(vnode, 8);
-        		Action act = new Action(Permission.READ, new RelinquishAllHandler());
-        		vnode.createChild("relinquish all").setAction(act).build().setSerializable(false);
-        		refreshPriorities();
+        		if (pa == null) {
+        			try {
+        				pa = getPriorityArray();
+        			} catch (BACnetException e) {
+        				return;
+        			}
+        		}
+        		if (pa != null) {
+        			makeRelinquishAction(vnode, 8);
+        			Action act = new Action(Permission.READ, new RelinquishAllHandler());
+        			vnode.createChild("relinquish all").setAction(act).build().setSerializable(false);
+        			refreshPriorities(pa);
+        		}
         	}
-        }
 		
     }
     
     private void refreshPriorities() {
-    	Node vnode = node.getChild("presentValue");
-    	PriorityArray priorities;
-		try {
-			priorities = getPriorityArray();
-		} catch (BACnetException e) {
-			// TODO Auto-generated catch block
-			LOGGER.error("error: ", e);
-			return;
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			LOGGER.error("error: ", e);
-			return;
-		}
+    	refreshPriorities(null);
+    }
+    
+    private void refreshPriorities(PriorityArray priorities) {
+    	Node vnode = node.getChild("present value");
+    	if (priorities == null) {
+    		try {
+    			priorities = getPriorityArray();
+    		} catch (BACnetException e) {
+    			// TODO Auto-generated catch block
+    			LOGGER.error("error: ", e);
+    			return;
+    		}
+    	}
+		if (priorities == null) return;
 		for (int i=1; i<=priorities.getCount(); i++) {
 			String p = priorities.get(i).getValue().toString();
 			Node pnode = vnode.getChild("Priority "+i);
@@ -593,9 +613,9 @@ public class BacnetPoint {
     	valnode.createChild("relinquish").setAction(act).build().setSerializable(false);
     }
     
-    private PriorityArray getPriorityArray() throws Exception {
+    private PriorityArray getPriorityArray() throws BACnetException {
 			Encodable e = RequestUtils.getProperty(folder.conn.localDevice, folder.root.device, oid, PropertyIdentifier.priorityArray);
-			if (e instanceof BACnetError) throw new Exception("got BACnetError: " + e.toString());
+			if (e instanceof BACnetError) return null;
 			return (PriorityArray) e;
     }
     
@@ -603,14 +623,12 @@ public class BacnetPoint {
     	public void handle(ActionResult event) {
 			try {
 				PriorityArray priorities = getPriorityArray();
+				if (priorities == null) return;
 				for (int i=1; i<=priorities.getCount(); i++) {
 	    			relinquish(i);
 	    			refreshPriorities();
 	    		}
 			} catch (BACnetException e) {
-				// TODO Auto-generated catch block
-				LOGGER.error("error: ", e);
-			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				LOGGER.error("error: ", e);
 			}	
@@ -681,17 +699,24 @@ public class BacnetPoint {
             String referenceObjectTypeDescription, int referenceInstanceNumber, int referenceDeviceId) {
         if (DeviceFolder.isOneOf(objectTypeId, ObjectType.binaryInput, ObjectType.binaryOutput,
                 ObjectType.binaryValue)) {
-            if ("0".equals(presentValue) && unitsDescription.size() > 0)
-                return unitsDescription.get(0);
-            if ("1".equals(presentValue) && unitsDescription.size() > 1)
-                return unitsDescription.get(1);
+            if ("0".equals(presentValue)) {
+            	if (unitsDescription.size() > 0) return unitsDescription.get(0);
+            	else return "0";
+            }
+            if ("1".equals(presentValue)) {
+            	if (unitsDescription.size() > 1) return unitsDescription.get(1);
+            	else return "1";
+            }
         }
         else if (DeviceFolder.isOneOf(objectTypeId, ObjectType.multiStateInput, ObjectType.multiStateOutput,
                 ObjectType.multiStateValue)) {
             try {
                 int index = Integer.parseInt(presentValue) - 1;
-                if (index >= 0 && index < unitsDescription.size())
-                    return unitsDescription.get(index);
+                if (index >= 0) {
+                	if (index < unitsDescription.size()) return unitsDescription.get(index);
+                	else return presentValue;
+                }
+                    
             }
             catch (NumberFormatException e) {
                 // no op

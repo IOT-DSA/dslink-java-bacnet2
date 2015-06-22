@@ -24,7 +24,9 @@ import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.service.confirmed.SubscribeCOVRequest;
 import com.serotonin.bacnet4j.type.AmbiguousValue;
 import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.constructed.BACnetError;
 import com.serotonin.bacnet4j.type.constructed.DeviceObjectPropertyReference;
+import com.serotonin.bacnet4j.type.constructed.PriorityArray;
 import com.serotonin.bacnet4j.type.constructed.PropertyValue;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
@@ -205,6 +207,7 @@ public class DeviceFolder {
 	            final RemoteDevice initiatingDevice, final ObjectIdentifier monitoredObjectIdentifier,
 	            final UnsignedInteger timeRemaining, final SequenceOf<PropertyValue> listOfValues) {
 			for (PropertyValue pv: listOfValues) {
+				if (point.node != null) LOGGER.debug("got cov for " + point.node.getName());
 				updatePointValue(point, pv.getPropertyIdentifier(), pv.getValue());
 			}
 		}
@@ -230,6 +233,8 @@ public class DeviceFolder {
 	}
 	
 	private void updatePointValue(BacnetPoint pt, PropertyIdentifier pid, Encodable encodable) {
+		PriorityArray pa = null;
+		if (encodable instanceof BACnetError) return;
 		if (pid.equals(PropertyIdentifier.objectName)) {
             pt.setObjectName(PropertyValues.getString(encodable));
     	} else if (pid.equals(PropertyIdentifier.presentValue) && ObjectType.schedule.intValue() == pt.getObjectTypeId()) {
@@ -278,8 +283,10 @@ public class DeviceFolder {
             }
         } else if (pid.equals(PropertyIdentifier.recordCount)) {
             pt.setPresentValue(PropertyValues.getString(encodable), pid);
+        } else if (pid.equals(PropertyIdentifier.priorityArray) && encodable instanceof PriorityArray) {
+        	pa = (PriorityArray) encodable;
         }
-		pt.update();
+		pt.update(pa);
 	}
 	
 	void addObjectPoint(ObjectIdentifier oid, PropertyReferences refs, Map<ObjectIdentifier, BacnetPoint> points) {
