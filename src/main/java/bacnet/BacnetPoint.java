@@ -19,7 +19,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vertx.java.core.Handler;
 
-import com.serotonin.bacnet4j.event.DeviceEventAdapter;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.obj.ObjectProperties;
 import com.serotonin.bacnet4j.service.confirmed.WritePropertyRequest;
@@ -53,7 +52,7 @@ public class BacnetPoint {
 	ObjectIdentifier oid;
 	private PropertyIdentifier pid;
 	int id;
-	private DeviceEventAdapter listener;
+	//private DeviceEventAdapter listener;
 	
 	private int objectTypeId;
     private int instanceNumber;
@@ -205,18 +204,20 @@ public class BacnetPoint {
 //        setReferenceObjectTypeId(referenceObjectTypeId);
 //        setReferenceObjectTypeDescription(referenceObjectTypeDescription);
 //        setReferenceInstanceNumber(referenceInstanceNumber);
-        clearActions();
+//        clearActions();
     	makeActions();
     	update();
         
-        if (listener!=null) folder.conn.localDevice.getEventHandler().removeListener(listener);
+        //if (listener!=null) folder.conn.localDevice.getEventHandler().removeListener(listener);
         
-        listener = folder.conn.link.setupPoint(this, folder.root);
+        //listener = folder.conn.link.setupPoint(this, folder.root);
     }
     
     private void makeActions() {
     	Action act = new Action(Permission.READ, new RemoveHandler());
-    	node.createChild("remove").setAction(act).build().setSerializable(false);
+    	Node anode = node.getChild("remove");
+    	if (anode == null) node.createChild("remove").setAction(act).build().setSerializable(false);
+    	else anode.setAction(act);
     	
     	act = new Action(Permission.READ, new EditHandler());
     	act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
@@ -224,22 +225,26 @@ public class BacnetPoint {
 		act.addParameter(new Parameter("object instance number", ValueType.NUMBER, node.getAttribute("object instance number")));
 		act.addParameter(new Parameter("use COV", ValueType.BOOL, node.getAttribute("use COV")));
 		act.addParameter(new Parameter("settable", ValueType.BOOL, node.getAttribute("settable")));
-    	node.createChild("edit").setAction(act).build().setSerializable(false);
-    	
+		anode = node.getChild("edit");
+		if (anode == null) node.createChild("edit").setAction(act).build().setSerializable(false);
+		else anode.setAction(act);
+		
     	act = new Action(Permission.READ, new CopyHandler());
     	act.addParameter(new Parameter("name", ValueType.STRING));
-    	node.createChild("make copy").setAction(act).build().setSerializable(false);
+    	anode = node.getChild("make copy");
+    	if (anode == null) node.createChild("make copy").setAction(act).build().setSerializable(false);
+    	else anode.setAction(act);
     
     }
     
-    private void clearActions() {
-    	if (node == null || node.getChildren() == null) return;
-    	for (Node child: node.getChildren().values()) {
-    		if (child.getAction() != null) {
-    			node.removeChild(child);
-    		}
-    	}
-    }
+//    private void clearActions() {
+//    	if (node == null || node.getChildren() == null) return;
+//    	for (Node child: node.getChildren().values()) {
+//    		if (child.getAction() != null) {
+//    			node.removeChild(child);
+//    		}
+//    	}
+//    }
     
     private class SetHandler implements Handler<ActionResult> {
     	private int priority;
@@ -559,10 +564,6 @@ public class BacnetPoint {
 	}
     
     void update() {
-    	update(null);
-    }
-    
-    void update(PriorityArray pa) {
     	if (node == null) return;
     	
     	if (objectName != null) {
@@ -601,13 +602,12 @@ public class BacnetPoint {
         	vnode.setWritable(Writable.NEVER);
         	if (settable) {
         		makeSetAction(vnode, 8);
-        		if (pa == null) {
+        		PriorityArray pa = null;
         			try {
         				pa = getPriorityArray();
         			} catch (BACnetException e) {
         				return;
         			}
-        		}
         		if (pa != null) {
         			makeRelinquishAction(vnode, 8);
         			Action act = new Action(Permission.READ, new RelinquishAllHandler());

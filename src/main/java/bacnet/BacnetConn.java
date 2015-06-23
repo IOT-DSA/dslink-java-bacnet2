@@ -81,7 +81,9 @@ class BacnetConn {
 		defaultInterval = node.getAttribute("default polling interval").getNumber().longValue();
 		
 		Action act = new Action(Permission.READ, new RemoveHandler());
-        node.createChild("remove").setAction(act).build().setSerializable(false);
+		Node anode = node.getChild("remove");
+        if (anode == null) node.createChild("remove").setAction(act).build().setSerializable(false);
+        else anode.setAction(act);
         
         act = new Action(Permission.READ, new EditHandler());
         act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
@@ -105,7 +107,9 @@ class BacnetConn {
 		act.addParameter(new Parameter("local device name", ValueType.STRING, node.getAttribute("local device name")));
 		act.addParameter(new Parameter("local device vendor", ValueType.STRING, node.getAttribute("local device vendor")));
 		act.addParameter(new Parameter("default polling interval", ValueType.NUMBER, node.getAttribute("default polling interval")));
-		node.createChild("edit").setAction(act).build().setSerializable(false);
+		anode = node.getChild("edit");
+		if (anode == null) node.createChild("edit").setAction(act).build().setSerializable(false);
+		else anode.setAction(act);
 		
 //		act = new Action(Permission.READ, new CopyHandler());
 //		act.addParameter(new Parameter("name", ValueType.STRING));
@@ -153,7 +157,9 @@ class BacnetConn {
         }
         
         act = new Action(Permission.READ, new DeviceDiscoveryHandler());
-        node.createChild("discover devices").setAction(act).build().setSerializable(false);
+        anode = node.getChild("discover devices");
+        if (anode == null) node.createChild("discover devices").setAction(act).build().setSerializable(false);
+        else anode.setAction(act);
         
         act = new Action(Permission.READ, new AddDeviceHandler());
         act.addParameter(new Parameter("name", ValueType.STRING));
@@ -161,7 +167,9 @@ class BacnetConn {
         act.addParameter(new Parameter("polling interval", ValueType.NUMBER, new Value(defaultInterval)));
         act.addParameter(new Parameter("cov usage", ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED")));
         act.addParameter(new Parameter("cov lease time (minutes)", ValueType.NUMBER, new Value(60)));
-        node.createChild("add device").setAction(act).build().setSerializable(false);
+        anode = node.getChild("add device");
+        if (anode == null) node.createChild("add device").setAction(act).build().setSerializable(false);
+        else anode.setAction(act);
 	
 	}
 	
@@ -215,11 +223,11 @@ class BacnetConn {
 				rename(name);
 			}
 			
-			if (node.getChildren()!=null) {
-				for (Node child: node.getChildren().values()) {
-					if (child.getAction()!=null) node.removeChild(child);
-				}
-			}
+//			if (node.getChildren()!=null) {
+//				for (Node child: node.getChildren().values()) {
+//					if (child.getAction()!=null) node.removeChild(child);
+//				}
+//			}
 			init();
 		}
 	}

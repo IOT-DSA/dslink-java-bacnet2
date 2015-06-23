@@ -22,8 +22,9 @@ import org.slf4j.LoggerFactory;
 import org.vertx.java.core.Handler;
 
 import bacnet.BacnetConn.CovType;
+import bacnet.DeviceFolder.CovEvent;
+import bacnet.DeviceFolder.CovListener;
 
-import com.serotonin.bacnet4j.event.DeviceEventAdapter;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.util.PropertyReferences;
 
@@ -131,26 +132,57 @@ public class BacnetLink {
 		}
 	}
 	
-	DeviceEventAdapter setupPoint(final BacnetPoint point, final DeviceFolder devicefold) {
+	void setupPoint(final BacnetPoint point, final DeviceFolder devicefold) {
 		Node child = point.node.getChild("present value");
 		if (devicefold.root.covType != CovType.NONE && point.isCov()) {
-			child.getListener().setOnSubscribeHandler(null);
 			ScheduledFuture<?> fut = futures.remove(child);
 			if (fut != null) {
 				fut.cancel(false);
 			}
-			child.getListener().setOnUnsubscribeHandler(null);
-			getPoint(point, devicefold);
-			DeviceEventAdapter cl = devicefold.getNewCovListener(point);
-			devicefold.setupCov(point, cl);
-			return cl;
+			final CovListener cl = devicefold.getNewCovListener(point);
+			child.getListener().setOnSubscribeHandler(new Handler<Node>() {
+				public void handle(final Node event) {
+					getPoint(point, devicefold);
+					devicefold.setupCov(point, cl);
+					final CovEvent covEv = cl.event;
+//					int waittime = 250;
+//					int totaltime = 0;
+//					int lifetime = 60000 * devicefold.root.node.getAttribute("cov lease time (minutes)").getNumber().intValue();
+					if (futures.containsKey(event)) {
+						return;
+			        }
+					ScheduledThreadPoolExecutor stpe = Objects.getDaemonThreadPool();
+					ScheduledFuture<?> fut = stpe.scheduleWithFixedDelay(new Runnable() {
+						public void run() {
+							covEv.process();
+						}	                 
+					}, 0, 250, TimeUnit.MILLISECONDS);
+					futures.put(event, fut);
+				}
+			});
+			child.getListener().setOnUnsubscribeHandler(new Handler<Node>() {
+				public void handle(final Node event) {
+					ScheduledFuture<?> fut = futures.remove(event);
+					if (fut != null) {
+						fut.cancel(false);
+					}
+					//cl.event.active = false;
+					devicefold.conn.localDevice.getEventHandler().removeListener(cl);
+				}
+			});
+//			ScheduledFuture<?> fut = futures.remove(child);
+//			if (fut != null) {
+//				fut.cancel(false);
+//			}
+//			child.getListener().setOnUnsubscribeHandler(null);
+			return;
 		}
 		child.getListener().setOnSubscribeHandler(new Handler<Node>() {
 			public void handle(final Node event) {
-				if (devicefold.root.covType != CovType.NONE && point.isCov()) {
-					setupPoint(point, devicefold);
-					return;
-				}
+//				if (devicefold.root.covType != CovType.NONE && point.isCov()) {
+//					setupPoint(point, devicefold);
+//					return;
+//				}
 				if (futures.containsKey(event)) {
 					return;
 		        }
@@ -173,7 +205,7 @@ public class BacnetLink {
 				}
 			}
 		});
-		return null;
+		return;
     }
 	
 	private void getPoint(BacnetPoint point, DeviceFolder devicefold) {

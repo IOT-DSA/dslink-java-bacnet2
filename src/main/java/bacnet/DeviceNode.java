@@ -42,7 +42,9 @@ public class DeviceNode extends DeviceFolder {
 	    act.addParameter(new Parameter("polling interval", ValueType.NUMBER, node.getAttribute("polling interval")));
 	    act.addParameter(new Parameter("cov usage", ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED"), node.getAttribute("cov usage")));
 	    act.addParameter(new Parameter("cov lease time (minutes)", ValueType.NUMBER, node.getAttribute("cov lease time (minutes)")));
-	    node.createChild("edit").setAction(act).build().setSerializable(false);
+	    Node anode = node.getChild("edit");
+	    if (anode == null) node.createChild("edit").setAction(act).build().setSerializable(false);
+	    else anode.setAction(act);
 	}
 	
 	private class EditHandler implements Handler<ActionResult> {
@@ -74,7 +76,6 @@ public class DeviceNode extends DeviceFolder {
 				rename(name);
 			}
 	        
-	        node.removeChild("edit");
 	        makeEditAction();
 		}
 	}

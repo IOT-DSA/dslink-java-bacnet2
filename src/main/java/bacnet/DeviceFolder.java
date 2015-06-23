@@ -26,7 +26,6 @@ import com.serotonin.bacnet4j.type.AmbiguousValue;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.constructed.BACnetError;
 import com.serotonin.bacnet4j.type.constructed.DeviceObjectPropertyReference;
-import com.serotonin.bacnet4j.type.constructed.PriorityArray;
 import com.serotonin.bacnet4j.type.constructed.PropertyValue;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
@@ -194,22 +193,42 @@ public class DeviceFolder {
 		return new CovListener(p);
 	}
 	
-	private class CovListener extends DeviceEventAdapter {
+	public class CovListener extends DeviceEventAdapter {
 		
-		BacnetPoint point;
+		CovEvent event;
 		
 		CovListener(BacnetPoint p) {
-			this.point = p;
+			this.event = new CovEvent(p);
 		}
 		
 		@Override
 		public void covNotificationReceived(final UnsignedInteger subscriberProcessIdentifier,
 	            final RemoteDevice initiatingDevice, final ObjectIdentifier monitoredObjectIdentifier,
 	            final UnsignedInteger timeRemaining, final SequenceOf<PropertyValue> listOfValues) {
+			event.update(listOfValues);
+		}
+	}
+	
+	class CovEvent {
+		private BacnetPoint point;
+		private SequenceOf<PropertyValue> listOfValues;
+		//boolean active;
+		CovEvent(BacnetPoint pt) {
+			point = pt;
+			listOfValues = null;
+			//active = true;
+		}
+		void update(SequenceOf<PropertyValue> lov) {
+			listOfValues = lov;
+		}
+		
+		void process() {
+			if (listOfValues == null) return;
 			for (PropertyValue pv: listOfValues) {
 				if (point.node != null) LOGGER.debug("got cov for " + point.node.getName());
 				updatePointValue(point, pv.getPropertyIdentifier(), pv.getValue());
 			}
+			listOfValues = null;
 		}
 	}
 	
@@ -233,7 +252,7 @@ public class DeviceFolder {
 	}
 	
 	private void updatePointValue(BacnetPoint pt, PropertyIdentifier pid, Encodable encodable) {
-		PriorityArray pa = null;
+		
 		if (encodable instanceof BACnetError) return;
 		if (pid.equals(PropertyIdentifier.objectName)) {
             pt.setObjectName(PropertyValues.getString(encodable));
@@ -283,10 +302,8 @@ public class DeviceFolder {
             }
         } else if (pid.equals(PropertyIdentifier.recordCount)) {
             pt.setPresentValue(PropertyValues.getString(encodable), pid);
-        } else if (pid.equals(PropertyIdentifier.priorityArray) && encodable instanceof PriorityArray) {
-        	pa = (PriorityArray) encodable;
         }
-		pt.update(pa);
+		pt.update();
 	}
 	
 	void addObjectPoint(ObjectIdentifier oid, PropertyReferences refs, Map<ObjectIdentifier, BacnetPoint> points) {
