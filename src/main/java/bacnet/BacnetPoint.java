@@ -570,13 +570,13 @@ public class BacnetPoint {
 			Node vnode = node.getChild("objectName");
 			if (vnode != null) vnode.setValue(new Value(objectName));
 			else node.createChild("objectName").setValueType(ValueType.STRING).setValue(new Value(objectName)).build();
-			LOGGER.info("objectName updated to " + objectName);
+			LOGGER.debug("objectName updated to " + objectName);
 		}
 		if (dataType != null) {
         	Node vnode = node.getChild("dataType");
         	if (vnode != null) vnode.setValue(new Value(dataType.toString()));
         	else node.createChild("dataType").setValueType(ValueType.STRING).setValue(new Value(dataType.toString())).build();
-        	LOGGER.info("dataType updated to " + dataType);
+        	LOGGER.debug("dataType updated to " + dataType);
         }
 		Node vnode = node.getChild("present value");
 		if (presentValue != null) {
@@ -596,7 +596,7 @@ public class BacnetPoint {
         		}
         	}
         	else vnode = node.createChild("present value").setValueType(ValueType.STRING).setValue(new Value(prettyVal)).build();
-        	LOGGER.info("presentValue updated to " + presentValue);
+        	LOGGER.debug("presentValue updated to " + presentValue);
 		}
         	vnode.clearChildren();
         	vnode.setWritable(Writable.NEVER);

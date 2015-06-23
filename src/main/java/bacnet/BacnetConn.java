@@ -386,7 +386,7 @@ class BacnetConn {
            // e.printStackTrace();
         	LOGGER.debug("error: ", e);
         }
-        LOGGER.info("Got device name: "  + d.getName());
+        LOGGER.debug("Got device name: "  + d.getName());
 	}
 	
 	DeviceNode setupDeviceNode(final RemoteDevice d, String name, long interval, CovType covtype, int covlife) {
@@ -421,7 +421,7 @@ class BacnetConn {
 		
 		@Override
         public void iAmReceived(RemoteDevice d) {
-                LOGGER.info("IAm received from " + d);
+                LOGGER.debug("IAm received from " + d);
                 devices.add(d);
         }
 	}
