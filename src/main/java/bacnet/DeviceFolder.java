@@ -50,6 +50,7 @@ public class DeviceFolder {
 	protected Node node;
 	protected BacnetConn conn;
 	protected DeviceNode root;
+	private int unnamedCount;
 	//private HashMap<ObjectIdentifier, BacnetPoint> points;
 	
 	static {
@@ -258,7 +259,13 @@ public class DeviceFolder {
 		
 		if (encodable instanceof BACnetError) return;
 		if (pid.equals(PropertyIdentifier.objectName)) {
-            pt.setObjectName(PropertyValues.getString(encodable));
+			String name = BacnetConn.toLegalName(PropertyValues.getString(encodable));
+			if (name.length() < 1) {
+				pt.setObjectName("unnamed device " + unnamedCount);
+        		unnamedCount += 1;
+			} else {
+				pt.setObjectName(name);
+			}
     	} else if (pid.equals(PropertyIdentifier.presentValue) && ObjectType.schedule.intValue() == pt.getObjectTypeId()) {
             handleAmbiguous((AmbiguousValue) encodable, pt, pid);
     	} else if (pid.equals(PropertyIdentifier.presentValue)) {

@@ -374,11 +374,12 @@ class BacnetConn {
                 public boolean requestProgress(double progress, ObjectIdentifier oid,
                         PropertyIdentifier pid, UnsignedInteger pin, Encodable value) {
                     if (pid.equals(PropertyIdentifier.objectName)) {
-                    	if (value instanceof BACnetError || value.toString().trim().length() < 1) {
+                    	String name = toLegalName(value.toString());
+                    	if (value instanceof BACnetError || name.length() < 1) {
                     		d.setName("unnamed device " + unnamedCount);
                     		unnamedCount += 1;
                     	} else {
-                    		d.setName(value.toString());
+                    		d.setName(name);
                     	}
                     }
 //                    else if (pid.equals(PropertyIdentifier.vendorName))
@@ -396,6 +397,25 @@ class BacnetConn {
         LOGGER.debug("Got device name: "  + d.getName());
 	}
 	
+	static String toLegalName(String s) {
+		if (s == null) return "";
+		while (s.length() > 0 && (s.startsWith("$") || s.startsWith("@"))) {
+			s = s.substring(1);
+		}
+		s = s.replace('%', ' ');
+		s = s.replace('.', ' ');
+		s = s.replace('/', ' ');
+		s = s.replace('\\', ' ');
+		s = s.replace('?', ' ');
+		s = s.replace('*', ' ');
+		s = s.replace(':', ' ');
+		s = s.replace('|', ' ');
+		s = s.replace('"', ' ');
+		s = s.replace('<', ' ');
+		s = s.replace('>', ' ');
+		return s.trim();
+	}
+
 	DeviceNode setupDeviceNode(final RemoteDevice d, String name, long interval, CovType covtype, int covlife) {
 		if (d == null) return null;
 		getDeviceProps(d);
