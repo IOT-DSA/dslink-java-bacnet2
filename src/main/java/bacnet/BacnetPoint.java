@@ -252,7 +252,7 @@ public class BacnetPoint {
     		priority = p;
     	}
     	public void handle(ActionResult event) {
-    		String newval = event.getParameter("value", ValueType.STRING).getString();
+    		Value newval = event.getParameter("value", ValueType.STRING);
     		handleSet(newval, priority, false);
     	}
     }
@@ -264,24 +264,24 @@ public class BacnetPoint {
     	}
     	public void handle(ValuePair event) {
     		if (!event.isFromExternalSource()) return;
-    		String newval = event.getCurrent().getString();
+    		Value newval = event.getCurrent();
     		handleSet(newval, priority, true);
     	}
     }
     
-    private void handleSet(String newval, int priority, boolean raw) {
+    private void handleSet(Value newval, int priority, boolean raw) {
     	if (dataType == DataType.BINARY) {
 			if (raw) {
-				newval = String.valueOf(Boolean.parseBoolean(newval) || newval.equals("1"));
+//				newval = String.valueOf(Boolean.parseBoolean(newval) || newval.equals("1"));
 			} else {
 				String on = (unitsDescription.size() > 1) ? unitsDescription.get(1) : "1";
-				newval = String.valueOf(newval.equals(on));
+				newval = new Value(String.valueOf(newval.getString().equals(on)));
 			}
 		} else if (dataType == DataType.MULTISTATE) {
 			if (!raw) {
-				int i = unitsDescription.indexOf(newval);
+				int i = unitsDescription.indexOf(newval.getString());
 				if (i == -1) return;
-				newval = String.valueOf(i);
+				newval = new Value(String.valueOf(i));
 			}
 		}
 		Encodable enc = valueToEncodable(newval, oid.getObjectType(), pid);
@@ -350,6 +350,13 @@ public class BacnetPoint {
     }
 
     public void setDataType(DataType dataType) {
+    	if (dataType == DataType.NUMERIC && presentValue != null) {
+    		try {
+				Double.parseDouble(presentValue);
+			} catch (NumberFormatException e) {
+				dataType = DataType.ALPHANUMERIC;
+			}
+    	}
         this.dataType = dataType;
 //        if (node != null && dataType != null) {
 //        	Node vnode = node.getChild("dataType");
@@ -380,6 +387,7 @@ public class BacnetPoint {
     public void setPresentValue(String presentValue, PropertyIdentifier pid) {
     	this.pid = pid;
         this.presentValue = presentValue;
+        setDataType(dataType);
 //        if (node != null && presentValue != null) {
 //        	Node vnode = node.getChild("present value");
 //        	if (vnode != null) vnode.setValue(new Value(presentValue));
@@ -487,12 +495,14 @@ public class BacnetPoint {
 //        }
     }
     
-    private Encodable valueToEncodable(String value, ObjectType objectType, PropertyIdentifier pid) {
+    private Encodable valueToEncodable(Value value, ObjectType objectType, PropertyIdentifier pid) {
         Class<? extends Encodable> clazz = ObjectProperties.getPropertyTypeDefinition(objectType, pid).getClazz();
         
         switch (dataType) {
         case BINARY: {
-        	boolean b = (Boolean.parseBoolean(value) || value.equals("1"));
+        	boolean b;
+        	if (value.getType().compare(ValueType.BOOL)) b = value.getBool();
+        	else b = (Boolean.parseBoolean(value.getString()) || value.getString().equals("1"));
             if (clazz == BinaryPV.class) {
                 if (b)
                     return BinaryPV.active;
@@ -509,7 +519,9 @@ public class BacnetPoint {
                 return new Real(b ? 1 : 0);
         }
         case NUMERIC: {
-            double d = Double.parseDouble(value);
+            double d;
+            if (value.getType() == ValueType.NUMBER) d = value.getNumber().doubleValue();
+            else d = Double.parseDouble(value.getString());
             if (clazz == BinaryPV.class) {
                 if (d != 0)
                     return BinaryPV.active;
@@ -527,22 +539,33 @@ public class BacnetPoint {
         }
         case ALPHANUMERIC: {
             if (clazz == BinaryPV.class) {
-                if (Boolean.parseBoolean(value) || value.equals("1"))
+            	boolean b;
+            	if (value.getType().compare(ValueType.BOOL)) b = value.getBool();
+            	else b = (Boolean.parseBoolean(value.getString()) || value.getString().equals("1"));
+                if (b)
                     return BinaryPV.active;
                 return BinaryPV.inactive;
             }
 
-            if (clazz == UnsignedInteger.class)
-                return new UnsignedInteger(Integer.parseInt(value));
-
-            if (clazz == LifeSafetyState.class)
-                return new LifeSafetyState(Integer.parseInt(value));
-
-            if (clazz == Real.class)
-                return new Real((float) Double.parseDouble(value));
+            if (clazz == UnsignedInteger.class) {
+            	int i = Integer.parseInt(value.getString());
+            	if (value.getType() == ValueType.NUMBER) i = value.getNumber().intValue();
+                return new UnsignedInteger(i);
+            }
+            if (clazz == LifeSafetyState.class) {
+            	int i = Integer.parseInt(value.getString());
+            	if (value.getType() == ValueType.NUMBER) i = value.getNumber().intValue();
+                return new LifeSafetyState(i);
+            }
+            if (clazz == Real.class) {
+            	float f = (float) Double.parseDouble(value.getString());
+            	if (value.getType() == ValueType.NUMBER) f = value.getNumber().floatValue(); 
+                return new Real(f);
+            }
         }
         case MULTISTATE: {
-        	int i = Integer.parseInt(value);
+        	int i = Integer.parseInt(value.getString());
+        	if (value.getType().compare(ValueType.ENUM)) i = unitsDescription.indexOf(value.getString());
             if (clazz == BinaryPV.class) {
                 if (i != 0)
                     return BinaryPV.active;
@@ -581,21 +604,53 @@ public class BacnetPoint {
 		Node vnode = node.getChild("present value");
 		if (presentValue != null) {
 			String prettyVal = getPrettyPresentValue(objectTypeId, presentValue, unitsDescription, referenceObjectTypeDescription, referenceInstanceNumber, referenceDeviceId);
-			node.setValueType(ValueType.STRING);
+			ValueType vt;
+			Value val;
+			switch (dataType) {
+			case BINARY: {
+				String off = (unitsDescription.size() > 0) ? unitsDescription.get(0) : "0";
+	    		String on = (unitsDescription.size() > 1) ? unitsDescription.get(1) : "1";
+				vt = ValueType.makeBool(on, off);
+				val = new Value(Boolean.parseBoolean(presentValue) || presentValue.equals("1"));
+				break;
+			}
+			case NUMERIC: {
+				vt = ValueType.NUMBER;
+				val = new Value(Double.parseDouble(presentValue));
+				break;
+			}
+			case MULTISTATE: {
+				Set<String> enums = new HashSet<String>(unitsDescription);
+				vt = ValueType.makeEnum(enums);
+				int index = Integer.parseInt(presentValue) - 1;
+                if (index >= 0 && index < unitsDescription.size()) val = new Value(unitsDescription.get(index));
+                else val = new Value(presentValue);
+				break;
+			}
+			case ALPHANUMERIC: {
+				vt = ValueType.STRING;
+				val = new Value(presentValue);
+				break;
+			}
+			default: {
+				vt = ValueType.STRING;
+				val = new Value(presentValue);
+			}
+			}
+			
 			node.setValue(new Value(prettyVal));
 			node.removeChild("units");
         	if (vnode != null) {
+        		vnode.setValueType(vt);
+        		vnode.setValue(val);
         		if (!(DeviceFolder.isOneOf(objectTypeId, ObjectType.binaryInput, ObjectType.binaryOutput,
         				ObjectType.binaryValue, ObjectType.multiStateInput, ObjectType.multiStateOutput, 
         				ObjectType.multiStateValue, ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone,
         				ObjectType.trendLog)) && unitsDescription.size() > 0) {
-        			vnode.setValue(new Value(presentValue));
         			node.createChild("units").setValueType(ValueType.STRING).setValue(new Value(unitsDescription.get(0))).build();
-        		} else {
-        			vnode.setValue(new Value(prettyVal));
         		}
         	}
-        	else vnode = node.createChild("present value").setValueType(ValueType.STRING).setValue(new Value(prettyVal)).build();
+        	else vnode = node.createChild("present value").setValueType(vt).setValue(val).build();
         	LOGGER.debug("presentValue updated to " + presentValue);
 		}
         	vnode.clearChildren();

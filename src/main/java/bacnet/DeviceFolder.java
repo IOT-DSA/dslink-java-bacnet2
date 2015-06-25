@@ -166,6 +166,9 @@ public class DeviceFolder {
 			}
 			
 			getProperties(refs, points);
+			for (BacnetPoint pt: points.values()) {
+				conn.link.setupPoint(pt, getMe());
+			}
 		}
 	}
 	
