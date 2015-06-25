@@ -43,6 +43,7 @@ class BacnetConn {
 	private static final Logger LOGGER;
 	
 	Node node;
+	private Node statnode;
 	LocalDevice localDevice;
 	private long defaultInterval;
 	BacnetLink link;
@@ -56,9 +57,11 @@ class BacnetConn {
 	BacnetConn(BacnetLink link, Node node) {
 		this.node = node;
 		this.link = link;
+		this.statnode = node.createChild("STATUS").setValueType(ValueType.STRING).setValue(new Value("")).build();
 	}
 	
 	void init() {
+		statnode.setValue(new Value("Setting up connection"));
 		unnamedCount = 0;
 		
 		isIP = node.getAttribute("isIP").getBool();
@@ -151,6 +154,7 @@ class BacnetConn {
         	//e.printStackTrace();
         	//remove();
         	LOGGER.debug("error: ", e);
+        	statnode.setValue(new Value("Error initializing local device"));
         	localDevice.terminate();
         	return;
         } finally {
@@ -171,6 +175,8 @@ class BacnetConn {
         anode = node.getChild("add device");
         if (anode == null) node.createChild("add device").setAction(act).build().setSerializable(false);
         else anode.setAction(act);
+        
+        statnode.setValue(new Value("Connected"));
 	
 	}
 	
@@ -455,7 +461,7 @@ class BacnetConn {
 			DeviceNode dn = setupDeviceNode(dev, child.getName(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
 			if (dn!=null) dn.restoreLastSession();
 			else node.removeChild(child);
-		} else if (child.getAction() == null) {
+		} else if (child.getAction() == null && !child.getName().equals("STATUS")) {
 			node.removeChild(child);
 		}
 	}
