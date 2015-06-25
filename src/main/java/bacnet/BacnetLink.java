@@ -192,7 +192,7 @@ public class BacnetLink {
 						if (point.node != null) LOGGER.debug("polling " + point.node.getName());
 						getPoint(point, devicefold);
 					}	                 
-				}, 0, devicefold.root.interval, TimeUnit.SECONDS);
+				}, 0, devicefold.root.interval, TimeUnit.MILLISECONDS);
 				futures.put(event, fut);
 			}
 		});
@@ -246,7 +246,7 @@ public class BacnetLink {
 			int locdevId = event.getParameter("local device id", ValueType.NUMBER).getNumber().intValue();
 			String locdevName = event.getParameter("local device name", ValueType.STRING).getString();
 			String locdevVend = event.getParameter("local device vendor", ValueType.STRING).getString();
-			long interval = event.getParameter("default polling interval", ValueType.NUMBER).getNumber().longValue();
+			long interval = (long) (1000*event.getParameter("default polling interval", ValueType.NUMBER).getNumber().doubleValue());
 			
 			Node child = node.createChild(name).build();
 			child.setAttribute("isIP", new Value(isIP));

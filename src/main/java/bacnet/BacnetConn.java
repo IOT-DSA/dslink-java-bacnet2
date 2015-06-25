@@ -106,7 +106,8 @@ class BacnetConn {
 		act.addParameter(new Parameter("local device id", ValueType.NUMBER, node.getAttribute("local device id")));
 		act.addParameter(new Parameter("local device name", ValueType.STRING, node.getAttribute("local device name")));
 		act.addParameter(new Parameter("local device vendor", ValueType.STRING, node.getAttribute("local device vendor")));
-		act.addParameter(new Parameter("default polling interval", ValueType.NUMBER, node.getAttribute("default polling interval")));
+		double defint = node.getAttribute("default polling interval").getNumber().doubleValue()/1000;
+		act.addParameter(new Parameter("default polling interval", ValueType.NUMBER, new Value(defint)));
 		anode = node.getChild("edit");
 		if (anode == null) node.createChild("edit").setAction(act).build().setSerializable(false);
 		else anode.setAction(act);
@@ -164,7 +165,7 @@ class BacnetConn {
         act = new Action(Permission.READ, new AddDeviceHandler());
         act.addParameter(new Parameter("name", ValueType.STRING));
         act.addParameter(new Parameter("MAC address", ValueType.STRING, new Value("10.0.1.248:47808")));
-        act.addParameter(new Parameter("polling interval", ValueType.NUMBER, new Value(defaultInterval)));
+        act.addParameter(new Parameter("polling interval", ValueType.NUMBER, new Value(((double)defaultInterval)/1000)));
         act.addParameter(new Parameter("cov usage", ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED")));
         act.addParameter(new Parameter("cov lease time (minutes)", ValueType.NUMBER, new Value(60)));
         anode = node.getChild("add device");
@@ -204,7 +205,7 @@ class BacnetConn {
 			int locdevId = event.getParameter("local device id", ValueType.NUMBER).getNumber().intValue();
 			String locdevName = event.getParameter("local device name", ValueType.STRING).getString();
 			String locdevVend = event.getParameter("local device vendor", ValueType.STRING).getString();
-			long interval = event.getParameter("default polling interval", ValueType.NUMBER).getNumber().longValue();
+			long interval = (long) (1000*event.getParameter("default polling interval", ValueType.NUMBER).getNumber().doubleValue());
 			
 			node.setAttribute("local network number", new Value(lnn));
 			node.setAttribute("strict device comparisons", new Value(strict));
@@ -275,7 +276,7 @@ class BacnetConn {
 			String name = null;
 			Value namev = event.getParameter("name", ValueType.STRING);
 			if (namev != null) name = namev.getString();
-			long interval = event.getParameter("polling interval", ValueType.NUMBER).getNumber().longValue();
+			long interval = (long) (1000*event.getParameter("polling interval", ValueType.NUMBER).getNumber().doubleValue());
 			CovType covtype = CovType.NONE;
 			try {
 				covtype = CovType.valueOf(event.getParameter("cov usage").getString());

@@ -246,16 +246,16 @@ public class BacnetPoint {
 //    	}
 //    }
     
-    private class SetHandler implements Handler<ActionResult> {
-    	private int priority;
-    	SetHandler(int p) {
-    		priority = p;
-    	}
-    	public void handle(ActionResult event) {
-    		Value newval = event.getParameter("value", ValueType.STRING);
-    		handleSet(newval, priority, false);
-    	}
-    }
+//    private class SetHandler implements Handler<ActionResult> {
+//    	private int priority;
+//    	SetHandler(int p) {
+//    		priority = p;
+//    	}
+//    	public void handle(ActionResult event) {
+//    		Value newval = event.getParameter("value", ValueType.STRING);
+//    		handleSet(newval, priority, false);
+//    	}
+//    }
     
     private class RawSetHandler implements Handler<ValuePair> {
     	private int priority;
@@ -287,7 +287,7 @@ public class BacnetPoint {
 		Encodable enc = valueToEncodable(newval, oid.getObjectType(), pid);
 		try {
 			folder.conn.localDevice.send(folder.root.device, new WritePropertyRequest(oid, pid, null, enc, new UnsignedInteger(priority)));
-			Thread.sleep(500);
+			Thread.sleep(300);
 		} catch (BACnetException e) {
 			// TODO Auto-generated catch block
 			//e.printStackTrace();
@@ -690,10 +690,50 @@ public class BacnetPoint {
     	}
 		if (priorities == null) return;
 		for (int i=1; i<=priorities.getCount(); i++) {
-			String p = priorities.get(i).getValue().toString();
+			Encodable enc = priorities.get(i).getValue();
+			String p = enc.toString();
+			ValueType vt;
+			Value val = null;
+			boolean isnull = (enc instanceof Null);
+			switch (dataType) {
+			case BINARY: {
+				String off = (unitsDescription.size() > 0) ? unitsDescription.get(0) : "0";
+	    		String on = (unitsDescription.size() > 1) ? unitsDescription.get(1) : "1";
+				vt = ValueType.makeBool(on, off);
+				if (!isnull) val = new Value(Boolean.parseBoolean(p) || p.equals("1"));
+				break;
+			}
+			case NUMERIC: {
+				vt = ValueType.NUMBER;
+				if (!isnull) val = new Value(Double.parseDouble(p));
+				break;
+			}
+			case MULTISTATE: {
+				Set<String> enums = new HashSet<String>(unitsDescription);
+				vt = ValueType.makeEnum(enums);
+				int index = Integer.parseInt(p) - 1;
+				if (!isnull) {
+					if (index >= 0 && index < unitsDescription.size()) val = new Value(unitsDescription.get(index));
+					else val = new Value(p);
+				}
+				break;
+			}
+			case ALPHANUMERIC: {
+				vt = ValueType.STRING;
+				if (!isnull) val = new Value(p);
+				break;
+			}
+			default: {
+				vt = ValueType.STRING;
+				if (!isnull) val = new Value(p);
+			}
+			}
 			Node pnode = vnode.getChild("Priority "+i);
-			if (pnode != null) pnode.setValue(new Value(p));
-			else pnode = vnode.createChild("Priority "+i).setValueType(ValueType.STRING).setValue(new Value(p)).build();
+			if (pnode != null) {
+				pnode.setValueType(vt);
+				pnode.setValue(val);
+			}
+			else pnode = vnode.createChild("Priority "+i).setValueType(vt).setValue(val).build();
 			makeSetAction(pnode, i);
 			makeRelinquishAction(pnode, i);
 		}
@@ -733,6 +773,11 @@ public class BacnetPoint {
     	}
     	public void handle(ActionResult event) {
     		relinquish(priority);
+    		try {
+				Thread.sleep(300);
+			} catch (InterruptedException e) {
+				
+			}
     		refreshPriorities();
     	}
     }
@@ -747,43 +792,43 @@ public class BacnetPoint {
     }
     
     private void makeSetAction(Node valnode, int priority) {
-    	Action act = new Action(Permission.READ, new SetHandler(priority));
-    	Parameter par;
-    	switch(dataType) {
-    	case BINARY: {
-    		String off = (unitsDescription.size() > 0) ? unitsDescription.get(0) : "0";
-    		String on = (unitsDescription.size() > 1) ? unitsDescription.get(1) : "1";
-    		String def = ("0".equals(presentValue)) ? off : on;
-    		par = new Parameter("value", ValueType.makeEnum(on, off), new Value(def));
-    		break;
-    	}
-    	case NUMERIC: {
-    		par = new Parameter("value", ValueType.STRING, new Value(presentValue));
-    		break;
-    	}
-    	case MULTISTATE: {
-    		Set<String> enums = new HashSet<String>(unitsDescription);
-    		par = new Parameter("value", ValueType.makeEnum(enums));
-    		try {
-                 int index = Integer.parseInt(presentValue) - 1;
-                 if (index >= 0 && index < unitsDescription.size())
-                	 par = new Parameter("value", ValueType.makeEnum(enums), new Value(unitsDescription.get(index)));
-            } catch (NumberFormatException e) {
-                 // no op
-            }
-    		break;
-    	}
-    	case ALPHANUMERIC: {
-    		par = new Parameter("value", ValueType.STRING, new Value(presentValue));
-    		break;
-    	}
-    	default: {
-    		par = new Parameter("value", ValueType.STRING, new Value(presentValue));
-    		break;
-    	}
-    	}
-    	act.addParameter(par);
-    	valnode.createChild("setPretty").setAction(act).build().setSerializable(false);
+//    	Action act = new Action(Permission.READ, new SetHandler(priority));
+//    	Parameter par;
+//    	switch(dataType) {
+//    	case BINARY: {
+//    		String off = (unitsDescription.size() > 0) ? unitsDescription.get(0) : "0";
+//    		String on = (unitsDescription.size() > 1) ? unitsDescription.get(1) : "1";
+//    		String def = ("0".equals(presentValue)) ? off : on;
+//    		par = new Parameter("value", ValueType.makeEnum(on, off), new Value(def));
+//    		break;
+//    	}
+//    	case NUMERIC: {
+//    		par = new Parameter("value", ValueType.STRING, new Value(presentValue));
+//    		break;
+//    	}
+//    	case MULTISTATE: {
+//    		Set<String> enums = new HashSet<String>(unitsDescription);
+//    		par = new Parameter("value", ValueType.makeEnum(enums));
+//    		try {
+//                 int index = Integer.parseInt(presentValue) - 1;
+//                 if (index >= 0 && index < unitsDescription.size())
+//                	 par = new Parameter("value", ValueType.makeEnum(enums), new Value(unitsDescription.get(index)));
+//            } catch (NumberFormatException e) {
+//                 // no op
+//            }
+//    		break;
+//    	}
+//    	case ALPHANUMERIC: {
+//    		par = new Parameter("value", ValueType.STRING, new Value(presentValue));
+//    		break;
+//    	}
+//    	default: {
+//    		par = new Parameter("value", ValueType.STRING, new Value(presentValue));
+//    		break;
+//    	}
+//    	}
+//    	act.addParameter(par);
+//    	valnode.createChild("setPretty").setAction(act).build().setSerializable(false);
     	valnode.setWritable(Writable.WRITE);
     	valnode.getListener().setValueHandler(new RawSetHandler(priority));
     }

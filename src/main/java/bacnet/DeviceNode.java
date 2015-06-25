@@ -39,7 +39,8 @@ public class DeviceNode extends DeviceFolder {
 		Action act = new Action(Permission.READ, new EditHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
 		act.addParameter(new Parameter("MAC address", ValueType.STRING, node.getAttribute("MAC address")));
-	    act.addParameter(new Parameter("polling interval", ValueType.NUMBER, node.getAttribute("polling interval")));
+		double defint = node.getAttribute("polling interval").getNumber().doubleValue()/1000;
+	    act.addParameter(new Parameter("polling interval", ValueType.NUMBER, new Value(defint)));
 	    act.addParameter(new Parameter("cov usage", ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED"), node.getAttribute("cov usage")));
 	    act.addParameter(new Parameter("cov lease time (minutes)", ValueType.NUMBER, node.getAttribute("cov lease time (minutes)")));
 	    Node anode = node.getChild("edit");
@@ -50,7 +51,7 @@ public class DeviceNode extends DeviceFolder {
 	private class EditHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			String name = event.getParameter("name", ValueType.STRING).getString();
-			long interv = event.getParameter("polling interval", ValueType.NUMBER).getNumber().longValue();
+			long interv = (long) (1000*event.getParameter("polling interval", ValueType.NUMBER).getNumber().doubleValue());
 			CovType covtype = CovType.NONE;
 			try {
 				covtype = CovType.valueOf(event.getParameter("cov usage").getString());
