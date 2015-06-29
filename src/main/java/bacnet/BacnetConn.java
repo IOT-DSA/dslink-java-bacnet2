@@ -217,7 +217,7 @@ class BacnetConn {
 	
 	private class RestartHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
-			localDevice.terminate();
+			if (localDevice!=null) localDevice.terminate();
 			init();
 		}
 	}

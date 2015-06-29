@@ -18,7 +18,7 @@ dependencies {
     compile 'org.iot-dsa:dslink:0.3.0'
     compile fileTree('external')
     compile 'org.apache.commons:commons-lang3:3.0'
-	compile files('bacnet4j/bacnet4j.jar', 'bacnet4j/seroUtils.jar', 'bacnet4j/RXTXcomm.jar')
+	compile files('bacnet4j/bacnet4J.jar', 'bacnet4j/seroUtils.jar', 'bacnet4j/RXTXcomm.jar')
 }
 
 run {
