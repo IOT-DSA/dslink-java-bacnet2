@@ -107,11 +107,6 @@ class BacnetConn {
 			}
 		});
 		
-		act = new Action(Permission.READ, new RestartHandler());
-		anode = node.getChild("restart");
-		if (anode == null) node.createChild("restart").setAction(act).build().setSerializable(false);
-		else anode.setAction(act);
-		
 		Network network;
 		if (isIP) {
 			network = new IpNetwork(bip, port, lba, lnn);
@@ -149,29 +144,43 @@ class BacnetConn {
         	LOGGER.debug("error: ", e);
         	statnode.setValue(new Value("Error initializing local device"));
         	localDevice.terminate();
-        	return;
+        	localDevice = null;
         } finally {
             //localDevice.terminate();
         }
         
-        act = new Action(Permission.READ, new DeviceDiscoveryHandler());
-        anode = node.getChild("discover devices");
-        if (anode == null) node.createChild("discover devices").setAction(act).build().setSerializable(false);
-        else anode.setAction(act);
+		if (localDevice != null) {
+			act = new Action(Permission.READ, new StopHandler());
+			anode = node.getChild("stop");
+			if (anode == null) node.createChild("stop").setAction(act).build().setSerializable(false);
+			else anode.setAction(act);
+		}
+		
+		act = new Action(Permission.READ, new RestartHandler());
+		anode = node.getChild("restart");
+		if (anode == null) node.createChild("restart").setAction(act).build().setSerializable(false);
+		else anode.setAction(act);
         
-        act = new Action(Permission.READ, new AddDeviceHandler());
-        act.addParameter(new Parameter("name", ValueType.STRING));
-        String defMac = "10";
-        if (isIP) defMac = "10.0.1.248:47808";
-        act.addParameter(new Parameter("MAC address", ValueType.STRING, new Value(defMac)));
-        act.addParameter(new Parameter("polling interval", ValueType.NUMBER, new Value(((double)defaultInterval)/1000)));
-        act.addParameter(new Parameter("cov usage", ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED")));
-        act.addParameter(new Parameter("cov lease time (minutes)", ValueType.NUMBER, new Value(60)));
-        anode = node.getChild("add device");
-        if (anode == null) node.createChild("add device").setAction(act).build().setSerializable(false);
-        else anode.setAction(act);
-        
-        statnode.setValue(new Value("Connected"));
+        if (localDevice != null) {
+			act = new Action(Permission.READ, new DeviceDiscoveryHandler());
+			anode = node.getChild("discover devices");
+			if (anode == null) node.createChild("discover devices").setAction(act).build().setSerializable(false);
+			else anode.setAction(act);
+			
+			act = new Action(Permission.READ, new AddDeviceHandler());
+			act.addParameter(new Parameter("name", ValueType.STRING));
+			String defMac = "10";
+			if (isIP) defMac = "10.0.1.248:47808";
+			act.addParameter(new Parameter("MAC address", ValueType.STRING, new Value(defMac)));
+			act.addParameter(new Parameter("polling interval", ValueType.NUMBER, new Value(((double) defaultInterval) / 1000)));
+			act.addParameter(new Parameter("cov usage", ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED")));
+			act.addParameter(new Parameter("cov lease time (minutes)",ValueType.NUMBER, new Value(60)));
+			anode = node.getChild("add device");
+			if (anode == null)node.createChild("add device").setAction(act).build().setSerializable(false);
+			else anode.setAction(act);
+			statnode.setValue(new Value("Connected"));
+		}
+		
 	
 	}
 	
@@ -195,7 +204,6 @@ class BacnetConn {
 			} else {
 				act.addParameter(new Parameter("comm port id", ValueType.STRING, node.getAttribute("comm port id")));
 			}
-			act.addParameter(new Parameter("comm port id", ValueType.STRING, node.getAttribute("comm port id")));
 			act.addParameter(new Parameter("baud rate", ValueType.NUMBER, node.getAttribute("baud rate")));
 			act.addParameter(new Parameter("this station id", ValueType.NUMBER, node.getAttribute("this station id")));
 			act.addParameter(new Parameter("frame error retry count", ValueType.NUMBER, node.getAttribute("frame error retry count")));
@@ -214,11 +222,27 @@ class BacnetConn {
 		return act;
 	}
 	
+	private class StopHandler implements Handler<ActionResult> {
+		public void handle(ActionResult event) {
+			stop();
+		}
+	}
 	
 	private class RestartHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
-			if (localDevice!=null) localDevice.terminate();
-			init();
+			stop();
+			restoreLastSession();
+		}
+	}
+	
+	void stop() {
+		if (localDevice!=null) {
+			localDevice.terminate();
+			localDevice = null;
+			node.removeChild("stop");
+			node.removeChild("discover devices");
+			node.removeChild("add device");
+			statnode.setValue(new Value("Stopped"));
 		}
 	}
 	
@@ -264,7 +288,7 @@ class BacnetConn {
 			node.setAttribute("local device vendor", new Value(locdevVend));
 			node.setAttribute("default polling interval", new Value(interval));
 
-			localDevice.terminate();
+			stop();
 			
 			if (!name.equals(node.getName())) {
 				rename(name);
@@ -275,7 +299,7 @@ class BacnetConn {
 //					if (child.getAction()!=null) node.removeChild(child);
 //				}
 //			}
-			init();
+			restoreLastSession();
 		}
 	}
 	
@@ -293,7 +317,7 @@ class BacnetConn {
 	}
 	
 	private void remove() {
-		localDevice.terminate();
+		stop();
 		node.clearChildren();
 		node.getParent().removeChild(node);
 	}
@@ -340,6 +364,10 @@ class BacnetConn {
 	RemoteDevice getDevice(String mac, long interval, CovType covtype, int covlife) {
 		ConcurrentLinkedQueue<RemoteDevice> devs = new ConcurrentLinkedQueue<RemoteDevice>();
 		DiscoveryListener dl = new DiscoveryListener(devs);
+		if (localDevice == null) {
+			stop();
+			return null;
+		}
 		localDevice.getEventHandler().addListener(dl);
 		try {
 			localDevice.sendUnconfirmed(new Address(new OctetString(mac)), new WhoIsRequest());
@@ -371,6 +399,10 @@ class BacnetConn {
 		public void handle(ActionResult event) {
 			ConcurrentLinkedQueue<RemoteDevice> devs = new ConcurrentLinkedQueue<RemoteDevice>();
 			DiscoveryListener dl = new DiscoveryListener(devs);
+			if (localDevice == null) {
+				stop();
+				return;
+			}
 			localDevice.getEventHandler().addListener(dl);
 			try {
 				localDevice.sendGlobalBroadcast(new WhoIsRequest());

@@ -270,6 +270,10 @@ public class BacnetPoint {
     }
     
     private void handleSet(Value newval, int priority, boolean raw) {
+    	if (folder.conn.localDevice == null) {
+    		folder.conn.stop();
+    		return;
+    	}
     	if (dataType == DataType.BINARY) {
 			if (raw) {
 //				newval = String.valueOf(Boolean.parseBoolean(newval) || newval.equals("1"));
@@ -745,9 +749,13 @@ public class BacnetPoint {
     }
     
     private PriorityArray getPriorityArray() throws BACnetException {
-			Encodable e = RequestUtils.getProperty(folder.conn.localDevice, folder.root.device, oid, PropertyIdentifier.priorityArray);
-			if (e instanceof BACnetError) return null;
-			return (PriorityArray) e;
+    	if (folder.conn.localDevice == null) {
+    		folder.conn.stop();
+    		return null;
+    	}
+		Encodable e = RequestUtils.getProperty(folder.conn.localDevice, folder.root.device, oid, PropertyIdentifier.priorityArray);
+		if (e instanceof BACnetError) return null;
+		return (PriorityArray) e;
     }
     
     private class RelinquishAllHandler implements Handler<ActionResult> {
@@ -783,6 +791,10 @@ public class BacnetPoint {
     }
     
     private void relinquish(int priority) {
+    	if (folder.conn.localDevice == null) {
+    		folder.conn.stop();
+    		return;
+    	}
     	try {
     		folder.conn.localDevice.send(folder.root.device, new WritePropertyRequest(oid, pid, null, new Null(), new UnsignedInteger(priority)));
 		} catch (BACnetException e) {

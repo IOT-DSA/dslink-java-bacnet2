@@ -172,6 +172,10 @@ public class BacnetLink {
 	}
 	
 	void setupPoint(final BacnetPoint point, final DeviceFolder devicefold) {
+		if (devicefold.conn.localDevice == null) {
+			devicefold.conn.stop();
+			return;
+		}
 		Node child = point.node.getChild("present value");
 		if (devicefold.root.covType != CovType.NONE && point.isCov()) {
 			ScheduledFuture<?> fut = futures.remove(child);
@@ -209,7 +213,8 @@ public class BacnetLink {
 						fut.cancel(false);
 					}
 					//cl.event.active = false;
-					devicefold.conn.localDevice.getEventHandler().removeListener(cl);
+					if (devicefold.conn.localDevice != null) 
+						devicefold.conn.localDevice.getEventHandler().removeListener(cl);
 				}
 			});
 //			ScheduledFuture<?> fut = futures.remove(child);
@@ -231,6 +236,10 @@ public class BacnetLink {
 				ScheduledThreadPoolExecutor stpe = Objects.getDaemonThreadPool();
 				ScheduledFuture<?> fut = stpe.scheduleWithFixedDelay(new Runnable() {
 					public void run() {
+						if (devicefold.conn.localDevice == null) {
+							devicefold.conn.stop();
+							return;
+						}
 						if (point.node != null) LOGGER.debug("polling " + point.node.getName());
 						getPoint(point, devicefold);
 					}	                 
