@@ -1,7 +1,9 @@
 package bacnet;
 
-import java.util.LinkedList;
+import java.util.HashSet;
 import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
@@ -88,36 +90,27 @@ class BacnetConn {
         if (anode == null) node.createChild("remove").setAction(act).build().setSerializable(false);
         else anode.setAction(act);
         
-        act = new Action(Permission.READ, new EditHandler());
-        act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
-        if (isIP) {
-			act.addParameter(new Parameter("broadcast ip", ValueType.STRING, node.getAttribute("broadcast ip")));
-			act.addParameter(new Parameter("port", ValueType.NUMBER, node.getAttribute("port")));
-			act.addParameter(new Parameter("local bind address", ValueType.STRING, node.getAttribute("local bind address")));
-		} else {
-			act.addParameter(new Parameter("comm port id", ValueType.STRING, node.getAttribute("comm port id")));
-			act.addParameter(new Parameter("baud rate", ValueType.NUMBER, node.getAttribute("baud rate")));
-			act.addParameter(new Parameter("this station id", ValueType.NUMBER, node.getAttribute("this station id")));
-			act.addParameter(new Parameter("frame error retry count", ValueType.NUMBER, node.getAttribute("frame error retry count")));
-		}
-		act.addParameter(new Parameter("local network number", ValueType.NUMBER, node.getAttribute("local network number")));
-		act.addParameter(new Parameter("strict device comparisons", ValueType.BOOL, node.getAttribute("strict device comparisons")));
-		act.addParameter(new Parameter("timeout", ValueType.NUMBER, node.getAttribute("timeout")));
-		act.addParameter(new Parameter("segment timeout", ValueType.NUMBER, node.getAttribute("segment timeout")));
-		act.addParameter(new Parameter("segment window", ValueType.NUMBER, node.getAttribute("segment window")));
-		act.addParameter(new Parameter("retries", ValueType.NUMBER, node.getAttribute("retries")));
-		act.addParameter(new Parameter("local device id", ValueType.NUMBER, node.getAttribute("local device id")));
-		act.addParameter(new Parameter("local device name", ValueType.STRING, node.getAttribute("local device name")));
-		act.addParameter(new Parameter("local device vendor", ValueType.STRING, node.getAttribute("local device vendor")));
-		double defint = node.getAttribute("default polling interval").getNumber().doubleValue()/1000;
-		act.addParameter(new Parameter("default polling interval", ValueType.NUMBER, new Value(defint)));
+        act = getEditAction();
 		anode = node.getChild("edit");
-		if (anode == null) node.createChild("edit").setAction(act).build().setSerializable(false);
-		else anode.setAction(act);
+		if (anode == null) {
+			anode = node.createChild("edit").setAction(act).build();
+			anode.setSerializable(false);
+		} else {
+			anode.setAction(act);
+		}
+		final Node fanode = anode;
+		fanode.getListener().setOnListHandler(new Handler<Node>() {
+			public void handle(Node event) {
+				//TODO
+				//System.out.println("doing the other thing");
+				fanode.setAction(getEditAction());
+			}
+		});
 		
-//		act = new Action(Permission.READ, new CopyHandler());
-//		act.addParameter(new Parameter("name", ValueType.STRING));
-//		node.createChild("make copy").setAction(act).build().setSerializable(false);
+		act = new Action(Permission.READ, new RestartHandler());
+		anode = node.getChild("restart");
+		if (anode == null) node.createChild("restart").setAction(act).build().setSerializable(false);
+		else anode.setAction(act);
 		
 		Network network;
 		if (isIP) {
@@ -168,7 +161,9 @@ class BacnetConn {
         
         act = new Action(Permission.READ, new AddDeviceHandler());
         act.addParameter(new Parameter("name", ValueType.STRING));
-        act.addParameter(new Parameter("MAC address", ValueType.STRING, new Value("10.0.1.248:47808")));
+        String defMac = "10";
+        if (isIP) defMac = "10.0.1.248:47808";
+        act.addParameter(new Parameter("MAC address", ValueType.STRING, new Value(defMac)));
         act.addParameter(new Parameter("polling interval", ValueType.NUMBER, new Value(((double)defaultInterval)/1000)));
         act.addParameter(new Parameter("cov usage", ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED")));
         act.addParameter(new Parameter("cov lease time (minutes)", ValueType.NUMBER, new Value(60)));
@@ -180,7 +175,52 @@ class BacnetConn {
 	
 	}
 	
+	private Action getEditAction() {
+		Action act = new Action(Permission.READ, new EditHandler());
+        act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
+        if (isIP) {
+			act.addParameter(new Parameter("broadcast ip", ValueType.STRING, node.getAttribute("broadcast ip")));
+			act.addParameter(new Parameter("port", ValueType.NUMBER, node.getAttribute("port")));
+			act.addParameter(new Parameter("local bind address", ValueType.STRING, node.getAttribute("local bind address")));
+		} else {
+			Set<String> portids = new HashSet<String>(BacnetLink.listPorts());
+			if (portids.size() > 0) {
+				 if (portids.contains(node.getAttribute("comm port id").getString())) {
+					 act.addParameter(new Parameter("comm port id", ValueType.makeEnum(portids), node.getAttribute("comm port id")));
+					 act.addParameter(new Parameter("comm port id (manual entry)", ValueType.STRING));
+				 } else {
+					 act.addParameter(new Parameter("comm port id", ValueType.makeEnum(portids)));
+					 act.addParameter(new Parameter("comm port id (manual entry)", ValueType.STRING, node.getAttribute("comm port id")));
+				 }
+			} else {
+				act.addParameter(new Parameter("comm port id", ValueType.STRING, node.getAttribute("comm port id")));
+			}
+			act.addParameter(new Parameter("comm port id", ValueType.STRING, node.getAttribute("comm port id")));
+			act.addParameter(new Parameter("baud rate", ValueType.NUMBER, node.getAttribute("baud rate")));
+			act.addParameter(new Parameter("this station id", ValueType.NUMBER, node.getAttribute("this station id")));
+			act.addParameter(new Parameter("frame error retry count", ValueType.NUMBER, node.getAttribute("frame error retry count")));
+		}
+		act.addParameter(new Parameter("local network number", ValueType.NUMBER, node.getAttribute("local network number")));
+		act.addParameter(new Parameter("strict device comparisons", ValueType.BOOL, node.getAttribute("strict device comparisons")));
+		act.addParameter(new Parameter("timeout", ValueType.NUMBER, node.getAttribute("timeout")));
+		act.addParameter(new Parameter("segment timeout", ValueType.NUMBER, node.getAttribute("segment timeout")));
+		act.addParameter(new Parameter("segment window", ValueType.NUMBER, node.getAttribute("segment window")));
+		act.addParameter(new Parameter("retries", ValueType.NUMBER, node.getAttribute("retries")));
+		act.addParameter(new Parameter("local device id", ValueType.NUMBER, node.getAttribute("local device id")));
+		act.addParameter(new Parameter("local device name", ValueType.STRING, node.getAttribute("local device name")));
+		act.addParameter(new Parameter("local device vendor", ValueType.STRING, node.getAttribute("local device vendor")));
+		double defint = node.getAttribute("default polling interval").getNumber().doubleValue()/1000;
+		act.addParameter(new Parameter("default polling interval", ValueType.NUMBER, new Value(defint)));
+		return act;
+	}
 	
+	
+	private class RestartHandler implements Handler<ActionResult> {
+		public void handle(ActionResult event) {
+			localDevice.terminate();
+			init();
+		}
+	}
 	
 	private class EditHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
@@ -298,7 +338,7 @@ class BacnetConn {
 	}
 	
 	RemoteDevice getDevice(String mac, long interval, CovType covtype, int covlife) {
-		Queue<RemoteDevice> devs = new LinkedList<RemoteDevice>();
+		ConcurrentLinkedQueue<RemoteDevice> devs = new ConcurrentLinkedQueue<RemoteDevice>();
 		DiscoveryListener dl = new DiscoveryListener(devs);
 		localDevice.getEventHandler().addListener(dl);
 		try {
@@ -329,7 +369,7 @@ class BacnetConn {
 	
 	private class DeviceDiscoveryHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
-			Queue<RemoteDevice> devs = new LinkedList<RemoteDevice>();
+			ConcurrentLinkedQueue<RemoteDevice> devs = new ConcurrentLinkedQueue<RemoteDevice>();
 			DiscoveryListener dl = new DiscoveryListener(devs);
 			localDevice.getEventHandler().addListener(dl);
 			try {

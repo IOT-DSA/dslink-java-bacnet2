@@ -2,6 +2,7 @@ package bacnet;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ArrayBlockingQueue;
 
 import org.apache.commons.lang3.StringUtils;
 import org.dsa.iot.dslink.node.Node;
@@ -193,48 +194,51 @@ public class DeviceFolder {
 		}
 	}
 
-	public CovListener getNewCovListener(BacnetPoint p) {
-		return new CovListener(p);
+	public static CovListener getNewCovListener() {
+		return new CovListener();
 	}
 	
-	public class CovListener extends DeviceEventAdapter {
+	public static class CovListener extends DeviceEventAdapter {
 		
-		CovEvent event;
+		ArrayBlockingQueue<SequenceOf<PropertyValue>> event;
+		//BacnetPoint point;
 		
-		CovListener(BacnetPoint p) {
-			this.event = new CovEvent(p);
+		CovListener() {
+			//this.point = p;
+			this.event = new ArrayBlockingQueue<SequenceOf<PropertyValue>>(1);
 		}
 		
 		@Override
 		public void covNotificationReceived(final UnsignedInteger subscriberProcessIdentifier,
 	            final RemoteDevice initiatingDevice, final ObjectIdentifier monitoredObjectIdentifier,
 	            final UnsignedInteger timeRemaining, final SequenceOf<PropertyValue> listOfValues) {
-			event.update(listOfValues);
+			event.clear();
+			event.add(listOfValues);
 		}
 	}
 	
-	class CovEvent {
-		private BacnetPoint point;
-		private SequenceOf<PropertyValue> listOfValues;
-		//boolean active;
-		CovEvent(BacnetPoint pt) {
-			point = pt;
-			listOfValues = null;
-			//active = true;
-		}
-		void update(SequenceOf<PropertyValue> lov) {
-			listOfValues = lov;
-		}
-		
-		void process() {
-			if (listOfValues == null) return;
-			for (PropertyValue pv: listOfValues) {
-				if (point.node != null) LOGGER.debug("got cov for " + point.node.getName());
-				updatePointValue(point, pv.getPropertyIdentifier(), pv.getValue());
-			}
-			listOfValues = null;
-		}
-	}
+//	class CovEvent {
+//		private BacnetPoint point;
+//		private SequenceOf<PropertyValue> listOfValues;
+//		//boolean active;
+//		CovEvent(BacnetPoint pt) {
+//			point = pt;
+//			listOfValues = null;
+//			//active = true;
+//		}
+//		void update(SequenceOf<PropertyValue> lov) {
+//			listOfValues = lov;
+//		}
+//		
+//		void process() {
+//			if (listOfValues == null) return;
+//			for (PropertyValue pv: listOfValues) {
+//				if (point.node != null) LOGGER.debug("got cov for " + point.node.getName());
+//				updatePointValue(point, pv.getPropertyIdentifier(), pv.getValue());
+//			}
+//			listOfValues = null;
+//		}
+//	}
 	
 	void getProperties(PropertyReferences refs, final Map<ObjectIdentifier, BacnetPoint> points) {
 		try {
@@ -255,7 +259,7 @@ public class DeviceFolder {
 		}
 	}
 	
-	private void updatePointValue(BacnetPoint pt, PropertyIdentifier pid, Encodable encodable) {
+	void updatePointValue(BacnetPoint pt, PropertyIdentifier pid, Encodable encodable) {
 		
 		if (encodable instanceof BACnetError) return;
 		if (pid.equals(PropertyIdentifier.objectName)) {

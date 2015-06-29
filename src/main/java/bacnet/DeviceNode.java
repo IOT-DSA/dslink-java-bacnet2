@@ -33,6 +33,7 @@ public class DeviceNode extends DeviceFolder {
 		}
 		
 		makeEditAction();
+
 	}
 	
 	private void makeEditAction() {
@@ -47,6 +48,7 @@ public class DeviceNode extends DeviceFolder {
 	    if (anode == null) node.createChild("edit").setAction(act).build().setSerializable(false);
 	    else anode.setAction(act);
 	}
+
 	
 	private class EditHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {

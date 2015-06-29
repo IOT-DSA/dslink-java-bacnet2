@@ -1,7 +1,14 @@
 package bacnet;
 
+import gnu.io.CommPortIdentifier;
+
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -22,9 +29,10 @@ import org.slf4j.LoggerFactory;
 import org.vertx.java.core.Handler;
 
 import bacnet.BacnetConn.CovType;
-import bacnet.DeviceFolder.CovEvent;
 import bacnet.DeviceFolder.CovListener;
 
+import com.serotonin.bacnet4j.type.constructed.PropertyValue;
+import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.util.PropertyReferences;
 
@@ -78,9 +86,40 @@ public class BacnetLink {
 //		act.addParameter(new Parameter("Operating System", ValueType.makeEnum("Windows-x32", "Windows-x64", "Linux-x86", "Linux-x86_64", "Linux-ia64", "MacOSX")));
 //		node.createChild("setup rxtx").setAction(act).build().setSerializable(false);
 		
-		act = new Action(Permission.READ, new AddConnHandler(false));
+		act = getAddSerialAction();
+		final Node anode = node.createChild("add mstp connection").setAction(act).build();
+		anode.setSerializable(false);
+		anode.getListener().setOnListHandler(new Handler<Node>() {
+			public void handle(Node event) {
+				//TODO
+				//System.out.println("doing the thing");
+				anode.setAction(getAddSerialAction());
+			}
+		});
+	}
+	
+	static List<String> listPorts() {
+		@SuppressWarnings("unchecked")
+		java.util.Enumeration<CommPortIdentifier> portEnum = CommPortIdentifier.getPortIdentifiers();
+		List<String> portlist = new LinkedList<String>();
+		while ( portEnum.hasMoreElements() ) 
+		{
+			CommPortIdentifier portIdentifier = portEnum.nextElement();
+			portlist.add(portIdentifier.getName());
+		}
+		return portlist;
+	}
+	
+	private Action getAddSerialAction() {
+		Action act = new Action(Permission.READ, new AddConnHandler(false));
 		act.addParameter(new Parameter("name", ValueType.STRING));
-		act.addParameter(new Parameter("comm port id", ValueType.STRING));
+		Set<String> portids = new HashSet<String>(listPorts());
+		if (portids.size() > 0) {
+			act.addParameter(new Parameter("comm port id", ValueType.makeEnum(portids)));
+			act.addParameter(new Parameter("comm port id (manual entry)", ValueType.STRING));
+		} else {
+			act.addParameter(new Parameter("comm port id", ValueType.STRING));
+		}
 		act.addParameter(new Parameter("baud rate", ValueType.NUMBER, new Value(19200)));
 		act.addParameter(new Parameter("this station id", ValueType.NUMBER, new Value(0)));
 		act.addParameter(new Parameter("frame error retry count", ValueType.NUMBER, new Value(1)));
@@ -94,7 +133,7 @@ public class BacnetLink {
 		act.addParameter(new Parameter("local device name", ValueType.STRING, new Value("DSLink")));
 		act.addParameter(new Parameter("local device vendor", ValueType.STRING, new Value("DGLogik Inc.")));
 		act.addParameter(new Parameter("default polling interval", ValueType.NUMBER, new Value(5)));
-		node.createChild("add mstp connection").setAction(act).build().setSerializable(false);
+		return act;
 	}
 	
 	public void restoreLastSession() {
@@ -139,24 +178,27 @@ public class BacnetLink {
 			if (fut != null) {
 				fut.cancel(false);
 			}
-			final CovListener cl = devicefold.getNewCovListener(point);
+			final CovListener cl = DeviceFolder.getNewCovListener();
 			child.getListener().setOnSubscribeHandler(new Handler<Node>() {
 				public void handle(final Node event) {
 					getPoint(point, devicefold);
 					devicefold.setupCov(point, cl);
-					final CovEvent covEv = cl.event;
-//					int waittime = 250;
-//					int totaltime = 0;
-//					int lifetime = 60000 * devicefold.root.node.getAttribute("cov lease time (minutes)").getNumber().intValue();
+					final ArrayBlockingQueue<SequenceOf<PropertyValue>> covEv = cl.event;
 					if (futures.containsKey(event)) {
 						return;
 			        }
 					ScheduledThreadPoolExecutor stpe = Objects.getDaemonThreadPool();
 					ScheduledFuture<?> fut = stpe.scheduleWithFixedDelay(new Runnable() {
 						public void run() {
-							covEv.process();
+							SequenceOf<PropertyValue> listOfValues = covEv.poll();
+							if (listOfValues != null) {
+								for (PropertyValue pv: listOfValues) {
+									if (point.node != null) LOGGER.debug("got cov for " + point.node.getName());
+									devicefold.updatePointValue(point, pv.getPropertyIdentifier(), pv.getValue());
+								}
+							}
 						}	                 
-					}, 0, 250, TimeUnit.MILLISECONDS);
+					}, 0, 50, TimeUnit.MILLISECONDS);
 					futures.put(event, fut);
 				}
 			});
