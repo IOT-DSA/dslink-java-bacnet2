@@ -1,6 +1,5 @@
 package bacnet;
 
-import java.util.HashSet;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -192,7 +191,7 @@ class BacnetConn {
 			act.addParameter(new Parameter("port", ValueType.NUMBER, node.getAttribute("port")));
 			act.addParameter(new Parameter("local bind address", ValueType.STRING, node.getAttribute("local bind address")));
 		} else {
-			Set<String> portids = new HashSet<String>(BacnetLink.listPorts());
+			Set<String> portids = BacnetLink.listPorts();
 			if (portids.size() > 0) {
 				 if (portids.contains(node.getAttribute("comm port id").getString())) {
 					 act.addParameter(new Parameter("comm port id", ValueType.makeEnum(portids), node.getAttribute("comm port id")));

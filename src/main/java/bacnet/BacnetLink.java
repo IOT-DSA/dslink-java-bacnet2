@@ -1,10 +1,7 @@
 package bacnet;
 
-import gnu.io.CommPortIdentifier;
-
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +32,9 @@ import com.serotonin.bacnet4j.type.constructed.PropertyValue;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.util.PropertyReferences;
+import com.serotonin.io.serial.CommPortConfigException;
+import com.serotonin.io.serial.CommPortProxy;
+import com.serotonin.io.serial.SerialUtils;
 
 public class BacnetLink {
 	private static final Logger LOGGER;
@@ -98,22 +98,23 @@ public class BacnetLink {
 		});
 	}
 	
-	static List<String> listPorts() {
-		@SuppressWarnings("unchecked")
-		java.util.Enumeration<CommPortIdentifier> portEnum = CommPortIdentifier.getPortIdentifiers();
-		List<String> portlist = new LinkedList<String>();
-		while ( portEnum.hasMoreElements() ) 
-		{
-			CommPortIdentifier portIdentifier = portEnum.nextElement();
-			portlist.add(portIdentifier.getName());
+	static Set<String> listPorts() {
+		Set<String> portids = new HashSet<String>();
+		try {
+			List<CommPortProxy> cports = SerialUtils.getCommPorts();
+			for (CommPortProxy port: cports)  {
+				portids.add(port.getId());
+			}
+		} catch (CommPortConfigException e) {
+			// TODO Auto-generated catch block
 		}
-		return portlist;
+		return portids;
 	}
 	
 	private Action getAddSerialAction() {
 		Action act = new Action(Permission.READ, new AddConnHandler(false));
 		act.addParameter(new Parameter("name", ValueType.STRING));
-		Set<String> portids = new HashSet<String>(listPorts());
+		Set<String> portids = listPorts();
 		if (portids.size() > 0) {
 			act.addParameter(new Parameter("comm port id", ValueType.makeEnum(portids)));
 			act.addParameter(new Parameter("comm port id (manual entry)", ValueType.STRING));
