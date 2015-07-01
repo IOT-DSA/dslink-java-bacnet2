@@ -194,17 +194,14 @@ public class DeviceFolder {
 		}
 	}
 
-	public static CovListener getNewCovListener() {
-		return new CovListener();
-	}
 	
-	public static class CovListener extends DeviceEventAdapter {
+	public class CovListener extends DeviceEventAdapter {
 		
 		ArrayBlockingQueue<SequenceOf<PropertyValue>> event;
-		//BacnetPoint point;
+		BacnetPoint point;
 		
-		CovListener() {
-			//this.point = p;
+		CovListener(BacnetPoint p) {
+			this.point = p;
 			this.event = new ArrayBlockingQueue<SequenceOf<PropertyValue>>(1);
 		}
 		
@@ -212,8 +209,10 @@ public class DeviceFolder {
 		public void covNotificationReceived(final UnsignedInteger subscriberProcessIdentifier,
 	            final RemoteDevice initiatingDevice, final ObjectIdentifier monitoredObjectIdentifier,
 	            final UnsignedInteger timeRemaining, final SequenceOf<PropertyValue> listOfValues) {
-			event.clear();
-			event.add(listOfValues);
+			if (root.device.equals(initiatingDevice) && point.oid.equals(monitoredObjectIdentifier)) {
+				event.clear();
+				event.add(listOfValues);
+			}
 		}
 	}
 	

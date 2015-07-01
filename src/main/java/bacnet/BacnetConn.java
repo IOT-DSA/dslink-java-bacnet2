@@ -58,12 +58,18 @@ class BacnetConn {
 	BacnetConn(BacnetLink link, Node node) {
 		this.node = node;
 		this.link = link;
+		
+		isIP = node.getAttribute("isIP").getBool();
+		defaultInterval = node.getAttribute("default polling interval").getNumber().longValue();
+		
+		if (!isIP) link.serialConns.add(this);
 		this.statnode = node.createChild("STATUS").setValueType(ValueType.STRING).setValue(new Value("")).build();
+	
+		unnamedCount = 0;
 	}
 	
 	void init() {
 		statnode.setValue(new Value("Setting up connection"));
-		unnamedCount = 0;
 		
 		isIP = node.getAttribute("isIP").getBool();
 		String bip = node.getAttribute("broadcast ip").getString();
@@ -97,14 +103,6 @@ class BacnetConn {
 		} else {
 			anode.setAction(act);
 		}
-		final Node fanode = anode;
-		fanode.getListener().setOnListHandler(new Handler<Node>() {
-			public void handle(Node event) {
-				//TODO
-				//System.out.println("doing the other thing");
-				fanode.setAction(getEditAction());
-			}
-		});
 		
 		Network network;
 		if (isIP) {
@@ -183,7 +181,7 @@ class BacnetConn {
 	
 	}
 	
-	private Action getEditAction() {
+	Action getEditAction() {
 		Action act = new Action(Permission.READ, new EditHandler());
         act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
         if (isIP) {
@@ -318,6 +316,7 @@ class BacnetConn {
 	private void remove() {
 		stop();
 		node.clearChildren();
+		link.serialConns.remove(getMe());
 		node.getParent().removeChild(node);
 	}
 	

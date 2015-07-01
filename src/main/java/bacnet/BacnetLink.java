@@ -1,16 +1,11 @@
 package bacnet;
 
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
@@ -20,39 +15,32 @@ import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.serializer.Deserializer;
 import org.dsa.iot.dslink.serializer.Serializer;
-import org.dsa.iot.dslink.util.Objects;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.vertx.java.core.Handler;
 
 import bacnet.BacnetConn.CovType;
-import bacnet.DeviceFolder.CovListener;
-
-import com.serotonin.bacnet4j.type.constructed.PropertyValue;
-import com.serotonin.bacnet4j.type.constructed.SequenceOf;
-import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
-import com.serotonin.bacnet4j.util.PropertyReferences;
 import com.serotonin.io.serial.CommPortConfigException;
 import com.serotonin.io.serial.CommPortProxy;
 import com.serotonin.io.serial.SerialUtils;
 
 public class BacnetLink {
-	private static final Logger LOGGER;
+	//private static final Logger LOGGER;
 	
 	private Node node;
-	private final Map<Node, ScheduledFuture<?>> futures;
+	final Map<BacnetPoint, ScheduledFuture<?>> futures;
+	final Set<BacnetConn> serialConns;
 	Serializer copySerializer;
 	Deserializer copyDeserializer;
 	
-	static {
-		LOGGER = LoggerFactory.getLogger(BacnetLink.class);
-	}
+//	static {
+//		LOGGER = LoggerFactory.getLogger(BacnetLink.class);
+//	}
 	
 	private BacnetLink(Node node, Serializer ser, Deserializer deser) {
 		this.node = node;
-		this.futures = new ConcurrentHashMap<Node, ScheduledFuture<?>>();
+		this.futures = new ConcurrentHashMap<BacnetPoint, ScheduledFuture<?>>();
 		this.copyDeserializer = deser;
 		this.copySerializer = ser;
+		this.serialConns = new HashSet<BacnetConn>();
 	}
 	
 	public static void start(Node parent, Serializer ser, Deserializer deser) {
@@ -87,15 +75,31 @@ public class BacnetLink {
 //		node.createChild("setup rxtx").setAction(act).build().setSerializable(false);
 		
 		act = getAddSerialAction();
-		final Node anode = node.createChild("add mstp connection").setAction(act).build();
-		anode.setSerializable(false);
-		anode.getListener().setOnListHandler(new Handler<Node>() {
-			public void handle(Node event) {
-				//TODO
-				//System.out.println("doing the thing");
-				anode.setAction(getAddSerialAction());
+		node.createChild("add mstp connection").setAction(act).build().setSerializable(false);
+		
+		act = new Action(Permission.READ, new PortScanHandler());
+		node.createChild("scan for serial ports").setAction(act).build().setSerializable(false);
+	}
+	
+	private class PortScanHandler implements Handler<ActionResult> {
+		public void handle(ActionResult event) {
+			Action act = getAddSerialAction();
+			Node anode = node.getChild("add mstp connection");
+			if (anode == null) {
+				anode = node.createChild("add mstp connection").setAction(act).build();
+				anode.setSerializable(false);
+			} else {
+				anode.setAction(act);
 			}
-		});
+			
+			for (BacnetConn conn: serialConns) {
+				anode = conn.node.getChild("edit");
+				if (anode != null) { 
+					act = conn.getEditAction();
+					anode.setAction(act);
+				}
+			}
+		}
 	}
 	
 	static Set<String> listPorts() {
@@ -177,98 +181,40 @@ public class BacnetLink {
 			devicefold.conn.stop();
 			return;
 		}
-		Node child = point.node.getChild("present value");
+		setupNode(point, devicefold, 0);
+		setupNode(point, devicefold, 1);
+    }
+	
+	private void setupNode(final BacnetPoint point, final DeviceFolder devicefold, final int nodeIndex) {
+		Node child;
+		switch (nodeIndex) {
+		case 0: child = point.node; break;
+		case 1: child = point.node.getChild("present value"); break;
+		default: return;
+		}
 		if (devicefold.root.covType != CovType.NONE && point.isCov()) {
-			ScheduledFuture<?> fut = futures.remove(child);
-			if (fut != null) {
-				fut.cancel(false);
-			}
-			final CovListener cl = DeviceFolder.getNewCovListener();
-			child.getListener().setOnSubscribeHandler(new Handler<Node>() {
-				public void handle(final Node event) {
-					getPoint(point, devicefold);
-					devicefold.setupCov(point, cl);
-					final ArrayBlockingQueue<SequenceOf<PropertyValue>> covEv = cl.event;
-					if (futures.containsKey(event)) {
-						return;
-			        }
-					ScheduledThreadPoolExecutor stpe = Objects.getDaemonThreadPool();
-					ScheduledFuture<?> fut = stpe.scheduleWithFixedDelay(new Runnable() {
-						public void run() {
-							SequenceOf<PropertyValue> listOfValues = covEv.poll();
-							if (listOfValues != null) {
-								for (PropertyValue pv: listOfValues) {
-									if (point.node != null) LOGGER.debug("got cov for " + point.node.getName());
-									devicefold.updatePointValue(point, pv.getPropertyIdentifier(), pv.getValue());
-								}
-							}
-						}	                 
-					}, 0, 50, TimeUnit.MILLISECONDS);
-					futures.put(event, fut);
-				}
-			});
-			child.getListener().setOnUnsubscribeHandler(new Handler<Node>() {
-				public void handle(final Node event) {
-					ScheduledFuture<?> fut = futures.remove(event);
-					if (fut != null) {
-						fut.cancel(false);
-					}
-					//cl.event.active = false;
-					if (devicefold.conn.localDevice != null) 
-						devicefold.conn.localDevice.getEventHandler().removeListener(cl);
-				}
-			});
 //			ScheduledFuture<?> fut = futures.remove(child);
 //			if (fut != null) {
 //				fut.cancel(false);
 //			}
-//			child.getListener().setOnUnsubscribeHandler(null);
-			return;
-		}
-		child.getListener().setOnSubscribeHandler(new Handler<Node>() {
-			public void handle(final Node event) {
-//				if (devicefold.root.covType != CovType.NONE && point.isCov()) {
-//					setupPoint(point, devicefold);
-//					return;
-//				}
-				if (futures.containsKey(event)) {
-					return;
-		        }
-				ScheduledThreadPoolExecutor stpe = Objects.getDaemonThreadPool();
-				ScheduledFuture<?> fut = stpe.scheduleWithFixedDelay(new Runnable() {
-					public void run() {
-						if (devicefold.conn.localDevice == null) {
-							devicefold.conn.stop();
-							return;
-						}
-						if (point.node != null) LOGGER.debug("polling " + point.node.getName());
-						getPoint(point, devicefold);
-					}	                 
-				}, 0, devicefold.root.interval, TimeUnit.MILLISECONDS);
-				futures.put(event, fut);
-			}
-		});
-
-		child.getListener().setOnUnsubscribeHandler(new Handler<Node>() {
-			public void handle(Node event) {
-				ScheduledFuture<?> fut = futures.remove(event);
-				if (fut != null) {
-					fut.cancel(false);
+			child.getListener().setOnSubscribeHandler(new Handler<Node>() {
+				public void handle(final Node event) {
+					point.poller.subscribe(nodeIndex, true);
 				}
+			});
+		} else {
+			child.getListener().setOnSubscribeHandler(new Handler<Node>() {
+				public void handle(final Node event) {
+					point.poller.subscribe(nodeIndex, false);
+				}
+			});
+		}
+		child.getListener().setOnUnsubscribeHandler(new Handler<Node>() {
+			public void handle(final Node event) {
+				point.poller.unsubscribe(nodeIndex);
 			}
 		});
-		return;
-    }
-	
-	private void getPoint(BacnetPoint point, DeviceFolder devicefold) {
-		PropertyReferences refs = new PropertyReferences();
-		Map<ObjectIdentifier, BacnetPoint> points = new HashMap<ObjectIdentifier, BacnetPoint>();
-		ObjectIdentifier oid = point.oid;
-      	DeviceFolder.addPropertyReferences(refs, oid);
-      	points.put(oid, point);
-      	devicefold.getProperties(refs, points);
 	}
-
 	
 	private class AddConnHandler implements Handler<ActionResult> {
 		private boolean isIP;
@@ -324,48 +270,6 @@ public class BacnetLink {
 			conn.init();
 		}
 	}
-	
-//	private enum RxtxVersion {
-//		Win32 ("Windows-x32"),
-//		Win64 ("Windows-x64"),
-//		Linux86 ("Linux-x86"),
-//		Linux64 ("Linux-x86_64"),
-//		Linuxia64 ("Linux-ia64"),
-//		MacOSX ("MacOSX");
-//	
-//		private final String folder;
-//		//final String serialFile;
-//		RxtxVersion(String folder) {
-//			this.folder = folder;
-//			//this.serialFile = serialFile;
-//		}
-//		
-//		@Override
-//		public String toString() {
-//			return folder;
-//		}
-//		
-//		public static RxtxVersion getEnum(String s) {
-//			for (RxtxVersion v: RxtxVersion.values()) {
-//				if (s.equals(v.toString())) return v;
-//			}
-//			return null;
-//		}
-//		
-//	}
-//	
-//	private static class RxtxSetupHandler implements Handler<ActionResult> {
-//		public void handle(ActionResult event) {
-//			RxtxVersion version = RxtxVersion.getEnum(event.getParameter("Operating System").getString());
-//			if (version == null) return;
-//			File rxtxfile = new File("rxtxSerial", version.toString());
-//			String toAdd = rxtxfile.getAbsolutePath();
-//			String path = System.getProperty("java.library.path");
-//			System.setProperty("java.library.path", path + ";" + toAdd + ";");
-//			System.out.println(System.getProperty("java.library.path"));
-//		
-//		}
-//	}
 	
 	private BacnetLink getMe() {
 		return this;

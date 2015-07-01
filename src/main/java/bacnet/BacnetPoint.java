@@ -46,8 +46,9 @@ public class BacnetPoint {
 	
 	private static PointCounter numPoints = new PointCounter();
 	
-	private DeviceFolder folder;
+	DeviceFolder folder;
 	private Node parent;
+	final BacnetPoller poller;
 	Node node;
 	ObjectIdentifier oid;
 	private PropertyIdentifier pid;
@@ -73,6 +74,7 @@ public class BacnetPoint {
 	
     public BacnetPoint(DeviceFolder folder, Node parent, ObjectIdentifier oid) {
     	this.folder = folder;
+    	poller = new BacnetPoller(this);
     	this.parent = parent;
     	this.node = null;
     	this.oid = oid;
@@ -92,6 +94,7 @@ public class BacnetPoint {
     
     public BacnetPoint(DeviceFolder folder, Node parent, Node node) {
     	this.folder = folder;
+    	poller = new BacnetPoller(this);
     	this.parent = parent;
     	this.node = node;
     	ObjectType ot = DeviceFolder.parseObjectType(node.getAttribute("object type").getString());
@@ -291,14 +294,15 @@ public class BacnetPoint {
 		Encodable enc = valueToEncodable(newval, oid.getObjectType(), pid);
 		try {
 			folder.conn.localDevice.send(folder.root.device, new WritePropertyRequest(oid, pid, null, enc, new UnsignedInteger(priority)));
-			Thread.sleep(300);
+			//Thread.sleep(500);
 		} catch (BACnetException e) {
 			// TODO Auto-generated catch block
 			//e.printStackTrace();
 			LOGGER.debug("error: ", e);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			LOGGER.debug("error: ", e);
+//		} catch (InterruptedException e) {
+//			// TODO Auto-generated catch block
+//			LOGGER.error("interrupted");
+//			LOGGER.debug("error: ", e);
 		}
 		refreshPriorities();
     }
@@ -606,8 +610,10 @@ public class BacnetPoint {
         	LOGGER.debug("dataType updated to " + dataType);
         }
 		Node vnode = node.getChild("present value");
+		Value oldval = null;
+		if (vnode != null) oldval = vnode.getValue();
 		if (presentValue != null) {
-			String prettyVal = getPrettyPresentValue(objectTypeId, presentValue, unitsDescription, referenceObjectTypeDescription, referenceInstanceNumber, referenceDeviceId);
+			//String prettyVal = getPrettyPresentValue(objectTypeId, presentValue, unitsDescription, referenceObjectTypeDescription, referenceInstanceNumber, referenceDeviceId);
 			ValueType vt;
 			Value val;
 			switch (dataType) {
@@ -642,37 +648,46 @@ public class BacnetPoint {
 			}
 			}
 			
-			node.setValue(new Value(prettyVal));
+			node.setValueType(vt);
+			node.setValue(val);
 			node.removeChild("units");
+			if (!(DeviceFolder.isOneOf(objectTypeId, ObjectType.binaryInput, ObjectType.binaryOutput,
+    				ObjectType.binaryValue, ObjectType.multiStateInput, ObjectType.multiStateOutput, 
+    				ObjectType.multiStateValue, ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone,
+    				ObjectType.trendLog)) && unitsDescription.size() > 0) {
+    			node.createChild("units").setValueType(ValueType.STRING).setValue(new Value(unitsDescription.get(0))).build();
+    		}
         	if (vnode != null) {
         		vnode.setValueType(vt);
         		vnode.setValue(val);
-        		if (!(DeviceFolder.isOneOf(objectTypeId, ObjectType.binaryInput, ObjectType.binaryOutput,
-        				ObjectType.binaryValue, ObjectType.multiStateInput, ObjectType.multiStateOutput, 
-        				ObjectType.multiStateValue, ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone,
-        				ObjectType.trendLog)) && unitsDescription.size() > 0) {
-        			node.createChild("units").setValueType(ValueType.STRING).setValue(new Value(unitsDescription.get(0))).build();
-        		}
         	}
         	else vnode = node.createChild("present value").setValueType(vt).setValue(val).build();
         	LOGGER.debug("presentValue updated to " + presentValue);
 		}
-        	vnode.clearChildren();
-        	vnode.setWritable(Writable.NEVER);
+        	
         	if (settable) {
         		makeSetAction(vnode, 8);
         		PriorityArray pa = null;
-        			try {
-        				pa = getPriorityArray();
-        			} catch (BACnetException e) {
-        				return;
-        			}
-        		if (pa != null) {
+//        		try {
+//    				Thread.sleep(500);
+//    			} catch (InterruptedException e) {	
+//    				LOGGER.error("interrupted");
+//    			}
+        		try {
+        			pa = getPriorityArray();
+        		} catch (BACnetException e) {
+        			return;
+        		}
+        		Value newval = vnode.getValue();
+        		if (pa != null && (!newval.equals(oldval) || vnode.getChildren() == null ||  vnode.getChildren().size() < pa.getCount()+3)) {
         			makeRelinquishAction(vnode, 8);
         			Action act = new Action(Permission.READ, new RelinquishAllHandler());
         			vnode.createChild("relinquish all").setAction(act).build().setSerializable(false);
         			refreshPriorities(pa);
         		}
+        	} else {
+        		vnode.clearChildren();
+            	vnode.setWritable(Writable.NEVER);
         	}
 		
     }
@@ -736,10 +751,12 @@ public class BacnetPoint {
 			if (pnode != null) {
 				pnode.setValueType(vt);
 				pnode.setValue(val);
+			} else {
+				pnode = vnode.createChild("Priority "+i).setValueType(vt).setValue(val).build();
+				makeSetAction(pnode, i);
+				makeRelinquishAction(pnode, i);
 			}
-			else pnode = vnode.createChild("Priority "+i).setValueType(vt).setValue(val).build();
-			makeSetAction(pnode, i);
-			makeRelinquishAction(pnode, i);
+			
 		}
     }
     
@@ -765,8 +782,13 @@ public class BacnetPoint {
 				if (priorities == null) return;
 				for (int i=1; i<=priorities.getCount(); i++) {
 	    			relinquish(i);
-	    			refreshPriorities();
 	    		}
+//				try {
+//    				Thread.sleep(500);
+//    			} catch (InterruptedException e) {
+//    				LOGGER.error("interrupted");
+//    			}
+    			refreshPriorities();
 			} catch (BACnetException e) {
 				// TODO Auto-generated catch block
 				LOGGER.error("error: ", e);
@@ -781,11 +803,11 @@ public class BacnetPoint {
     	}
     	public void handle(ActionResult event) {
     		relinquish(priority);
-    		try {
-				Thread.sleep(300);
-			} catch (InterruptedException e) {
-				
-			}
+//    		try {
+//				Thread.sleep(500);
+//			} catch (InterruptedException e) {
+//				LOGGER.error("interrupted");
+//			}
     		refreshPriorities();
     	}
     }
