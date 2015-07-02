@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
+
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
@@ -15,15 +16,18 @@ import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.serializer.Deserializer;
 import org.dsa.iot.dslink.serializer.Serializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.vertx.java.core.Handler;
 
 import bacnet.BacnetConn.CovType;
+
 import com.serotonin.io.serial.CommPortConfigException;
 import com.serotonin.io.serial.CommPortProxy;
 import com.serotonin.io.serial.SerialUtils;
 
 public class BacnetLink {
-	//private static final Logger LOGGER;
+	private static final Logger LOGGER;
 	
 	private Node node;
 	final Map<BacnetPoint, ScheduledFuture<?>> futures;
@@ -31,9 +35,9 @@ public class BacnetLink {
 	Serializer copySerializer;
 	Deserializer copyDeserializer;
 	
-//	static {
-//		LOGGER = LoggerFactory.getLogger(BacnetLink.class);
-//	}
+	static {
+		LOGGER = LoggerFactory.getLogger(BacnetLink.class);
+	}
 	
 	private BacnetLink(Node node, Serializer ser, Deserializer deser) {
 		this.node = node;
@@ -108,9 +112,11 @@ public class BacnetLink {
 			List<CommPortProxy> cports = SerialUtils.getCommPorts();
 			for (CommPortProxy port: cports)  {
 				portids.add(port.getId());
+				LOGGER.debug("comm port found: " + port.getId() );
 			}
 		} catch (CommPortConfigException e) {
 			// TODO Auto-generated catch block
+			LOGGER.debug("error scanning for ports: ", e);
 		}
 		return portids;
 	}
