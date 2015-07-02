@@ -10,6 +10,9 @@ version = '0.0.1-SNAPSHOT'
 repositories {
     mavenCentral()
     maven {
+    	url '.m2/repository'
+    }
+    maven {
         url 'https://oss.sonatype.org/content/repositories/snapshots/'
     }
 }
@@ -19,7 +22,7 @@ dependencies {
     compile 'org.apache.commons:commons-lang3:3.0'
     compile 'commons-logging:commons-logging:1.1.1'
     compile 'org.scream3r:jssc:2.8.0'
-	compile files('bacnet4j/bacnet4j-2.0.2.jar', 'bacnet4j/serotonin-utils-2.1.1.jar')
+	compile 'com.serotonin:bacnet4j:2.0.2'
 }
 
 run {
