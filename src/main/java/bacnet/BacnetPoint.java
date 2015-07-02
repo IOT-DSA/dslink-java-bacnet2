@@ -667,6 +667,7 @@ public class BacnetPoint {
         	
         	if (settable) {
         		makeSetAction(vnode, 8);
+        		makeSetAction(node, 8);
         		PriorityArray pa = null;
 //        		try {
 //    				Thread.sleep(500);

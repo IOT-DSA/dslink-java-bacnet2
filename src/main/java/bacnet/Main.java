@@ -30,6 +30,7 @@ public class Main extends DSLinkHandler {
         Serializer copyser = new Serializer(manager);
 		Deserializer copydeser = new Deserializer(manager);
         BacnetLink.start(superRoot, copyser, copydeser);
+        
 	}
 
 }
