@@ -1,11 +1,16 @@
 package bacnet;
 
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
+import java.util.regex.Pattern;
+
+import jssc.SerialNativeInterface;
+import jssc.SerialPortList;
 
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
@@ -23,8 +28,8 @@ import org.vertx.java.core.Handler;
 import bacnet.BacnetConn.CovType;
 
 import com.serotonin.io.serial.CommPortConfigException;
+import com.serotonin.io.serial.CommPortIdentifier;
 import com.serotonin.io.serial.CommPortProxy;
-import com.serotonin.io.serial.SerialUtils;
 
 public class BacnetLink {
 	private static final Logger LOGGER;
@@ -109,7 +114,7 @@ public class BacnetLink {
 	static Set<String> listPorts() {
 		Set<String> portids = new HashSet<String>();
 		try {
-			List<CommPortProxy> cports = SerialUtils.getCommPorts();
+			List<CommPortProxy> cports = getCommPorts();
 			for (CommPortProxy port: cports)  {
 				portids.add(port.getId());
 				LOGGER.debug("comm port found: " + port.getId() );
@@ -120,6 +125,39 @@ public class BacnetLink {
 		}
 		return portids;
 	}
+	
+	private static List<CommPortProxy> getCommPorts() throws CommPortConfigException {
+        try {
+            List<CommPortProxy> ports = new LinkedList<CommPortProxy>();
+            String[] portNames;
+            
+            switch(SerialNativeInterface.getOsType()){
+            	case SerialNativeInterface.OS_LINUX:
+            		portNames = SerialPortList.getPortNames(Pattern.compile("(cu|ttyS|ttyUSB|ttyACM|ttyAMA|rfcomm|ttyO)[0-9]{1,3}"));
+                break;
+            	case SerialNativeInterface.OS_MAC_OS_X:
+                    portNames = SerialPortList.getPortNames(Pattern.compile("(cu|tty)..*")); //Was "tty.(serial|usbserial|usbmodem).*")
+                break;
+                default:
+                	 portNames = SerialPortList.getPortNames();
+                break;
+            }
+            
+            for (String portName : portNames) {
+                CommPortIdentifier id = new CommPortIdentifier(portName, false);
+                ports.add(new CommPortProxy(id));
+            }
+
+            return ports;
+        }
+        catch (UnsatisfiedLinkError e) {
+            throw new CommPortConfigException(e.getMessage());
+        }
+        catch (NoClassDefFoundError e) {
+            throw new CommPortConfigException(
+                    "Comm configuration error. Check that rxtx DLL or libraries have been correctly installed.");
+        }
+    }
 	
 	private Action getAddSerialAction() {
 		Action act = new Action(Permission.READ, new AddConnHandler(false));
