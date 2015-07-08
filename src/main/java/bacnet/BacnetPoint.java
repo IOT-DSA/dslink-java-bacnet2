@@ -599,15 +599,30 @@ public class BacnetPoint {
     	
     	if (objectName != null) {
 			Node vnode = node.getChild("objectName");
-			if (vnode != null) vnode.setValue(new Value(objectName));
-			else node.createChild("objectName").setValueType(ValueType.STRING).setValue(new Value(objectName)).build();
-			LOGGER.debug("objectName updated to " + objectName);
+			if (vnode != null) {
+				if (!new Value(objectName).equals(vnode.getValue())) {
+					vnode.setValue(new Value(objectName));
+					LOGGER.debug("objectName updated to " + objectName);
+				}
+			}
+			else {
+				node.createChild("objectName").setValueType(ValueType.STRING).setValue(new Value(objectName)).build();
+				LOGGER.debug("objectName set to " + objectName);
+			}
+			
 		}
 		if (dataType != null) {
         	Node vnode = node.getChild("dataType");
-        	if (vnode != null) vnode.setValue(new Value(dataType.toString()));
-        	else node.createChild("dataType").setValueType(ValueType.STRING).setValue(new Value(dataType.toString())).build();
-        	LOGGER.debug("dataType updated to " + dataType);
+        	if (vnode != null) {
+        		if (!new Value(dataType.toString()).equals(vnode.getValue())) {
+        			vnode.setValue(new Value(dataType.toString()));
+        			LOGGER.debug("dataType updated to " + dataType);
+        		}
+        	}
+        	else {
+        		node.createChild("dataType").setValueType(ValueType.STRING).setValue(new Value(dataType.toString())).build();
+        		LOGGER.debug("dataType set to " + dataType);
+        	}
         }
 		Node vnode = node.getChild("present value");
 		Value oldval = null;
@@ -647,49 +662,65 @@ public class BacnetPoint {
 				val = new Value(presentValue);
 			}
 			}
-			
-			node.setValueType(vt);
-			node.setValue(val);
-			node.removeChild("units");
+			if (node.getValueType() != vt || node.getValue() != val) {
+				node.setValueType(vt);
+				node.setValue(val);
+			}
+			Value units = null;
 			if (!(DeviceFolder.isOneOf(objectTypeId, ObjectType.binaryInput, ObjectType.binaryOutput,
     				ObjectType.binaryValue, ObjectType.multiStateInput, ObjectType.multiStateOutput, 
     				ObjectType.multiStateValue, ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone,
     				ObjectType.trendLog)) && unitsDescription.size() > 0) {
-    			node.createChild("units").setValueType(ValueType.STRING).setValue(new Value(unitsDescription.get(0))).build();
+				units = new Value(unitsDescription.get(0));
+			}
+			Node unode = node.getChild("units");
+			if (unode != null) {
+				if (units == null) node.removeChild("units");
+				else if (!units.equals(unode.getValue())) unode.setValue(units);
+			} else {
+				if (units != null) node.createChild("units").setValueType(ValueType.STRING).setValue(units).build();
     		}
         	if (vnode != null) {
-        		vnode.setValueType(vt);
-        		vnode.setValue(val);
-        	}
-        	else vnode = node.createChild("present value").setValueType(vt).setValue(val).build();
-        	LOGGER.debug("presentValue updated to " + presentValue);
-		}
-        	
-        	if (settable) {
-        		makeSetAction(vnode, 8);
-        		makeSetAction(node, 8);
-        		PriorityArray pa = null;
-//        		try {
-//    				Thread.sleep(500);
-//    			} catch (InterruptedException e) {	
-//    				LOGGER.error("interrupted");
-//    			}
-        		try {
-        			pa = getPriorityArray();
-        		} catch (BACnetException e) {
-        			return;
-        		}
-        		Value newval = vnode.getValue();
-        		if (pa != null && (!newval.equals(oldval) || vnode.getChildren() == null ||  vnode.getChildren().size() < pa.getCount()+3)) {
-        			makeRelinquishAction(vnode, 8);
-        			Action act = new Action(Permission.READ, new RelinquishAllHandler());
-        			vnode.createChild("relinquish all").setAction(act).build().setSerializable(false);
-        			refreshPriorities(pa);
+        		if (!vt.equals(vnode.getValueType()) || !val.equals(vnode.getValue())) {
+        			vnode.setValueType(vt);
+        			vnode.setValue(val);
+        			LOGGER.debug("presentValue updated to " + presentValue);
         		}
         	} else {
+        		vnode = node.createChild("present value").setValueType(vt).setValue(val).build();
+        		LOGGER.debug("presentValue set to " + presentValue);
+        	}
+		}
+        	
+		if (settable) {
+			if (vnode.getWritable() != Writable.WRITE) {
+				makeSetAction(vnode, 8);
+	        	makeSetAction(node, 8);
+	        	PriorityArray pa = null;
+//	        	try {
+//	    			Thread.sleep(500);
+//	    		} catch (InterruptedException e) {	
+//	    			LOGGER.error("interrupted");
+//	    		}
+	        	try {
+	        		pa = getPriorityArray();
+	        	} catch (BACnetException e) {
+	        		return;
+	        	}
+	        	Value newval = vnode.getValue();
+	        	if (pa != null && (!newval.equals(oldval) || vnode.getChildren() == null ||  vnode.getChildren().size() < pa.getCount()+3)) {
+	        		makeRelinquishAction(vnode, 8);
+	        		Action act = new Action(Permission.READ, new RelinquishAllHandler());
+	        		vnode.createChild("relinquish all").setAction(act).build().setSerializable(false);
+	        		refreshPriorities(pa);
+	        	}
+			}
+        } else {
+        	if (vnode.getWritable() != Writable.NEVER) {
         		vnode.clearChildren();
             	vnode.setWritable(Writable.NEVER);
         	}
+        }
 		
     }
     

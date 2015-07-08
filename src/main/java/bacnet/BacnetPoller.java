@@ -93,6 +93,7 @@ public class BacnetPoller {
 				getPoint(point, point.folder);
 			}	                 
 		}, 0, point.folder.root.interval, TimeUnit.MILLISECONDS);
+		LOGGER.debug("started polling for " + point.getObjectName());
 		link.futures.put(point, fut);
 	}
 	
@@ -100,6 +101,7 @@ public class BacnetPoller {
 		ScheduledFuture<?> fut = link.futures.remove(point);
 		if (fut != null) {
 			fut.cancel(false);
+			LOGGER.debug("cancelled polling for " + point.getObjectName());
 		}
 	}
 	
