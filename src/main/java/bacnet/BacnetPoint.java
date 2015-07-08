@@ -594,6 +594,10 @@ public class BacnetPoint {
 
 	}
     
+    private static boolean areEqual(ValueType a, ValueType b) {
+    	return a == b || (a != null && b != null && a.toJsonString().equals(b.toJsonString()));
+    }
+    
     void update() {
     	if (node == null) return;
     	
@@ -662,7 +666,7 @@ public class BacnetPoint {
 				val = new Value(presentValue);
 			}
 			}
-			if (node.getValueType() != vt || node.getValue() != val) {
+			if (!areEqual(vt, node.getValueType()) || !val.equals(node.getValue())) {
 				node.setValueType(vt);
 				node.setValue(val);
 			}
@@ -681,14 +685,14 @@ public class BacnetPoint {
 				if (units != null) node.createChild("units").setValueType(ValueType.STRING).setValue(units).build();
     		}
         	if (vnode != null) {
-        		if (!vt.equals(vnode.getValueType()) || !val.equals(vnode.getValue())) {
+        		if (!areEqual(vt, vnode.getValueType()) || !val.equals(vnode.getValue())) {
         			vnode.setValueType(vt);
         			vnode.setValue(val);
-        			LOGGER.debug("presentValue updated to " + presentValue);
+        			LOGGER.debug("presentValue updated to " + val);
         		}
         	} else {
         		vnode = node.createChild("present value").setValueType(vt).setValue(val).build();
-        		LOGGER.debug("presentValue set to " + presentValue);
+        		LOGGER.debug("presentValue set to " + val);
         	}
 		}
         	

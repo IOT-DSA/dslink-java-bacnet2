@@ -248,7 +248,7 @@ public class DeviceFolder {
 			        	
 			        	updatePointValue(pt, pid, encodable);
 			        	
-			        	return false;
+			        	return prog == 1;
 			        }
 			 });
 		} catch (BACnetException e) {
