@@ -69,7 +69,7 @@ public class BacnetLink {
 		act.addParameter(new Parameter("local bind address", ValueType.STRING, new Value("0.0.0.0")));
 		act.addParameter(new Parameter("local network number", ValueType.NUMBER, new Value(0)));
 		act.addParameter(new Parameter("strict device comparisons", ValueType.BOOL, new Value(true)));
-		act.addParameter(new Parameter("timeout", ValueType.NUMBER, new Value(6000)));
+		act.addParameter(new Parameter("Timeout", ValueType.NUMBER, new Value(6000)));
 		act.addParameter(new Parameter("segment timeout", ValueType.NUMBER, new Value(5000)));
 		act.addParameter(new Parameter("segment window", ValueType.NUMBER, new Value(5)));
 		act.addParameter(new Parameter("retries", ValueType.NUMBER, new Value(2)));
@@ -174,7 +174,7 @@ public class BacnetLink {
 		act.addParameter(new Parameter("frame error retry count", ValueType.NUMBER, new Value(1)));
 		act.addParameter(new Parameter("local network number", ValueType.NUMBER, new Value(0)));
 		act.addParameter(new Parameter("strict device comparisons", ValueType.BOOL, new Value(true)));
-		act.addParameter(new Parameter("timeout", ValueType.NUMBER, new Value(6000)));
+		act.addParameter(new Parameter("Timeout", ValueType.NUMBER, new Value(6000)));
 		act.addParameter(new Parameter("segment timeout", ValueType.NUMBER, new Value(5000)));
 		act.addParameter(new Parameter("segment window", ValueType.NUMBER, new Value(5)));
 		act.addParameter(new Parameter("retries", ValueType.NUMBER, new Value(2)));
@@ -198,7 +198,7 @@ public class BacnetLink {
 			Value ferc = child.getAttribute("frame error retry count");
 			Value lnn = child.getAttribute("local network number");
 			Value strict = child.getAttribute("strict device comparisons");
-			Value timeout = child.getAttribute("timeout");
+			Value timeout = child.getAttribute("Timeout");
 			Value segtimeout = child.getAttribute("segment timeout");
 			Value segwin = child.getAttribute("segment window");
 			Value retries = child.getAttribute("retries");
@@ -281,7 +281,7 @@ public class BacnetLink {
 			}
 			int lnn = event.getParameter("local network number", ValueType.NUMBER).getNumber().intValue();
 			boolean strict = event.getParameter("strict device comparisons", ValueType.BOOL).getBool();
-			int timeout = event.getParameter("timeout", ValueType.NUMBER).getNumber().intValue();
+			int timeout = event.getParameter("Timeout", ValueType.NUMBER).getNumber().intValue();
 			int segtimeout = event.getParameter("segment timeout", ValueType.NUMBER).getNumber().intValue();
 			int segwin = event.getParameter("segment window", ValueType.NUMBER).getNumber().intValue();
 			int retries = event.getParameter("retries", ValueType.NUMBER).getNumber().intValue();
@@ -301,7 +301,7 @@ public class BacnetLink {
 			child.setAttribute("frame error retry count", new Value(ferc));
 			child.setAttribute("local network number", new Value(lnn));
 			child.setAttribute("strict device comparisons", new Value(strict));
-			child.setAttribute("timeout", new Value(timeout));
+			child.setAttribute("Timeout", new Value(timeout));
 			child.setAttribute("segment timeout", new Value(segtimeout));
 			child.setAttribute("segment window", new Value(segwin));
 			child.setAttribute("retries", new Value(retries));

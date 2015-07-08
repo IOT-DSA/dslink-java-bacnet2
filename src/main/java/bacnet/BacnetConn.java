@@ -81,7 +81,7 @@ class BacnetConn {
 		int ferc = node.getAttribute("frame error retry count").getNumber().intValue();
 		int lnn = node.getAttribute("local network number").getNumber().intValue();
 		boolean strict = node.getAttribute("strict device comparisons").getBool();
-		int timeout = node.getAttribute("timeout").getNumber().intValue();
+		int timeout = node.getAttribute("Timeout").getNumber().intValue();
 		int segtimeout = node.getAttribute("segment timeout").getNumber().intValue();
 		int segwin = node.getAttribute("segment window").getNumber().intValue();
 		int retries = node.getAttribute("retries").getNumber().intValue();
@@ -207,7 +207,7 @@ class BacnetConn {
 		}
 		act.addParameter(new Parameter("local network number", ValueType.NUMBER, node.getAttribute("local network number")));
 		act.addParameter(new Parameter("strict device comparisons", ValueType.BOOL, node.getAttribute("strict device comparisons")));
-		act.addParameter(new Parameter("timeout", ValueType.NUMBER, node.getAttribute("timeout")));
+		act.addParameter(new Parameter("Timeout", ValueType.NUMBER, node.getAttribute("Timeout")));
 		act.addParameter(new Parameter("segment timeout", ValueType.NUMBER, node.getAttribute("segment timeout")));
 		act.addParameter(new Parameter("segment window", ValueType.NUMBER, node.getAttribute("segment window")));
 		act.addParameter(new Parameter("retries", ValueType.NUMBER, node.getAttribute("retries")));
@@ -265,7 +265,7 @@ class BacnetConn {
 			}
 			int lnn = event.getParameter("local network number", ValueType.NUMBER).getNumber().intValue();
 			boolean strict = event.getParameter("strict device comparisons", ValueType.BOOL).getBool();
-			int timeout = event.getParameter("timeout", ValueType.NUMBER).getNumber().intValue();
+			int timeout = event.getParameter("Timeout", ValueType.NUMBER).getNumber().intValue();
 			int segtimeout = event.getParameter("segment timeout", ValueType.NUMBER).getNumber().intValue();
 			int segwin = event.getParameter("segment window", ValueType.NUMBER).getNumber().intValue();
 			int retries = event.getParameter("retries", ValueType.NUMBER).getNumber().intValue();
@@ -276,7 +276,7 @@ class BacnetConn {
 			
 			node.setAttribute("local network number", new Value(lnn));
 			node.setAttribute("strict device comparisons", new Value(strict));
-			node.setAttribute("timeout", new Value(timeout));
+			node.setAttribute("Timeout", new Value(timeout));
 			node.setAttribute("segment timeout", new Value(segtimeout));
 			node.setAttribute("segment window", new Value(segwin));
 			node.setAttribute("retries", new Value(retries));
@@ -355,7 +355,7 @@ class BacnetConn {
 			
 			RemoteDevice dev = getDevice(mac, interval, covtype, covlife);
 			
-			setupDeviceNode(dev, name, interval, covtype, covlife);
+			setupDeviceNode(dev, null, name, interval, covtype, covlife);
 		}
 	}
 	
@@ -410,8 +410,8 @@ class BacnetConn {
 					Thread.sleep(waittime);
 					totaltime += waittime;
 					RemoteDevice d = devs.poll();
-					if (d != null) {
-						setupDeviceNode(d, null, defaultInterval, CovType.NONE, 60);
+					if (d != null && !devInTree(d)) {
+						setupDeviceNode(d, null, null, defaultInterval, CovType.NONE, 60);
 					}
 				}
 			} catch (BACnetException e) {
@@ -426,6 +426,20 @@ class BacnetConn {
 				localDevice.getEventHandler().removeListener(dl);
 			}
 		}
+	}
+	
+	private boolean devInTree(RemoteDevice d) {
+		String mac;
+    	try {
+    		mac = d.getAddress().getMacAddress().toIpPortString();
+    	} catch (Exception e) {
+    		mac = Byte.toString(d.getAddress().getMacAddress().getMstpAddress());
+    	}
+    	if (node.getChildren()==null) return false;
+    	for (Node child: node.getChildren().values()) {
+    		if (new Value(mac).equals(child.getAttribute("MAC address"))) return true;
+    	}
+    	return false;
 	}
 	
 //	private void setupDeviceNodes(List<RemoteDevice> devices) {
@@ -486,14 +500,23 @@ class BacnetConn {
 		return s.trim();
 	}
 
-	DeviceNode setupDeviceNode(final RemoteDevice d, String name, long interval, CovType covtype, int covlife) {
+	DeviceNode setupDeviceNode(final RemoteDevice d, Node child, String name, long interval, CovType covtype, int covlife) {
 		if (d == null) return null;
 		getDeviceProps(d);
 		if (name == null) name = d.getName();
         if (name != null) {
-        	Node child = node.getChild(name);
-        	if (child == null) child = node.createChild(name).build();
-        	String mac;
+        	if (child == null) {
+				String modname = name;
+				child = node.getChild(modname);
+				int i = 1;
+				while (child != null) {
+					i++;
+					modname = name + i;
+					child = node.getChild(modname);
+				}
+				child = node.createChild(modname).build();
+			}
+			String mac;
         	try {
         		mac = d.getAddress().getMacAddress().toIpPortString();
         	} catch (Exception e) {
@@ -518,7 +541,7 @@ class BacnetConn {
 		
 		@Override
         public void iAmReceived(RemoteDevice d) {
-                LOGGER.debug("IAm received from " + d);
+                LOGGER.info("IAm received from " + d);
                 devices.add(d);
         }
 	}
@@ -548,7 +571,7 @@ class BacnetConn {
 			}
 			
 			RemoteDevice dev = getDevice(mac.getString(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
-			DeviceNode dn = setupDeviceNode(dev, child.getName(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
+			DeviceNode dn = setupDeviceNode(dev, child, child.getName(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
 			if (dn!=null) dn.restoreLastSession();
 			else node.removeChild(child);
 		} else if (child.getAction() == null && !child.getName().equals("STATUS")) {
