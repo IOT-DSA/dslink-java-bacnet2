@@ -194,6 +194,7 @@ public class BacnetPoint {
     	if (node.getChild("present value") == null) {
     		node.createChild("present value").setValueType(ValueType.STRING).setValue(new Value("")).build();
     	}
+    	folder.conn.link.setupPoint(this, folder);
 //        setObjectTypeId(objectTypeId);
 //        setInstanceNumber(instanceNumber);
 //        setObjectTypeDescription(objectTypeDescription);
@@ -213,7 +214,7 @@ public class BacnetPoint {
         
         //if (listener!=null) folder.conn.localDevice.getEventHandler().removeListener(listener);
         
-        //listener = folder.conn.link.setupPoint(this, folder.root);
+        
     }
     
     private void makeActions() {
@@ -329,7 +330,7 @@ public class BacnetPoint {
                 getUnitsDescription().add("1");
             }
     		setupNode();
-    		folder.conn.link.setupPoint(getMe(), folder);
+    		//folder.conn.link.setupPoint(getMe(), folder);
     	}
     }
     
@@ -985,9 +986,9 @@ public class BacnetPoint {
     	}
     }
     
-    private BacnetPoint getMe() {
-    	return this;
-    }
+//    private BacnetPoint getMe() {
+//    	return this;
+//    }
     
 	
 }

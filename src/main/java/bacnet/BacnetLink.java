@@ -230,7 +230,8 @@ public class BacnetLink {
     }
 	
 	private void setupNode(final BacnetPoint point, final DeviceFolder devicefold, final int nodeIndex) {
-		Node child;
+		LOGGER.debug("setting up node " + nodeIndex + " of point " + point.node.getName());
+		final Node child;
 		switch (nodeIndex) {
 		case 0: child = point.node; break;
 		case 1: child = point.node.getChild("present value"); break;
@@ -243,18 +244,21 @@ public class BacnetLink {
 //			}
 			child.getListener().setOnSubscribeHandler(new Handler<Node>() {
 				public void handle(final Node event) {
+					LOGGER.debug("subscribed (with cov) to node " + child.getName());
 					point.poller.subscribe(nodeIndex, true);
 				}
 			});
 		} else {
 			child.getListener().setOnSubscribeHandler(new Handler<Node>() {
 				public void handle(final Node event) {
+					LOGGER.debug("subscribed (without cov) to node " + child.getName());
 					point.poller.subscribe(nodeIndex, false);
 				}
 			});
 		}
 		child.getListener().setOnUnsubscribeHandler(new Handler<Node>() {
 			public void handle(final Node event) {
+				LOGGER.debug("unsubscribed from node " + child.getName());
 				point.poller.unsubscribe(nodeIndex);
 			}
 		});

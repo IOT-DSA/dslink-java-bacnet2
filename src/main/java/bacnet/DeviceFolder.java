@@ -111,8 +111,8 @@ public class DeviceFolder {
 		    	Value cov = child.getAttribute("use COV");
 		    	Value sett = child.getAttribute("settable");
 		    	if (ot!=null && inum!=null && cov!=null && sett!=null) {
-		    		BacnetPoint bp = new BacnetPoint(this, node, child);
-		    		conn.link.setupPoint(bp, this);
+		    		new BacnetPoint(this, node, child);
+		    		//conn.link.setupPoint(bp, this);
 		    	} else {
 		    		node.removeChild(child);
 		    	}
@@ -137,8 +137,8 @@ public class DeviceFolder {
 			pnode.setAttribute("settable", new Value(sett));
 			pnode.setAttribute("restore type", new Value("point"));
 			
-			BacnetPoint pt = new BacnetPoint(getMe(), node, pnode);
-			conn.link.setupPoint(pt, getMe());
+			new BacnetPoint(getMe(), node, pnode);
+			//conn.link.setupPoint(pt, getMe());
 		}
 	}
 	
@@ -168,9 +168,9 @@ public class DeviceFolder {
 			}
 			
 			getProperties(refs, points);
-			for (BacnetPoint pt: points.values()) {
-				conn.link.setupPoint(pt, getMe());
-			}
+//			for (BacnetPoint pt: points.values()) {
+//				conn.link.setupPoint(pt, getMe());
+//			}
 		}
 	}
 	
