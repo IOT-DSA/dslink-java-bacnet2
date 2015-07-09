@@ -3,6 +3,7 @@ package bacnet;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
@@ -11,6 +12,7 @@ import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
+import org.dsa.iot.dslink.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vertx.java.core.Handler;
@@ -51,6 +53,8 @@ class BacnetConn {
 	boolean isIP;
 	private int unnamedCount;
 	
+	private final ScheduledThreadPoolExecutor stpe;
+	
 	static {
 		LOGGER = LoggerFactory.getLogger(BacnetConn.class);
 	}
@@ -62,10 +66,19 @@ class BacnetConn {
 		isIP = node.getAttribute("isIP").getBool();
 		defaultInterval = node.getAttribute("default polling interval").getNumber().longValue();
 		
-		if (!isIP) link.serialConns.add(this);
+		if (!isIP) {
+			link.serialConns.add(this);
+			stpe = Objects.createDaemonThreadPool();
+		} else {
+			stpe = null;
+		}
 		this.statnode = node.createChild("STATUS").setValueType(ValueType.STRING).setValue(new Value("")).build();
 	
 		unnamedCount = 0;
+	}
+	
+	ScheduledThreadPoolExecutor getDaemonThreadPool() {
+		return stpe;
 	}
 	
 	void init() {
@@ -318,6 +331,7 @@ class BacnetConn {
 		node.clearChildren();
 		link.serialConns.remove(getMe());
 		node.getParent().removeChild(node);
+		if (!isIP) stpe.shutdown();
 	}
 	
 	protected void rename(String name) {

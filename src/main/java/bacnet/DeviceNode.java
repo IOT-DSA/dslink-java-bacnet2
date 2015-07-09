@@ -22,7 +22,7 @@ public class DeviceNode extends DeviceFolder {
 	RemoteDevice device;
 	long interval;
 	CovType covType;
-	private ScheduledThreadPoolExecutor stpe;
+	private final ScheduledThreadPoolExecutor stpe;
 	
 	DeviceNode(BacnetConn conn, Node node, RemoteDevice d) {
 		super(conn, node);
@@ -36,7 +36,8 @@ public class DeviceNode extends DeviceFolder {
 		} catch (Exception e) {
 		}
 		
-		this.stpe = Objects.createDaemonThreadPool();
+		if (conn.isIP) this.stpe = Objects.createDaemonThreadPool();
+		else this.stpe = conn.getDaemonThreadPool();
 		
 		makeEditAction();
 
@@ -49,7 +50,7 @@ public class DeviceNode extends DeviceFolder {
 	@Override
 	protected void remove() {
 		super.remove();
-		stpe.shutdown();
+		if (conn.isIP) stpe.shutdown();
 	}
 	
 	private void makeEditAction() {
