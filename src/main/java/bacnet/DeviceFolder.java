@@ -116,7 +116,7 @@ public class DeviceFolder {
 		    	} else {
 		    		node.removeChild(child);
 		    	}
-			} else if (child.getAction() == null) {
+			} else if (child.getAction() == null && child != root.statnode) {
 				node.removeChild(child);
 			}
 		}

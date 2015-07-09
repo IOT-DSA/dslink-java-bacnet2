@@ -46,7 +46,7 @@ class BacnetConn {
 	private static final Logger LOGGER;
 	
 	Node node;
-	private Node statnode;
+	private final Node statnode;
 	LocalDevice localDevice;
 	private long defaultInterval;
 	BacnetLink link;
@@ -73,6 +73,7 @@ class BacnetConn {
 			stpe = null;
 		}
 		this.statnode = node.createChild("STATUS").setValueType(ValueType.STRING).setValue(new Value("")).build();
+		this.statnode.setSerializable(false);
 	
 		unnamedCount = 0;
 	}

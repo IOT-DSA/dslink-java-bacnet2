@@ -245,21 +245,21 @@ public class BacnetLink {
 			child.getListener().setOnSubscribeHandler(new Handler<Node>() {
 				public void handle(final Node event) {
 					LOGGER.debug("subscribed (with cov) to node " + child.getName());
-					point.poller.subscribe(nodeIndex, true);
+					point.subscribe(nodeIndex, true);
 				}
 			});
 		} else {
 			child.getListener().setOnSubscribeHandler(new Handler<Node>() {
 				public void handle(final Node event) {
 					LOGGER.debug("subscribed (without cov) to node " + child.getName());
-					point.poller.subscribe(nodeIndex, false);
+					point.subscribe(nodeIndex, false);
 				}
 			});
 		}
 		child.getListener().setOnUnsubscribeHandler(new Handler<Node>() {
 			public void handle(final Node event) {
 				LOGGER.debug("unsubscribed from node " + child.getName());
-				point.poller.unsubscribe(nodeIndex);
+				point.unsubscribe(nodeIndex);
 			}
 		});
 	}

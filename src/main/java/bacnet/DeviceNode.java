@@ -1,6 +1,10 @@
 package bacnet;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
@@ -16,18 +20,49 @@ import org.vertx.java.core.json.JsonObject;
 import bacnet.BacnetConn.CovType;
 
 import com.serotonin.bacnet4j.RemoteDevice;
+import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
+import com.serotonin.bacnet4j.util.PropertyReferences;
 
 public class DeviceNode extends DeviceFolder {
 	
+	final Node statnode;
+	private boolean enabled;
 	RemoteDevice device;
 	long interval;
 	CovType covType;
+	
 	private final ScheduledThreadPoolExecutor stpe;
+	private final Map<ObjectIdentifier, BacnetPoint> subscribedPoints = new HashMap<ObjectIdentifier, BacnetPoint>();
+	private ScheduledFuture<?> future = null;
 	
 	DeviceNode(BacnetConn conn, Node node, RemoteDevice d) {
 		super(conn, node);
 		this.device = d;
 		this.root = this;
+		
+		if (node.getChild("STATUS") != null) {
+			this.statnode = node.getChild("STATUS");
+			enabled = new Value("enabled").equals(statnode.getValue());
+		} else {
+			this.statnode = node.createChild("STATUS").setValueType(ValueType.STRING).setValue(new Value("enabled")).build();
+			enabled = true;
+		}
+		
+		if (enabled) {
+			Action act = new Action(Permission.READ, new Handler<ActionResult>() {
+				public void handle(ActionResult event) {
+					disable();
+				}
+			});
+			node.createChild("disable").setAction(act).build().setSerializable(false);
+		} else {
+			Action act = new Action(Permission.READ, new Handler<ActionResult>() {
+				public void handle(ActionResult event) {
+					enable();
+				}
+			});
+			node.createChild("enable").setAction(act).build().setSerializable(false);
+		}
 		
 		this.interval = node.getAttribute("polling interval").getNumber().longValue();
 		this.covType = CovType.NONE;
@@ -45,6 +80,32 @@ public class DeviceNode extends DeviceFolder {
 	
 	ScheduledThreadPoolExecutor getDaemonThreadPool() {
 		return stpe;
+	}
+	
+	private void enable() {
+		enabled = true;
+		if (future == null) startPolling();
+		statnode.setValue(new Value("enabled"));
+		node.removeChild("enable");
+		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
+			public void handle(ActionResult event) {
+				disable();
+			}
+		});
+		node.createChild("disable").setAction(act).build().setSerializable(false);
+	}
+	
+	private void disable() {
+		enabled = false;
+		stopPolling();
+		statnode.setValue(new Value("disabled"));
+		node.removeChild("disable");
+		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
+			public void handle(ActionResult event) {
+				enable();
+			}
+		});
+		node.createChild("enable").setAction(act).build().setSerializable(false);
 	}
 	
 	@Override
@@ -115,6 +176,45 @@ public class DeviceNode extends DeviceFolder {
 	
 	protected JsonObject getParentJson(JsonObject jobj, Node n) {
 		return jobj.getObject(conn.node.getName());
+	}
+	
+	//polling
+	void addPointSub(BacnetPoint point) {
+		if (subscribedPoints.containsKey(point.oid)) return;
+		subscribedPoints.put(point.oid, point);
+		if (future == null) startPolling();
+	}
+	
+	void removePointSub(BacnetPoint point) {
+		subscribedPoints.remove(point.oid);
+		if (subscribedPoints.size() == 0) stopPolling();
+	}
+	
+	private void stopPolling() {
+		if (future != null) {
+			future.cancel(false);
+			future = null;
+		}
+	}
+	
+	private void startPolling() {
+		if (!enabled || subscribedPoints.size() == 0) return;
+		
+		future = stpe.scheduleWithFixedDelay(new Runnable() {
+			public void run() {
+				if (conn.localDevice == null) {
+					conn.stop();
+					return;
+				}
+				PropertyReferences refs = new PropertyReferences();
+				for (ObjectIdentifier oid: subscribedPoints.keySet()) {
+					DeviceFolder.addPropertyReferences(refs, oid);
+				}
+		      	getProperties(refs, subscribedPoints);
+			}
+		}, 0, interval, TimeUnit.MILLISECONDS);
+		
+		
 	}
 	
 }

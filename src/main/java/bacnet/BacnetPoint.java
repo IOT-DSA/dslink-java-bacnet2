@@ -1,9 +1,15 @@
 package bacnet;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
 import org.dsa.iot.dslink.node.Node;
@@ -25,6 +31,8 @@ import com.serotonin.bacnet4j.service.confirmed.WritePropertyRequest;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.constructed.BACnetError;
 import com.serotonin.bacnet4j.type.constructed.PriorityArray;
+import com.serotonin.bacnet4j.type.constructed.PropertyValue;
+import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.enumerated.BinaryPV;
 import com.serotonin.bacnet4j.type.enumerated.LifeSafetyState;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
@@ -33,8 +41,10 @@ import com.serotonin.bacnet4j.type.primitive.Null;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.Real;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
+import com.serotonin.bacnet4j.util.PropertyReferences;
 import com.serotonin.bacnet4j.util.RequestUtils;
 
+import bacnet.DeviceFolder.CovListener;
 import bacnet.DeviceFolder.DataType;
 
 public class BacnetPoint {
@@ -46,9 +56,14 @@ public class BacnetPoint {
 	
 	private static PointCounter numPoints = new PointCounter();
 	
+	private static final int MAX_SUBS_PER_POINT = 2;
+	private final CovListener listener; 
+	private final boolean[] subscribed = new boolean[MAX_SUBS_PER_POINT];
+	private boolean covSub;
+	
 	DeviceFolder folder;
 	private Node parent;
-	final BacnetPoller poller;
+
 	Node node;
 	ObjectIdentifier oid;
 	private PropertyIdentifier pid;
@@ -74,7 +89,7 @@ public class BacnetPoint {
 	
     public BacnetPoint(DeviceFolder folder, Node parent, ObjectIdentifier oid) {
     	this.folder = folder;
-    	poller = new BacnetPoller(this);
+    	this.listener = folder.new CovListener(this);
     	this.parent = parent;
     	this.node = null;
     	this.oid = oid;
@@ -94,7 +109,7 @@ public class BacnetPoint {
     
     public BacnetPoint(DeviceFolder folder, Node parent, Node node) {
     	this.folder = folder;
-    	poller = new BacnetPoller(this);
+    	this.listener = folder.new CovListener(this);
     	this.parent = parent;
     	this.node = node;
     	ObjectType ot = DeviceFolder.parseObjectType(node.getAttribute("object type").getString());
@@ -194,6 +209,7 @@ public class BacnetPoint {
     	if (node.getChild("present value") == null) {
     		node.createChild("present value").setValueType(ValueType.STRING).setValue(new Value("")).build();
     	}
+    	node.getChild("present value").setWritable(Writable.NEVER);
     	folder.conn.link.setupPoint(this, folder);
 //        setObjectTypeId(objectTypeId);
 //        setInstanceNumber(instanceNumber);
@@ -267,7 +283,12 @@ public class BacnetPoint {
     		priority = p;
     	}
     	public void handle(ValuePair event) {
-    		if (!event.isFromExternalSource()) return;
+    		LOGGER.debug("set?");
+    		if (!event.isFromExternalSource()) {
+    			LOGGER.debug("not set =(");
+    			return;
+    		}
+    		LOGGER.debug("set!");
     		Value newval = event.getCurrent();
     		handleSet(newval, priority, true);
     	}
@@ -294,6 +315,7 @@ public class BacnetPoint {
 		}
 		Encodable enc = valueToEncodable(newval, oid.getObjectType(), pid);
 		try {
+			LOGGER.debug("Sending write request");
 			folder.conn.localDevice.send(folder.root.device, new WritePropertyRequest(oid, pid, null, enc, new UnsignedInteger(priority)));
 			//Thread.sleep(500);
 		} catch (BACnetException e) {
@@ -986,9 +1008,99 @@ public class BacnetPoint {
     	}
     }
     
-//    private BacnetPoint getMe() {
-//    	return this;
-//    }
+    private BacnetPoint getMe() {
+    	return this;
+    }
+
     
+    //polling
+    void subscribe(int index, boolean iscov) {
+		if (index >= MAX_SUBS_PER_POINT) return;
+		boolean wasActive = isActive();
+		boolean wasCov = covSub;
+		subscribed[index] = true;
+		covSub = iscov;
+		if (!wasActive) {
+			if (covSub) startCov();
+			else startPoll();
+		} else if (wasCov != covSub) {
+			if (covSub) { 
+				stopPoll();
+				startCov();
+			} else {
+				stopCov();
+				startPoll();
+			}
+		}
+		
+	}
+	void unsubscribe(int index) {
+		boolean wasActive = isActive();
+		subscribed[index] = false;
+		if (wasActive && !isActive()) {
+			if (covSub) stopCov();
+			else stopPoll();
+		}
+		
+
+	}
+	boolean isActive() {
+		for (boolean b: subscribed) {
+			if (b) return true;
+		}
+		return false;
+	}
 	
+	void startPoll() {
+		folder.root.addPointSub(this);
+		LOGGER.debug("started polling for " + getObjectName());
+	}
+	
+	void stopPoll() {
+		folder.root.removePointSub(this);
+		LOGGER.debug("cancelled polling for " + getObjectName());
+	}
+	
+	void startCov() {
+		getPoint(this, folder);
+		folder.setupCov(this, listener);
+		final ArrayBlockingQueue<SequenceOf<PropertyValue>> covEv = listener.event;
+		if (folder.conn.link.futures.containsKey(this)) {
+			return;
+        }
+		ScheduledThreadPoolExecutor stpe = folder.root.getDaemonThreadPool();
+		ScheduledFuture<?> fut = stpe.scheduleWithFixedDelay(new Runnable() {
+			public void run() {
+				SequenceOf<PropertyValue> listOfValues = covEv.poll();
+				if (listOfValues != null) {
+					for (PropertyValue pv: listOfValues) {
+						if (node != null) LOGGER.debug("got cov for " + node.getName());
+						folder.updatePointValue(getMe(), pv.getPropertyIdentifier(), pv.getValue());
+					}
+				}
+			}	                 
+		}, 0, 50, TimeUnit.MILLISECONDS);
+		folder.conn.link.futures.put(this, fut);
+	}
+	
+	void stopCov() {
+		ScheduledFuture<?> fut = folder.conn.link.futures.remove(this);
+		if (fut != null) {
+			fut.cancel(false);
+		}
+		//cl.event.active = false;
+		if (folder.conn.localDevice != null) 
+			folder.conn.localDevice.getEventHandler().removeListener(listener);
+	}
+	
+	
+	private static void getPoint(BacnetPoint point, DeviceFolder devicefold) {
+		PropertyReferences refs = new PropertyReferences();
+		Map<ObjectIdentifier, BacnetPoint> points = new HashMap<ObjectIdentifier, BacnetPoint>();
+		ObjectIdentifier oid = point.oid;
+      	DeviceFolder.addPropertyReferences(refs, oid);
+      	points.put(oid, point);
+      	devicefold.getProperties(refs, points);
+	}
 }
+	
