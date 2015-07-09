@@ -1,5 +1,7 @@
 package bacnet;
 
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
@@ -7,6 +9,7 @@ import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
+import org.dsa.iot.dslink.util.Objects;
 import org.vertx.java.core.Handler;
 import org.vertx.java.core.json.JsonObject;
 
@@ -19,6 +22,7 @@ public class DeviceNode extends DeviceFolder {
 	RemoteDevice device;
 	long interval;
 	CovType covType;
+	private ScheduledThreadPoolExecutor stpe;
 	
 	DeviceNode(BacnetConn conn, Node node, RemoteDevice d) {
 		super(conn, node);
@@ -32,8 +36,20 @@ public class DeviceNode extends DeviceFolder {
 		} catch (Exception e) {
 		}
 		
+		this.stpe = Objects.createDaemonThreadPool();
+		
 		makeEditAction();
 
+	}
+	
+	ScheduledThreadPoolExecutor getDaemonThreadPool() {
+		return stpe;
+	}
+	
+	@Override
+	protected void remove() {
+		super.remove();
+		stpe.shutdown();
 	}
 	
 	private void makeEditAction() {

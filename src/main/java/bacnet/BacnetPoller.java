@@ -7,7 +7,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import org.dsa.iot.dslink.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,7 +81,7 @@ public class BacnetPoller {
 		if (link.futures.containsKey(point)) {
 			return;
         }
-		ScheduledThreadPoolExecutor stpe = Objects.getDaemonThreadPool();
+		ScheduledThreadPoolExecutor stpe = point.folder.root.getDaemonThreadPool();
 		ScheduledFuture<?> fut = stpe.scheduleWithFixedDelay(new Runnable() {
 			public void run() {
 				if (point.folder.conn.localDevice == null) {
@@ -112,7 +111,7 @@ public class BacnetPoller {
 		if (link.futures.containsKey(point)) {
 			return;
         }
-		ScheduledThreadPoolExecutor stpe = Objects.getDaemonThreadPool();
+		ScheduledThreadPoolExecutor stpe = point.folder.root.getDaemonThreadPool();
 		ScheduledFuture<?> fut = stpe.scheduleWithFixedDelay(new Runnable() {
 			public void run() {
 				SequenceOf<PropertyValue> listOfValues = covEv.poll();
