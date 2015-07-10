@@ -1,7 +1,9 @@
 package bacnet;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -14,6 +16,8 @@ import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.vertx.java.core.Handler;
 import org.vertx.java.core.json.JsonObject;
 
@@ -24,6 +28,10 @@ import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.util.PropertyReferences;
 
 public class DeviceNode extends DeviceFolder {
+	private static final Logger LOGGER;
+	static {
+		LOGGER = LoggerFactory.getLogger(DeviceNode.class);
+	}
 	
 	final Node statnode;
 	private boolean enabled;
@@ -32,7 +40,7 @@ public class DeviceNode extends DeviceFolder {
 	CovType covType;
 	
 	private final ScheduledThreadPoolExecutor stpe;
-	private final Map<ObjectIdentifier, BacnetPoint> subscribedPoints = new HashMap<ObjectIdentifier, BacnetPoint>();
+	private final ConcurrentMap<ObjectIdentifier, BacnetPoint> subscribedPoints = new ConcurrentHashMap<ObjectIdentifier, BacnetPoint>();
 	private ScheduledFuture<?> future = null;
 	
 	DeviceNode(BacnetConn conn, Node node, RemoteDevice d) {
@@ -88,6 +96,11 @@ public class DeviceNode extends DeviceFolder {
 	}
 	
 	private void enable() {
+		for (Node child: node.getChildren().values()) {
+			if (child.getAction() == null && child != statnode) {
+				child.removeConfig("disconnectedTs");
+			}
+		}
 		enabled = true;
 		if (future == null) startPolling();
 		if (device == null) {
@@ -124,6 +137,13 @@ public class DeviceNode extends DeviceFolder {
 			}
 		});
 		node.createChild("enable").setAction(act).build().setSerializable(false);
+		if (node.getChildren() == null) return;
+		for (Node child: node.getChildren().values()) {
+			if (child.getAction() == null && child != statnode) {
+				String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime());
+				child.setConfig("disconnectedTs", new Value(timeStamp));
+			}
+		}
 	}
 	
 	@Override
@@ -213,6 +233,7 @@ public class DeviceNode extends DeviceFolder {
 	
 	private void stopPolling() {
 		if (future != null) {
+			LOGGER.debug("stopping polling for device " + node.getName());
 			future.cancel(false);
 			future = null;
 		}
@@ -221,6 +242,7 @@ public class DeviceNode extends DeviceFolder {
 	private void startPolling() {
 		if (!enabled || subscribedPoints.size() == 0) return;
 		
+		LOGGER.debug("starting polling for device " + node.getName());
 		future = stpe.scheduleWithFixedDelay(new Runnable() {
 			public void run() {
 				if (conn.localDevice == null) {
@@ -231,7 +253,8 @@ public class DeviceNode extends DeviceFolder {
 				for (ObjectIdentifier oid: subscribedPoints.keySet()) {
 					DeviceFolder.addPropertyReferences(refs, oid);
 				}
-		      	getProperties(refs, subscribedPoints);
+				LOGGER.debug("polling for device " + node.getName());
+		      	getProperties(refs, new ConcurrentHashMap<ObjectIdentifier, BacnetPoint>(subscribedPoints));
 			}
 		}, 0, interval, TimeUnit.MILLISECONDS);
 		
