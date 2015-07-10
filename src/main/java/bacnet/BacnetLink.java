@@ -237,25 +237,17 @@ public class BacnetLink {
 		case 1: child = point.node.getChild("present value"); break;
 		default: return;
 		}
-		if (devicefold.root.covType != CovType.NONE && point.isCov()) {
-//			ScheduledFuture<?> fut = futures.remove(child);
-//			if (fut != null) {
-//				fut.cancel(false);
-//			}
-			child.getListener().setOnSubscribeHandler(new Handler<Node>() {
-				public void handle(final Node event) {
+		child.getListener().setOnSubscribeHandler(new Handler<Node>() {
+			public void handle(final Node event) {
+				if (devicefold.root.covType != CovType.NONE && point.isCov()) {
 					LOGGER.debug("subscribed (with cov) to node " + child.getName());
 					point.subscribe(nodeIndex, true);
-				}
-			});
-		} else {
-			child.getListener().setOnSubscribeHandler(new Handler<Node>() {
-				public void handle(final Node event) {
+				} else  {
 					LOGGER.debug("subscribed (without cov) to node " + child.getName());
 					point.subscribe(nodeIndex, false);
 				}
-			});
-		}
+			}
+		});
 		child.getListener().setOnUnsubscribeHandler(new Handler<Node>() {
 			public void handle(final Node event) {
 				LOGGER.debug("unsubscribed from node " + child.getName());

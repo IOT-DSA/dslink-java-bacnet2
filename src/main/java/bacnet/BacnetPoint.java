@@ -283,12 +283,9 @@ public class BacnetPoint {
     		priority = p;
     	}
     	public void handle(ValuePair event) {
-    		LOGGER.debug("set?");
     		if (!event.isFromExternalSource()) {
-    			LOGGER.debug("not set =(");
     			return;
     		}
-    		LOGGER.debug("set!");
     		Value newval = event.getCurrent();
     		handleSet(newval, priority, true);
     	}
@@ -299,6 +296,7 @@ public class BacnetPoint {
     		folder.conn.stop();
     		return;
     	}
+    	if (folder.root.device == null) return;
     	if (dataType == DataType.BINARY) {
 			if (raw) {
 //				newval = String.valueOf(Boolean.parseBoolean(newval) || newval.equals("1"));
@@ -829,6 +827,7 @@ public class BacnetPoint {
     		folder.conn.stop();
     		return null;
     	}
+    	if (folder.root.device == null) return null;
 		Encodable e = RequestUtils.getProperty(folder.conn.localDevice, folder.root.device, oid, PropertyIdentifier.priorityArray);
 		if (e instanceof BACnetError) return null;
 		return (PriorityArray) e;
@@ -876,6 +875,7 @@ public class BacnetPoint {
     		folder.conn.stop();
     		return;
     	}
+    	if (folder.root.device == null) return;
     	try {
     		folder.conn.localDevice.send(folder.root.device, new WritePropertyRequest(oid, pid, null, new Null(), new UnsignedInteger(priority)));
 		} catch (BACnetException e) {
@@ -1062,13 +1062,19 @@ public class BacnetPoint {
 	}
 	
 	void startCov() {
-		getPoint(this, folder);
+		ScheduledThreadPoolExecutor stpe = folder.root.getDaemonThreadPool();
+		
+		stpe.schedule(new Runnable() {
+			public void run() {
+				getPoint(getMe(), folder);
+			}
+		}, 0, TimeUnit.SECONDS);
 		folder.setupCov(this, listener);
 		final ArrayBlockingQueue<SequenceOf<PropertyValue>> covEv = listener.event;
 		if (folder.conn.link.futures.containsKey(this)) {
 			return;
         }
-		ScheduledThreadPoolExecutor stpe = folder.root.getDaemonThreadPool();
+		
 		ScheduledFuture<?> fut = stpe.scheduleWithFixedDelay(new Runnable() {
 			public void run() {
 				SequenceOf<PropertyValue> listOfValues = covEv.poll();

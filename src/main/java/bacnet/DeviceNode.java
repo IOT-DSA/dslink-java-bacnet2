@@ -48,6 +48,11 @@ public class DeviceNode extends DeviceFolder {
 			enabled = true;
 		}
 		
+		if (d == null) {
+			statnode.setValue(new Value("disabled"));
+			enabled = false;
+		}
+		
 		if (enabled) {
 			Action act = new Action(Permission.READ, new Handler<ActionResult>() {
 				public void handle(ActionResult event) {
@@ -85,6 +90,18 @@ public class DeviceNode extends DeviceFolder {
 	private void enable() {
 		enabled = true;
 		if (future == null) startPolling();
+		if (device == null) {
+			String mac = node.getAttribute("MAC address").getString();
+			CovType covtype = CovType.NONE;
+			try {
+				covtype = CovType.valueOf(node.getAttribute("cov usage").getString());
+			} catch (Exception e1) {
+			}
+			int covlife = node.getAttribute("cov lease time (minutes)").getNumber().intValue();
+			final RemoteDevice d = conn.getDevice(mac, interval, covtype, covlife);
+			conn.getDeviceProps(d);
+			device = d;
+		}
 		statnode.setValue(new Value("enabled"));
 		node.removeChild("enable");
 		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
@@ -93,6 +110,7 @@ public class DeviceNode extends DeviceFolder {
 			}
 		});
 		node.createChild("disable").setAction(act).build().setSerializable(false);
+		if (device == null) disable();
 	}
 	
 	private void disable() {
@@ -139,15 +157,18 @@ public class DeviceNode extends DeviceFolder {
 			}
 			int covlife =event.getParameter("cov lease time (minutes)", ValueType.NUMBER).getNumber().intValue();
 			String mac = event.getParameter("MAC address", ValueType.STRING).getString();
-			final RemoteDevice d = conn.getDevice(mac, interv, covtype, covlife);
-			conn.getDeviceProps(d);
+			if (!mac.equals(node.getAttribute("MAC address").getString())) {
+				final RemoteDevice d = conn.getDevice(mac, interv, covtype, covlife);
+				conn.getDeviceProps(d);
+				device = d;
+			}
 			interval = interv;
 			covType = covtype;
-        	try {
-        		mac = d.getAddress().getMacAddress().toIpPortString();
-        	} catch (Exception e) {
-        		mac = Byte.toString(d.getAddress().getMacAddress().getMstpAddress());
-        	}
+//        	try {
+//        		mac = d.getAddress().getMacAddress().toIpPortString();
+//        	} catch (Exception e) {
+//        		mac = Byte.toString(d.getAddress().getMacAddress().getMstpAddress());
+//        	}
         	node.setAttribute("MAC address", new Value(mac));
 	        node.setAttribute("polling interval", new Value(interval));
 	        node.setAttribute("cov usage", new Value(covtype.toString()));

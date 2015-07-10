@@ -370,7 +370,7 @@ class BacnetConn {
 			
 			RemoteDevice dev = getDevice(mac, interval, covtype, covlife);
 			
-			setupDeviceNode(dev, null, name, interval, covtype, covlife);
+			setupDeviceNode(dev, null, name, mac, interval, covtype, covlife);
 		}
 	}
 	
@@ -426,7 +426,7 @@ class BacnetConn {
 					totaltime += waittime;
 					RemoteDevice d = devs.poll();
 					if (d != null && !devInTree(d)) {
-						setupDeviceNode(d, null, null, defaultInterval, CovType.NONE, 60);
+						setupDeviceNode(d, null, null, null, defaultInterval, CovType.NONE, 60);
 					}
 				}
 			} catch (BACnetException e) {
@@ -515,10 +515,9 @@ class BacnetConn {
 		return s.trim();
 	}
 
-	DeviceNode setupDeviceNode(final RemoteDevice d, Node child, String name, long interval, CovType covtype, int covlife) {
-		if (d == null) return null;
-		getDeviceProps(d);
-		if (name == null) name = d.getName();
+	private DeviceNode setupDeviceNode(final RemoteDevice d, Node child, String name, String mac, long interval, CovType covtype, int covlife) {
+		if (d != null) getDeviceProps(d);
+		if (name == null && d != null) name = d.getName();
         if (name != null) {
         	if (child == null) {
 				String modname = name;
@@ -531,13 +530,14 @@ class BacnetConn {
 				}
 				child = node.createChild(modname).build();
 			}
-			String mac;
-        	try {
-        		mac = d.getAddress().getMacAddress().toIpPortString();
-        	} catch (Exception e) {
-        		mac = Byte.toString(d.getAddress().getMacAddress().getMstpAddress());
-        	}
-        	child.setAttribute("MAC address", new Value(mac));
+        	if (d != null) {
+				try {
+					mac = d.getAddress().getMacAddress().toIpPortString();
+				} catch (Exception e) {
+					mac = Byte.toString(d.getAddress().getMacAddress().getMstpAddress());
+				}
+			}
+			child.setAttribute("MAC address", new Value(mac));
         	child.setAttribute("polling interval", new Value(interval));
         	child.setAttribute("cov usage", new Value(covtype.toString()));
         	child.setAttribute("cov lease time (minutes)", new Value(covlife));
@@ -585,8 +585,15 @@ class BacnetConn {
 			} catch (Exception e) {
 			}
 			
-			RemoteDevice dev = getDevice(mac.getString(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
-			DeviceNode dn = setupDeviceNode(dev, child, child.getName(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
+			boolean disabled = child.getChild("STATUS") != null && new Value("disabled").equals(child.getChild("STATUS").getValue());
+			DeviceNode dn = null;
+			if (!disabled) {
+				RemoteDevice dev = getDevice(mac.getString(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
+				dn = setupDeviceNode(dev, child, child.getName(), mac.getString(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
+			} else {
+				dn = setupDeviceNode(null, child, child.getName(), mac.getString(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
+			}
+				
 			if (dn!=null) dn.restoreLastSession();
 			else node.removeChild(child);
 		} else if (child.getAction() == null && !child.getName().equals("STATUS")) {

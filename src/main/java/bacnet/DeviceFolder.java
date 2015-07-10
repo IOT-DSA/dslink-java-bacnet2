@@ -3,6 +3,7 @@ package bacnet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
 import org.dsa.iot.dslink.node.Node;
@@ -144,6 +145,7 @@ public class DeviceFolder {
 	
 	protected class ObjectDiscoveryHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
+			if (root.device == null) return;
 			final PropertyReferences refs = new PropertyReferences();
 			final Map<ObjectIdentifier, BacnetPoint> points = new HashMap<ObjectIdentifier, BacnetPoint>();
 			try {
@@ -174,24 +176,29 @@ public class DeviceFolder {
 		}
 	}
 	
-	void setupCov(BacnetPoint point, DeviceEventAdapter listener) {
+	void setupCov(final BacnetPoint point, DeviceEventAdapter listener) {
+		if (root.device == null) return;
 		CovType ct = CovType.NONE;
 		try {
 			ct = CovType.valueOf(root.node.getAttribute("cov usage").getString());
 		} catch (Exception e) {
 		}
 		if (ct == CovType.NONE) return;
-		com.serotonin.bacnet4j.type.primitive.Boolean confirmed = new com.serotonin.bacnet4j.type.primitive.Boolean(ct == CovType.CONFIRMED);
-		UnsignedInteger lifetime =  new UnsignedInteger(60 * root.node.getAttribute("cov lease time (minutes)").getNumber().intValue());
-		UnsignedInteger id = new UnsignedInteger(point.id);
+		final com.serotonin.bacnet4j.type.primitive.Boolean confirmed = new com.serotonin.bacnet4j.type.primitive.Boolean(ct == CovType.CONFIRMED);
+		final UnsignedInteger lifetime =  new UnsignedInteger(60 * root.node.getAttribute("cov lease time (minutes)").getNumber().intValue());
+		final UnsignedInteger id = new UnsignedInteger(point.id);
 		conn.localDevice.getEventHandler().addListener(listener);
-		try {
-			conn.localDevice.send(root.device, new SubscribeCOVRequest(id, point.oid, confirmed, lifetime));
-		} catch (BACnetException e) {
-			// TODO Auto-generated catch block
-			//e.printStackTrace();
-			LOGGER.debug("error: ", e);
-		}
+		
+		root.getDaemonThreadPool().schedule(new Runnable() {
+			public void run() {
+				try {
+					conn.localDevice.send(root.device, new SubscribeCOVRequest(id, point.oid, confirmed, lifetime));
+				} catch (BACnetException e) {
+					// TODO Auto-generated catch block
+					LOGGER.debug("error: ", e);
+				}
+			}
+		}, 0, TimeUnit.SECONDS);
 	}
 
 	
@@ -209,7 +216,7 @@ public class DeviceFolder {
 		public void covNotificationReceived(final UnsignedInteger subscriberProcessIdentifier,
 	            final RemoteDevice initiatingDevice, final ObjectIdentifier monitoredObjectIdentifier,
 	            final UnsignedInteger timeRemaining, final SequenceOf<PropertyValue> listOfValues) {
-			if (root.device.equals(initiatingDevice) && point.oid.equals(monitoredObjectIdentifier)) {
+			if (root.device != null && root.device.equals(initiatingDevice) && point.oid.equals(monitoredObjectIdentifier)) {
 				event.clear();
 				event.add(listOfValues);
 			}
@@ -240,6 +247,7 @@ public class DeviceFolder {
 //	}
 	
 	void getProperties(PropertyReferences refs, final Map<ObjectIdentifier, BacnetPoint> points) {
+		if (root.device == null) return;
 		try {
 			RequestUtils.readProperties(root.conn.localDevice, root.device, refs, new RequestListener() {
 			        
@@ -307,7 +315,7 @@ public class DeviceFolder {
             if (ref.getDeviceIdentifier() != null) {
                 pt.setReferenceDeviceId(ref.getDeviceIdentifier().getInstanceNumber());
             } else {
-                pt.setReferenceDeviceId(root.device.getInstanceNumber());
+                if (root.device != null) pt.setReferenceDeviceId(root.device.getInstanceNumber());
                 pt.setReferenceObjectTypeId(ref.getObjectIdentifier().getObjectType().intValue());
                 pt.setReferenceObjectTypeDescription(ref.getObjectIdentifier().getObjectType().toString());
                 pt.setReferenceInstanceNumber(ref.getObjectIdentifier().getInstanceNumber());
