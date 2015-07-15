@@ -64,7 +64,7 @@ public class BacnetLink {
 		
 		Action act = new Action(Permission.READ, new AddConnHandler(true));
 		act.addParameter(new Parameter("name", ValueType.STRING));
-		act.addParameter(new Parameter("broadcast ip", ValueType.STRING, new Value("10.0.1.255")));
+		act.addParameter(new Parameter("broadcast ip", ValueType.STRING, new Value("255.255.255.255")));
 		act.addParameter(new Parameter("port", ValueType.NUMBER, new Value(47808)));
 		act.addParameter(new Parameter("local bind address", ValueType.STRING, new Value("0.0.0.0")));
 		act.addParameter(new Parameter("local network number", ValueType.NUMBER, new Value(0)));
