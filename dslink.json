@@ -1,6 +1,6 @@
 {
   "name": "dslink-java-bacnet",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "A dslink for bacnet",
   "license": "GNU GPL",
   "main": "bin/dslink-java-bacnet",
@@ -16,6 +16,10 @@
     "url": "https://github.com/IOT-DSA/dslink-java-bacnet/issues"
   },
   "configs": {
+  	"name": {
+      "type": "string",
+      "default": "BACnet"
+    },
     "broker": {
       "type": "url"
     },
@@ -30,6 +34,10 @@
     "log": {
       "type": "enum",
       "default": "info"
+    },
+    "handler_class": {
+      "type": "string",
+      "default": "bacnet.Main"
     }
   }
 }
