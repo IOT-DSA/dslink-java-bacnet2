@@ -198,6 +198,9 @@ public class DeviceNode extends DeviceFolder {
 				rename(name);
 			}
 	        
+	        stopPolling();
+	        startPolling();
+	        
 	        makeEditAction();
 		}
 	}
