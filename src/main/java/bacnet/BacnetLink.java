@@ -92,6 +92,7 @@ public class BacnetLink {
 	
 	private class PortScanHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
+			LOGGER.debug("port scan invoked");
 			Action act = getAddSerialAction();
 			Node anode = node.getChild("add mstp connection");
 			if (anode == null) {
@@ -134,12 +135,15 @@ public class BacnetLink {
             switch(SerialNativeInterface.getOsType()){
             	case SerialNativeInterface.OS_LINUX:
             		portNames = SerialPortList.getPortNames(Pattern.compile("(cu|ttyS|ttyUSB|ttyACM|ttyAMA|rfcomm|ttyO)[0-9]{1,3}"));
-                break;
+            		LOGGER.debug("got linux port names");
+            	break;
             	case SerialNativeInterface.OS_MAC_OS_X:
                     portNames = SerialPortList.getPortNames(Pattern.compile("(cu|tty)..*")); //Was "tty.(serial|usbserial|usbmodem).*")
+                    LOGGER.debug("got mac port names");
                 break;
                 default:
                 	 portNames = SerialPortList.getPortNames();
+                	 LOGGER.debug("got default (windows) port names");
                 break;
             }
             

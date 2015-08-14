@@ -105,13 +105,14 @@ public class DeviceNode extends DeviceFolder {
 		if (future == null) startPolling();
 		if (device == null) {
 			String mac = node.getAttribute("MAC address").getString();
+			int instNum = node.getAttribute("instance number").getNumber().intValue();
 			CovType covtype = CovType.NONE;
 			try {
 				covtype = CovType.valueOf(node.getAttribute("cov usage").getString());
 			} catch (Exception e1) {
 			}
 			int covlife = node.getAttribute("cov lease time (minutes)").getNumber().intValue();
-			final RemoteDevice d = conn.getDevice(mac, interval, covtype, covlife);
+			final RemoteDevice d = conn.getDevice(mac, instNum, interval, covtype, covlife);
 			conn.getDeviceProps(d);
 			device = d;
 		}
@@ -156,6 +157,7 @@ public class DeviceNode extends DeviceFolder {
 		Action act = new Action(Permission.READ, new EditHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
 		act.addParameter(new Parameter("MAC address", ValueType.STRING, node.getAttribute("MAC address")));
+		act.addParameter(new Parameter("instance number", ValueType.NUMBER, node.getAttribute("instance number")));
 		double defint = node.getAttribute("polling interval").getNumber().doubleValue()/1000;
 	    act.addParameter(new Parameter("polling interval", ValueType.NUMBER, new Value(defint)));
 	    act.addParameter(new Parameter("cov usage", ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED"), node.getAttribute("cov usage")));
@@ -177,8 +179,9 @@ public class DeviceNode extends DeviceFolder {
 			}
 			int covlife =event.getParameter("cov lease time (minutes)", ValueType.NUMBER).getNumber().intValue();
 			String mac = event.getParameter("MAC address", ValueType.STRING).getString();
+			int instNum = event.getParameter("instance number", ValueType.NUMBER).getNumber().intValue();
 			if (!mac.equals(node.getAttribute("MAC address").getString())) {
-				final RemoteDevice d = conn.getDevice(mac, interv, covtype, covlife);
+				final RemoteDevice d = conn.getDevice(mac, instNum, interv, covtype, covlife);
 				conn.getDeviceProps(d);
 				device = d;
 			}
@@ -190,6 +193,7 @@ public class DeviceNode extends DeviceFolder {
 //        		mac = Byte.toString(d.getAddress().getMacAddress().getMstpAddress());
 //        	}
         	node.setAttribute("MAC address", new Value(mac));
+        	node.setAttribute("instance number", new Value(instNum));
 	        node.setAttribute("polling interval", new Value(interval));
 	        node.setAttribute("cov usage", new Value(covtype.toString()));
 	        node.setAttribute("cov lease time (minutes)", new Value(covlife));
