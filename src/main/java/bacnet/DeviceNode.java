@@ -106,13 +106,15 @@ public class DeviceNode extends DeviceFolder {
 		if (device == null) {
 			String mac = node.getAttribute("MAC address").getString();
 			int instNum = node.getAttribute("instance number").getNumber().intValue();
+			int netNum = node.getAttribute("network number").getNumber().intValue();
+			String linkMac = node.getAttribute("link service MAC").getString();
 			CovType covtype = CovType.NONE;
 			try {
 				covtype = CovType.valueOf(node.getAttribute("cov usage").getString());
 			} catch (Exception e1) {
 			}
 			int covlife = node.getAttribute("cov lease time (minutes)").getNumber().intValue();
-			final RemoteDevice d = conn.getDevice(mac, instNum, interval, covtype, covlife);
+			final RemoteDevice d = conn.getDevice(mac, instNum, netNum, linkMac, interval, covtype, covlife);
 			conn.getDeviceProps(d);
 			device = d;
 		}
@@ -158,6 +160,8 @@ public class DeviceNode extends DeviceFolder {
 		act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
 		act.addParameter(new Parameter("MAC address", ValueType.STRING, node.getAttribute("MAC address")));
 		act.addParameter(new Parameter("instance number", ValueType.NUMBER, node.getAttribute("instance number")));
+		act.addParameter(new Parameter("network number", ValueType.NUMBER, node.getAttribute("network number")));
+		act.addParameter(new Parameter("link service MAC", ValueType.STRING, node.getAttribute("link service MAC")));
 		double defint = node.getAttribute("polling interval").getNumber().doubleValue()/1000;
 	    act.addParameter(new Parameter("polling interval", ValueType.NUMBER, new Value(defint)));
 	    act.addParameter(new Parameter("cov usage", ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED"), node.getAttribute("cov usage")));
@@ -177,13 +181,19 @@ public class DeviceNode extends DeviceFolder {
 				covtype = CovType.valueOf(event.getParameter("cov usage").getString());
 			} catch (Exception e1) {
 			}
-			int covlife =event.getParameter("cov lease time (minutes)", ValueType.NUMBER).getNumber().intValue();
+			int covlife = event.getParameter("cov lease time (minutes)", ValueType.NUMBER).getNumber().intValue();
 			String mac = event.getParameter("MAC address", ValueType.STRING).getString();
-			int instNum = event.getParameter("instance number", ValueType.NUMBER).getNumber().intValue();
-			if (!mac.equals(node.getAttribute("MAC address").getString())) {
-				final RemoteDevice d = conn.getDevice(mac, instNum, interv, covtype, covlife);
-				conn.getDeviceProps(d);
-				device = d;
+			int instNum = event.getParameter("instance number", new Value(-1)).getNumber().intValue();
+			int netNum = event.getParameter("network number", ValueType.NUMBER).getNumber().intValue();
+			String linkMac = event.getParameter("link service MAC", new Value("")).getString();
+			if (!mac.equals(node.getAttribute("MAC address").getString()) || 
+				!linkMac.equals(node.getAttribute("link service MAC").getString()) ||
+				netNum != node.getAttribute("network number").getNumber().intValue() ||
+				instNum != node.getAttribute("instance number").getNumber().intValue()) {
+				
+					final RemoteDevice d = conn.getDevice(mac, instNum, netNum, linkMac, interv, covtype, covlife);
+					conn.getDeviceProps(d);
+					device = d;
 			}
 			interval = interv;
 			covType = covtype;
