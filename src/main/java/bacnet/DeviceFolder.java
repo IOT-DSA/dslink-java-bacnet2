@@ -13,10 +13,10 @@ import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
+import org.dsa.iot.dslink.util.handler.Handler;
+import org.dsa.iot.dslink.util.json.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.vertx.java.core.Handler;
-import org.vertx.java.core.json.JsonObject;
 
 import bacnet.BacnetConn.CovType;
 
@@ -462,8 +462,8 @@ public class DeviceFolder {
 	protected void duplicate(String name) {
 		JsonObject jobj = conn.link.copySerializer.serialize();
 		JsonObject parentobj = getParentJson(jobj, node);
-		JsonObject nodeobj = parentobj.getObject(node.getName());
-		parentobj.putObject(name, nodeobj);
+		JsonObject nodeobj = parentobj.get(node.getName());
+		parentobj.put(name, nodeobj);
 		conn.link.copyDeserializer.deserialize(jobj);
 		Node newnode = node.getParent().getChild(name);
 		DeviceFolder df = new DeviceFolder(conn, newnode, root);
@@ -472,7 +472,7 @@ public class DeviceFolder {
 
 	protected JsonObject getParentJson(JsonObject jobj, Node n) {
 		if (n == root.node) return root.getParentJson(jobj, n);
-		else return getParentJson(jobj, n.getParent()).getObject(n.getParent().getName());
+		else return getParentJson(jobj, n.getParent()).get(n.getParent().getName());
 	}
 	
 	protected class AddFolderHandler implements Handler<ActionResult> {
