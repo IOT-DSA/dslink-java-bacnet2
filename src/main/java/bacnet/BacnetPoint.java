@@ -116,7 +116,10 @@ public class BacnetPoint {
     	int instNum = node.getAttribute("object instance number").getNumber().intValue();
     	boolean usecov = node.getAttribute("use COV").getBool();
     	boolean canset = node.getAttribute("settable").getBool();
+    	Value pidval = node.getAttribute("pid");
     	this.oid = new ObjectIdentifier(ot, instNum);
+    	
+    	if (pidval != null) pid = new PropertyIdentifier(pidval.getNumber().intValue());
     	
     	setCov(usecov);
     	setSettable(canset);
@@ -415,6 +418,7 @@ public class BacnetPoint {
 
     public void setPresentValue(String presentValue, PropertyIdentifier pid) {
     	this.pid = pid;
+    	node.setAttribute("pid", new Value(pid.intValue()));
         this.presentValue = presentValue;
         setDataType(dataType);
 //        if (node != null && presentValue != null) {
