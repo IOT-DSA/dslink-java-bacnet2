@@ -12,30 +12,32 @@ import org.slf4j.LoggerFactory;
 
 
 public class Main extends DSLinkHandler {
-	
-	private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
-	
-	public static void main(String[] args) {
-		
-		//args = new String[] { "-b", "http://localhost:8080/conn", "-l", "debug" };
-		DSLinkFactory.start(args, new Main());
-	}
-	
-	@Override
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
+
+    public static void main(String[] args) {
+        DSLinkFactory.start(args, new Main());
+    }
+
+    @Override
     public boolean isResponder() {
         return true;
     }
-	
-	@Override
-	public void onResponderInitialized(DSLink link){
-		LOGGER.info("Initialized");
-		
-		NodeManager manager = link.getNodeManager();
+
+    @Override
+    public void onResponderInitialized(DSLink link) {
+        LOGGER.info("Initialized");
+
+        NodeManager manager = link.getNodeManager();
         Node superRoot = manager.getNode("/").getNode();
         Serializer copyser = new Serializer(manager);
-		Deserializer copydeser = new Deserializer(manager);
+        Deserializer copydeser = new Deserializer(manager);
         BacnetLink.start(superRoot, copyser, copydeser);
-        
-	}
+    }
+
+    @Override
+    public void onResponderConnected(DSLink link) {
+        LOGGER.info("Connected");
+    }
 
 }
