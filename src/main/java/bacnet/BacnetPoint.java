@@ -199,7 +199,7 @@ public class BacnetPoint {
     private void setupNode() {
         if (node == null) {
             String name = objectName;
-            if (!(name.startsWith("Analog") && name.startsWith("Binary"))) {
+            if (!(name.startsWith("Analog") || name.startsWith("Binary"))) {
                 name += " - " + objectTypeDescription;
             }
             NodeBuilder b = parent.createChild(name);
