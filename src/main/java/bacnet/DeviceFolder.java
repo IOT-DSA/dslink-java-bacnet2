@@ -193,8 +193,7 @@ public class DeviceFolder {
 			public void run() {
 				try {
 					conn.localDevice.send(root.device, new SubscribeCOVRequest(id, point.oid, confirmed, lifetime));
-				} catch (BACnetException e) {
-					// TODO Auto-generated catch block
+				} catch (Exception e) {
 					LOGGER.debug("error: ", e);
 				}
 			}

@@ -1,10 +1,17 @@
 package bacnet;
 
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 
+import com.serotonin.bacnet4j.npdu.ip.IpNetworkUtils;
+import com.serotonin.bacnet4j.transport.DefaultTransport;
+import com.serotonin.io.serial.SerialPortException;
+import com.serotonin.io.serial.SerialPortProxy;
+import com.serotonin.io.serial.SerialUtils;
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
@@ -23,7 +30,6 @@ import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.event.DeviceEventAdapter;
 import com.serotonin.bacnet4j.exception.BACnetException;
-import com.serotonin.bacnet4j.exception.BACnetServiceException;
 import com.serotonin.bacnet4j.npdu.Network;
 import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
 import com.serotonin.bacnet4j.npdu.mstp.MasterNode;
@@ -36,7 +42,6 @@ import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
-import com.serotonin.bacnet4j.type.primitive.OctetString;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.RequestListener;
 import com.serotonin.bacnet4j.util.RequestUtils;
@@ -95,7 +100,7 @@ class BacnetConn {
         int station = node.getAttribute("this station id").getNumber().intValue();
         int ferc = node.getAttribute("frame error retry count").getNumber().intValue();
         int lnn = node.getAttribute("local network number").getNumber().intValue();
-        boolean strict = node.getAttribute("strict device comparisons").getBool();
+        //boolean strict = node.getAttribute("strict device comparisons").getBool();
         int timeout = node.getAttribute("Timeout").getNumber().intValue();
         int segtimeout = node.getAttribute("segment timeout").getNumber().intValue();
         int segwin = node.getAttribute("segment window").getNumber().intValue();
@@ -123,28 +128,36 @@ class BacnetConn {
         if (isIP) {
             network = new IpNetwork(bip, port, lba, lnn);
         } else {
-            SerialParameters params = new SerialParameters();
-            params.setCommPortId(commPort);
-            params.setBaudRate(baud);
-            params.setPortOwnerName("DSLink");
+            InputStream is;
+            OutputStream out;
+            try {
+                SerialParameters params = new SerialParameters();
+                params.setCommPortId(commPort);
+                params.setBaudRate(baud);
+                params.setPortOwnerName("DSLink");
+                SerialPortProxy spp = SerialUtils.openSerialPort(params);
+                is = spp.getInputStream();
+                out = spp.getOutputStream();
+            } catch (SerialPortException e) {
+                throw new RuntimeException(e);
+            }
 
-            MasterNode mastnode = new MasterNode(params, (byte) station, ferc);
+            MasterNode mastnode = new MasterNode(is, out, (byte) station, ferc);
             network = new MstpNetwork(mastnode, lnn);
         }
-        Transport transport = new Transport(network);
+        Transport transport = new DefaultTransport(network);
         transport.setTimeout(timeout);
         transport.setSegTimeout(segtimeout);
         transport.setSegWindow(segwin);
         transport.setRetries(retries);
         localDevice = new LocalDevice(locdevId, transport);
         try {
-            localDevice.getConfiguration().setProperty(PropertyIdentifier.objectName, new CharacterString(locdevName));
-            localDevice.getConfiguration().setProperty(PropertyIdentifier.vendorName, new CharacterString(locdevVend));
-        } catch (BACnetServiceException e1) {
-            // TODO Auto-generated catch block
+            localDevice.getConfiguration().writeProperty(PropertyIdentifier.objectName, new CharacterString(locdevName));
+            localDevice.getConfiguration().writeProperty(PropertyIdentifier.vendorName, new CharacterString(locdevVend));
+        } catch (Exception e1) {
             LOGGER.debug("error: ", e1);
         }
-        localDevice.setStrict(strict);
+        //localDevice.setStrict(strict);
         try {
 
             localDevice.initialize();
@@ -388,11 +401,9 @@ class BacnetConn {
             return null;
         }
         if (!mac.isEmpty() && instanceNum >= 0) {
-            Address address = new Address(netNum, mac);
-            OctetString linkService = null;
-            if (!linkMac.isEmpty()) linkService = new OctetString(linkMac);
+            Address address = Utils.toAddress(netNum, mac);
             try {
-                return localDevice.findRemoteDevice(address, linkService, instanceNum);
+                return localDevice.findRemoteDevice(address, instanceNum);
             } catch (BACnetException e) {
                 LOGGER.debug("", e);
             }
@@ -401,13 +412,14 @@ class BacnetConn {
         try {
             if (mac.isEmpty())
                 localDevice.sendGlobalBroadcast(new WhoIsRequest(new UnsignedInteger(instanceNum), new UnsignedInteger(instanceNum)));
-            else if (instanceNum < 0) localDevice.sendUnconfirmed(new Address(netNum, mac), new WhoIsRequest());
-            else
-                localDevice.sendUnconfirmed(new Address(netNum, mac), new WhoIsRequest(new UnsignedInteger(instanceNum), new UnsignedInteger(instanceNum)));
-        } catch (BACnetException e) {
-            // TODO Auto-generated catch block
-            //e.printStackTrace();
-            LOGGER.debug("error: ", e);
+            else {
+                Address addr = Utils.toAddress(netNum, mac);
+                if (instanceNum < 0) {
+                    localDevice.send(addr, new WhoIsRequest());
+                } else {
+                    localDevice.send(addr, new WhoIsRequest(new UnsignedInteger(instanceNum), new UnsignedInteger(instanceNum)));
+                }
+            }
         } catch (Exception e1) {
             LOGGER.debug("error: ", e1);
         } finally {
@@ -449,13 +461,7 @@ class BacnetConn {
                         setupDeviceNode(d, null, null, null, null, null, null, defaultInterval, CovType.NONE, 60);
                     }
                 }
-            } catch (BACnetException e) {
-                // TODO Auto-generated catch block
-                //e.printStackTrace();
-                LOGGER.error("error: ", e);
-            } catch (InterruptedException e) {
-                // TODO Auto-generated catch block
-                //e.printStackTrace();
+            } catch (Exception e) {
                 LOGGER.error("error: ", e);
             } finally {
                 localDevice.getEventHandler().removeListener(dl);
@@ -464,15 +470,15 @@ class BacnetConn {
     }
 
     private boolean devInTree(RemoteDevice d) {
-        String mac;
-        try {
-            mac = d.getAddress().getMacAddress().toIpPortString();
-        } catch (Exception e) {
-            mac = Byte.toString(d.getAddress().getMacAddress().getMstpAddress());
-        }
         if (node.getChildren() == null) return false;
+        String mac = IpNetworkUtils.toIpPortString(d.getAddress().getMacAddress());
         for (Node child : node.getChildren().values()) {
-            if (new Value(mac).equals(child.getAttribute("MAC address"))) return true;
+            Value addr = child.getAttribute("MAC address");
+            Value inst = child.getAttribute("instance number");
+            if ((addr != null && mac.equals(addr.getString()))
+                    || (inst != null && inst.getNumber().intValue() == d.getInstanceNumber())) {
+                return true;
+            }
         }
         return false;
     }
@@ -538,16 +544,8 @@ class BacnetConn {
                 child = node.createChild(modname).build();
             }
             if (d != null) {
-                try {
-                    mac = d.getAddress().getMacAddress().toIpPortString();
-                } catch (Exception e) {
-                    mac = Byte.toString(d.getAddress().getMacAddress().getMstpAddress());
-                }
-                try {
-                    linkMac = d.getLinkService().getMacAddressDottedString();
-                } catch (Exception e) {
-                    linkMac = "";
-                }
+                mac = IpNetworkUtils.toIpPortString(d.getAddress().getMacAddress());
+                linkMac = "";
                 instanceNum = d.getInstanceNumber();
                 netNum = d.getAddress().getNetworkNumber().intValue();
             }

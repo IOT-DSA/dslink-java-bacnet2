@@ -330,14 +330,8 @@ public class BacnetPoint {
             LOGGER.debug("Sending write request");
             folder.conn.localDevice.send(folder.root.device, new WritePropertyRequest(oid, pid, null, enc, new UnsignedInteger(priority)));
             //Thread.sleep(500);
-        } catch (BACnetException e) {
-            // TODO Auto-generated catch block
-            //e.printStackTrace();
+        } catch (Exception e) {
             LOGGER.debug("error: ", e);
-//		} catch (InterruptedException e) {
-//			// TODO Auto-generated catch block
-//			LOGGER.error("interrupted");
-//			LOGGER.debug("error: ", e);
         }
         refreshPriorities();
     }
@@ -894,8 +888,7 @@ public class BacnetPoint {
         if (folder.root.device == null) return;
         try {
             folder.conn.localDevice.send(folder.root.device, new WritePropertyRequest(oid, pid, null, new Null(), new UnsignedInteger(priority)));
-        } catch (BACnetException e) {
-            // TODO Auto-generated catch block
+        } catch (Exception e) {
             LOGGER.error("error: ", e);
         }
     }
