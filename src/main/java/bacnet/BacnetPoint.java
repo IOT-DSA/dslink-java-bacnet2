@@ -124,17 +124,24 @@ public class BacnetPoint {
 
         setCov(usecov);
         setSettable(canset);
-        setObjectTypeId(ot.intValue());
-        setObjectTypeDescription(ot.toString());
-        setInstanceNumber(instNum);
-        setDataType(DeviceFolder.getDataType(ot));
+        try {
+            setObjectTypeId(ot.intValue());
 
-        if (DeviceFolder.isOneOf(ot, ObjectType.binaryInput, ObjectType.binaryOutput,
-                ObjectType.binaryValue)) {
-            getUnitsDescription().add("0");
-            getUnitsDescription().add("1");
+            setObjectTypeDescription(ot.toString());
+            setInstanceNumber(instNum);
+            setDataType(DeviceFolder.getDataType(ot));
+
+            if (DeviceFolder.isOneOf(ot, ObjectType.binaryInput, ObjectType.binaryOutput,
+                    ObjectType.binaryValue)) {
+                getUnitsDescription().add("0");
+                getUnitsDescription().add("1");
+            }
+            setupNode();
         }
-        setupNode();
+        catch (Exception e)
+        {
+            LOGGER.debug("Object Type Error: ( " + node.getAttribute("object type").getString() + " )", e);
+        }
     }
 
     public int getObjectTypeId() {
