@@ -430,8 +430,6 @@ class BacnetConn {
                     totaltime += waittime;
                     Thread.sleep(waittime);
                 } catch (InterruptedException e) {
-                    // TODO Auto-generated catch block
-                    //e.printStackTrace();
                     LOGGER.debug("error: ", e);
                 }
             }
@@ -471,7 +469,7 @@ class BacnetConn {
 
     private boolean devInTree(RemoteDevice d) {
         if (node.getChildren() == null) return false;
-        String mac = IpNetworkUtils.toIpPortString(d.getAddress().getMacAddress());
+        String mac = Utils.getMac(d);
         for (Node child : node.getChildren().values()) {
             Value addr = child.getAttribute("MAC address");
             Value inst = child.getAttribute("instance number");
@@ -544,7 +542,7 @@ class BacnetConn {
                 child = node.createChild(modname).build();
             }
             if (d != null) {
-                mac = IpNetworkUtils.toIpPortString(d.getAddress().getMacAddress());
+                mac = Utils.getMac(d);
                 linkMac = "";
                 instanceNum = d.getInstanceNumber();
                 netNum = d.getAddress().getNetworkNumber().intValue();

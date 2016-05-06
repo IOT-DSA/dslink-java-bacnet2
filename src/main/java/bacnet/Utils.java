@@ -1,5 +1,6 @@
 package bacnet;
 
+import com.serotonin.bacnet4j.*;
 import com.serotonin.bacnet4j.base.BACnetUtils;
 import com.serotonin.bacnet4j.npdu.ip.IpNetworkUtils;
 import com.serotonin.bacnet4j.type.constructed.Address;
@@ -21,5 +22,15 @@ public class Utils {
             int port = Integer.parseInt(mac.substring(colon + 1));
             return IpNetworkUtils.toAddress(netNum, ip, port);
         }
+    }
+
+    /**
+     * Returns the IP or MSTP mac for the given device.
+     */
+    public static String getMac(RemoteDevice remoteDevice) {
+        try {
+            return IpNetworkUtils.toIpPortString(remoteDevice.getAddress().getMacAddress());
+        } catch (IllegalArgumentException ignore) {}
+        return Byte.toString(remoteDevice.getAddress().getMacAddress().getBytes()[0]);
     }
 }
