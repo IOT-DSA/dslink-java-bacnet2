@@ -128,50 +128,55 @@ class BacnetConn {
         if (isIP) {
             network = new IpNetwork(bip, port, lba, lnn);
         } else {
-            InputStream is;
-            OutputStream out;
             try {
                 SerialParameters params = new SerialParameters();
                 params.setCommPortId(commPort);
                 params.setBaudRate(baud);
                 params.setPortOwnerName("DSLink");
                 SerialPortProxy spp = SerialUtils.openSerialPort(params);
-                is = spp.getInputStream();
-                out = spp.getOutputStream();
+                InputStream is = spp.getInputStream();
+                OutputStream out = spp.getOutputStream();
+                MasterNode mastnode = new MasterNode(is, out, (byte) station, ferc);
+                network = new MstpNetwork(mastnode, lnn);
             } catch (SerialPortException e) {
-                throw new RuntimeException(e);
+                LOGGER.debug("", e);
+                statnode.setValue(new Value("COM Port not found"));
+                network = null;
             }
 
-            MasterNode mastnode = new MasterNode(is, out, (byte) station, ferc);
-            network = new MstpNetwork(mastnode, lnn);
+            
         }
-        Transport transport = new DefaultTransport(network);
-        transport.setTimeout(timeout);
-        transport.setSegTimeout(segtimeout);
-        transport.setSegWindow(segwin);
-        transport.setRetries(retries);
-        localDevice = new LocalDevice(locdevId, transport);
-        try {
-            localDevice.getConfiguration().writeProperty(PropertyIdentifier.objectName, new CharacterString(locdevName));
-            localDevice.getConfiguration().writeProperty(PropertyIdentifier.vendorName, new CharacterString(locdevVend));
-        } catch (Exception e1) {
-            LOGGER.debug("error: ", e1);
-        }
-        //localDevice.setStrict(strict);
-        try {
-
-            localDevice.initialize();
-            localDevice.sendGlobalBroadcast(localDevice.getIAm());
-            //Thread.sleep(200000);
-        } catch (Exception e) {
-            //e.printStackTrace();
-            //remove();
-            LOGGER.debug("error: ", e);
-            statnode.setValue(new Value("Error initializing local device"));
-            localDevice.terminate();
-            localDevice = null;
-        } finally {
-            //localDevice.terminate();
+        if (network != null) {
+	        Transport transport = new DefaultTransport(network);
+	        transport.setTimeout(timeout);
+	        transport.setSegTimeout(segtimeout);
+	        transport.setSegWindow(segwin);
+	        transport.setRetries(retries);
+	        localDevice = new LocalDevice(locdevId, transport);
+	        try {
+	            localDevice.getConfiguration().writeProperty(PropertyIdentifier.objectName, new CharacterString(locdevName));
+	            localDevice.getConfiguration().writeProperty(PropertyIdentifier.vendorName, new CharacterString(locdevVend));
+	        } catch (Exception e1) {
+	            LOGGER.debug("error: ", e1);
+	        }
+	        //localDevice.setStrict(strict);
+	        try {
+	
+	            localDevice.initialize();
+	            localDevice.sendGlobalBroadcast(localDevice.getIAm());
+	            //Thread.sleep(200000);
+	        } catch (Exception e) {
+	            //e.printStackTrace();
+	            //remove();
+	            LOGGER.debug("error: ", e);
+	            statnode.setValue(new Value("Error initializing local device"));
+	            localDevice.terminate();
+	            localDevice = null;
+	        } finally {
+	            //localDevice.terminate();
+	        }
+        } else {
+        	localDevice = null;
         }
 
         if (localDevice != null) {

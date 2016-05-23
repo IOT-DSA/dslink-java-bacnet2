@@ -70,7 +70,8 @@ public class BacnetPoint {
     private PropertyIdentifier pid;
     int id;
     //private DeviceEventAdapter listener;
-
+    
+    private int defaultPriority;
     private int objectTypeId;
     private int instanceNumber;
     private String objectTypeDescription;
@@ -95,6 +96,7 @@ public class BacnetPoint {
         this.node = null;
         this.oid = oid;
         id = numPoints.increment();
+        this.defaultPriority = 8;
 
         setObjectTypeId(oid.getObjectType().intValue());
         setObjectTypeDescription(oid.getObjectType().toString());
@@ -117,6 +119,7 @@ public class BacnetPoint {
         int instNum = node.getAttribute("object instance number").getNumber().intValue();
         boolean usecov = node.getAttribute("use COV").getBool();
         boolean canset = node.getAttribute("settable").getBool();
+        int defprio = node.getAttribute("default priority").getNumber().intValue();
         Value pidval = node.getAttribute("pid");
         this.oid = new ObjectIdentifier(ot, instNum);
 
@@ -124,6 +127,7 @@ public class BacnetPoint {
 
         setCov(usecov);
         setSettable(canset);
+        setDefaultPriority(defprio);
         try {
             setObjectTypeId(ot.intValue());
 
@@ -224,6 +228,7 @@ public class BacnetPoint {
         node.setAttribute("object instance number", new Value(instanceNumber));
         node.setAttribute("use COV", new Value(cov));
         node.setAttribute("settable", new Value(settable));
+        node.setAttribute("default priority", new Value(defaultPriority));
         node.setAttribute("restore type", new Value("point"));
 
         if (node.getChild("present value") == null) {
@@ -265,6 +270,7 @@ public class BacnetPoint {
         act.addParameter(new Parameter("object instance number", ValueType.NUMBER, node.getAttribute("object instance number")));
         act.addParameter(new Parameter("use COV", ValueType.BOOL, node.getAttribute("use COV")));
         act.addParameter(new Parameter("settable", ValueType.BOOL, node.getAttribute("settable")));
+        act.addParameter(new Parameter("default priority", ValueType.NUMBER, node.getAttribute("default priority")));
         anode = node.getChild("edit");
         if (anode == null) node.createChild("edit").setAction(act).build().setSerializable(false);
         else anode.setAction(act);
@@ -309,7 +315,8 @@ public class BacnetPoint {
                 return;
             }
             Value newval = event.getCurrent();
-            handleSet(newval, priority, true);
+            int p = (priority > -1) ? priority : defaultPriority;
+            handleSet(newval, p, true);
         }
     }
 
@@ -353,6 +360,7 @@ public class BacnetPoint {
             }
             settable = event.getParameter("settable", ValueType.BOOL).getBool();
             cov = event.getParameter("use COV", ValueType.BOOL).getBool();
+            defaultPriority = event.getParameter("default priority", ValueType.NUMBER).getNumber().intValue();
             ObjectType ot = DeviceFolder.parseObjectType(event.getParameter("object type", ValueType.STRING).getString());
             instanceNumber = event.getParameter("object instance number", ValueType.NUMBER).getNumber().intValue();
             oid = new ObjectIdentifier(ot, instanceNumber);
@@ -385,6 +393,7 @@ public class BacnetPoint {
             newnode.setAttribute("object instance number", new Value(instanceNumber));
             newnode.setAttribute("use COV", new Value(cov));
             newnode.setAttribute("settable", new Value(settable));
+            newnode.setAttribute("default priority", new Value(defaultPriority));
             newnode.setAttribute("restore type", new Value("point"));
             new BacnetPoint(folder, parent, newnode);
         }
@@ -469,6 +478,14 @@ public class BacnetPoint {
     public void setSettable(boolean settable) {
         this.settable = settable;
 
+    }
+    
+    public int getDefaultPriority() {
+    	return defaultPriority;
+    }
+    
+    public void setDefaultPriority(int p) {
+    	this.defaultPriority = p;
     }
 
     public String getEngineeringUnits() {
@@ -736,8 +753,8 @@ public class BacnetPoint {
 
         if (settable) {
             if (vnode.getWritable() != Writable.WRITE) {
-                makeSetAction(vnode, 8);
-                makeSetAction(node, 8);
+                makeSetAction(vnode, -1);
+                makeSetAction(node, -1);
                 PriorityArray pa = null;
 //	        	try {
 //	    			Thread.sleep(500);
@@ -751,11 +768,13 @@ public class BacnetPoint {
                 }
                 Value newval = vnode.getValue();
                 if (pa != null && (!newval.equals(oldval) || vnode.getChildren() == null || vnode.getChildren().size() < pa.getCount() + 3)) {
-                    makeRelinquishAction(vnode, 8);
+                    makeRelinquishAction(vnode, -1);
                     Action act = new Action(Permission.READ, new RelinquishAllHandler());
                     vnode.createChild("relinquish all").setAction(act).build().setSerializable(false);
                     refreshPriorities(pa);
                 }
+            } else {
+            	refreshPriorities();
             }
         } else {
             if (vnode.getWritable() != Writable.NEVER) {
@@ -825,6 +844,10 @@ public class BacnetPoint {
             if (pnode != null) {
                 pnode.setValueType(vt);
                 pnode.setValue(val);
+                if (pnode.getChild("relinquish") == null) {
+                	makeSetAction(pnode, i);
+                	makeRelinquishAction(pnode, i);
+                }
             } else {
                 pnode = vnode.createChild("Priority " + i).setValueType(vt).setValue(val).build();
                 makeSetAction(pnode, i);
@@ -879,7 +902,8 @@ public class BacnetPoint {
         }
 
         public void handle(ActionResult event) {
-            relinquish(priority);
+        	int p = (priority > -1) ? priority : defaultPriority;
+            relinquish(p);
 //    		try {
 //				Thread.sleep(500);
 //			} catch (InterruptedException e) {

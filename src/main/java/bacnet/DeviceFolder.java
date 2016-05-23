@@ -111,7 +111,8 @@ public class DeviceFolder {
 		    	Value inum = child.getAttribute("object instance number");
 		    	Value cov = child.getAttribute("use COV");
 		    	Value sett = child.getAttribute("settable");
-		    	if (ot!=null && inum!=null && cov!=null && sett!=null) {
+		    	Value defp = child.getAttribute("default priority");
+		    	if (ot!=null && inum!=null && cov!=null && sett!=null && defp!=null) {
 		    		new BacnetPoint(this, node, child);
 		    		//conn.link.setupPoint(bp, this);
 		    	} else {
