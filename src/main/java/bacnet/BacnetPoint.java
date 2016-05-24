@@ -812,7 +812,7 @@ public class BacnetPoint {
                     String off = (unitsDescription.size() > 0) ? unitsDescription.get(0) : "0";
                     String on = (unitsDescription.size() > 1) ? unitsDescription.get(1) : "1";
                     vt = ValueType.makeBool(on, off);
-                    if (!isnull) val = new Value(Boolean.parseBoolean(p) || p.equals("1"));
+                    if (!isnull) val = new Value(Boolean.parseBoolean(p) || p.equals("1") || p.equals("Active"));
                     break;
                 }
                 case NUMERIC: {
