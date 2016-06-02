@@ -91,6 +91,8 @@ public class BacnetPoint {
     int id;
     //private DeviceEventAdapter listener;
     
+    byte typeid = Null.TYPE_ID;
+    
     private int defaultPriority;
     private int objectTypeId;
     private int instanceNumber;
@@ -399,7 +401,7 @@ public class BacnetPoint {
     		} else if (choice == 2) {
     			String dtstr = event.getParameter("time", ValueType.STRING).getString();
     			Date d = new Date(Integer.parseInt(dtstr.substring(0, 4)), Month.valueOf(Integer.parseInt(dtstr.substring(5, 7))), Integer.parseInt(dtstr.substring(8, 10)), null);
-    			Time t = new Time(Integer.parseInt(dtstr.substring(11, 13)), Integer.parseInt(dtstr.substring(14, 16)), Integer.parseInt(dtstr.substring(17, 19)), Integer.parseInt(dtstr.substring(20, 23)));
+    			Time t = new Time(Integer.parseInt(dtstr.substring(11, 13)), Integer.parseInt(dtstr.substring(14, 16)), Integer.parseInt(dtstr.substring(17, 19)), Integer.parseInt(dtstr.substring(20, 22)));
     			DateTime dt = new DateTime(d, t);
     			ByTime bytime = new ByTime(dt, new SignedInteger(count));
     			request = new ReadRangeRequest(oid, PropertyIdentifier.logBuffer, null, bytime);
@@ -427,15 +429,23 @@ public class BacnetPoint {
     	}
     }
     
-//    private class PropertySetHandler implements Handler<ValuePair> {
-//    	public void handle(ValuePair event) {
-//    		if (!event.isFromExternalSource()) {
-//                return;
-//            }
-//            Value newval = event.getCurrent();
-//            if (node != null) LOGGER.info("property set to " + newval.toString());
-//    	}
-//    }
+    private class PropertySetHandler implements Handler<ValuePair> {
+    	PropertyIdentifier prop;
+    	PropertySetHandler(PropertyIdentifier p) {
+    		prop = p;
+    	}
+    	
+    	public void handle(ValuePair event) {
+    		if (!event.isFromExternalSource()) {
+    			return;
+    		}
+    		JsonArray newval = event.getCurrent().getArray();
+    		Encodable enc = Utils.encodeJsonArray(newval, prop, typeid);
+    		
+    		folder.conn.localDevice.send(folder.root.device, new WritePropertyRequest(oid, prop, null, enc, new UnsignedInteger(defaultPriority)));
+    		
+    	}
+    }
     
     private class RawSetHandler implements Handler<ValuePair> {
         private int priority;
@@ -933,10 +943,10 @@ public class BacnetPoint {
         }
         
         updateProperty("effective period", effectivePeriod);
-        updateProperty("weekly schedule", weeklySchedule);
-        updateProperty("exception schedule", exceptionSchedule);
+        updateProperty("weekly schedule", weeklySchedule, PropertyIdentifier.weeklySchedule);
+        updateProperty("exception schedule", exceptionSchedule, PropertyIdentifier.exceptionSchedule);
         
-        updateProperty("date list", dateList);
+        updateProperty("date list", dateList, PropertyIdentifier.dateList);
         
         updateProperty("device reference", referenceDevice);
         updateProperty("object reference", referenceObject);
@@ -1010,15 +1020,15 @@ public class BacnetPoint {
         }
     }
     
-    private void updateProperty(String name, JsonArray value) {
+    private void updateProperty(String name, JsonArray value, PropertyIdentifier p) {
     	Node propnode = node.getChild(name);
     	if (value != null) {
         	if (propnode != null) propnode.setValue(new Value(value));
-        	else node.createChild(name).setValueType(ValueType.ARRAY).setValue(new Value(value)).build();
-//        	if (propnode.getWritable() != Writable.WRITE) {
-//        		propnode.setWritable(Writable.WRITE);
-//        		propnode.getListener().setValueHandler(new PropertySetHandler());
-//        	}
+        	else propnode = node.createChild(name).setValueType(ValueType.ARRAY).setValue(new Value(value)).build();
+        	if (propnode.getWritable() != Writable.WRITE) {
+        		propnode.setWritable(Writable.WRITE);
+        		propnode.getListener().setValueHandler(new PropertySetHandler(p));
+        	}
     	} else {
         	if (propnode != null) node.removeChild(propnode);
         }

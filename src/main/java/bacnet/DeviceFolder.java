@@ -42,6 +42,7 @@ import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.enumerated.EngineeringUnits;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.Enumerated;
+import com.serotonin.bacnet4j.type.primitive.Null;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.OctetString;
 import com.serotonin.bacnet4j.type.primitive.Primitive;
@@ -349,6 +350,8 @@ public class DeviceFolder {
         		JsonArray darr = new JsonArray();
         		for (TimeValue tv: ds.getDaySchedule()) {
         			darr.add(Utils.timeValueToJson(tv));
+        			byte ti = Utils.getPrimitiveType(tv.getValue());
+        			if (ti != Null.TYPE_ID) pt.typeid = ti;
         		}
         		jarr.add(darr);
         	}
@@ -356,7 +359,7 @@ public class DeviceFolder {
         } else if (pid.equals(PropertyIdentifier.exceptionSchedule)) {
         	JsonArray jarr = new JsonArray();
         	for (SpecialEvent se: (SequenceOf<SpecialEvent>) encodable) {
-        		jarr.add(Utils.specialEventToString(se));
+        		jarr.add(Utils.specialEventToJson(se));
         	}
         	pt.setExceptionSchedule(jarr); // TODO
         } else if (pid.equals(PropertyIdentifier.notificationClass)) {
