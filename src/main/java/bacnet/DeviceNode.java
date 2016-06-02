@@ -13,6 +13,9 @@ import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
 import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
+import org.dsa.iot.dslink.node.actions.ResultType;
+import org.dsa.iot.dslink.node.actions.table.Row;
+import org.dsa.iot.dslink.node.actions.table.Table;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.util.Objects;
@@ -24,6 +27,11 @@ import org.slf4j.LoggerFactory;
 import bacnet.BacnetConn.CovType;
 
 import com.serotonin.bacnet4j.RemoteDevice;
+import com.serotonin.bacnet4j.ServiceFuture;
+import com.serotonin.bacnet4j.exception.BACnetException;
+import com.serotonin.bacnet4j.service.acknowledgement.GetAlarmSummaryAck;
+import com.serotonin.bacnet4j.service.acknowledgement.GetAlarmSummaryAck.AlarmSummary;
+import com.serotonin.bacnet4j.service.confirmed.GetAlarmSummaryRequest;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.util.PropertyReferences;
 
@@ -68,6 +76,11 @@ public class DeviceNode extends DeviceFolder {
 				}
 			});
 			node.createChild("disable").setAction(act).build().setSerializable(false);
+			
+			act = new Action(Permission.READ, new AlarmSummaryHandler());
+			act.addResult(new Parameter("Alarm", ValueType.STRING));
+			act.setResultType(ResultType.TABLE);
+			node.createChild("get alarm summary").setAction(act).build().setSerializable(false);
 		} else {
 			Action act = new Action(Permission.READ, new Handler<ActionResult>() {
 				public void handle(ActionResult event) {
@@ -217,6 +230,27 @@ public class DeviceNode extends DeviceFolder {
 	        
 	        makeEditAction();
 		}
+	}
+	
+	private class AlarmSummaryHandler implements Handler<ActionResult> {
+		public void handle(ActionResult event) {
+			try {
+				//LOGGER.info("getting alarm summary...");
+				ServiceFuture resp = conn.localDevice.send(device, new GetAlarmSummaryRequest());
+				GetAlarmSummaryAck ack = (GetAlarmSummaryAck) resp.get();
+				//LOGGER.info("got alarm summary:");
+				//LOGGER.info(ack.getValues().toString());
+				Table table = event.getTable();
+				for (AlarmSummary summ: ack.getValues()) {
+					//LOGGER.info(summ.toString());
+					Row row = Row.make(new Value(summ.toString()));
+					table.addRow(row);
+				}
+			} catch (BACnetException e) {
+				LOGGER.debug("", e);
+			}
+		}
+		
 	}
 	
 	@Override

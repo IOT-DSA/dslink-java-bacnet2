@@ -1,6 +1,6 @@
 {
   "name": "dslink-java-bacnet",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "A dslink for bacnet",
   "license": "GNU GPL",
   "main": "bin/dslink-java-bacnet",

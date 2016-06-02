@@ -14,6 +14,7 @@ import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.util.handler.Handler;
+import org.dsa.iot.dslink.util.json.JsonArray;
 import org.dsa.iot.dslink.util.json.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,9 +28,15 @@ import com.serotonin.bacnet4j.service.confirmed.SubscribeCOVRequest;
 import com.serotonin.bacnet4j.type.AmbiguousValue;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.constructed.BACnetError;
+import com.serotonin.bacnet4j.type.constructed.CalendarEntry;
+import com.serotonin.bacnet4j.type.constructed.DailySchedule;
+import com.serotonin.bacnet4j.type.constructed.DateRange;
+import com.serotonin.bacnet4j.type.constructed.DateTime;
 import com.serotonin.bacnet4j.type.constructed.DeviceObjectPropertyReference;
 import com.serotonin.bacnet4j.type.constructed.PropertyValue;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
+import com.serotonin.bacnet4j.type.constructed.SpecialEvent;
+import com.serotonin.bacnet4j.type.constructed.TimeValue;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.enumerated.EngineeringUnits;
@@ -112,7 +119,8 @@ public class DeviceFolder {
 		    	Value cov = child.getAttribute("use COV");
 		    	Value sett = child.getAttribute("settable");
 		    	Value defp = child.getAttribute("default priority");
-		    	if (ot!=null && inum!=null && cov!=null && sett!=null && defp!=null) {
+		    	if (defp == null) child.setAttribute("default priority", new Value(8));
+		    	if (ot!=null && inum!=null && cov!=null && sett!=null) {
 		    		new BacnetPoint(this, node, child);
 		    		//conn.link.setupPoint(bp, this);
 		    	} else {
@@ -155,10 +163,12 @@ public class DeviceFolder {
                         if (pin == null) {
                         	for (Object o : (SequenceOf<?>) value) {
                         		ObjectIdentifier oid = (ObjectIdentifier) o;
+                        		//LOGGER.info(oid.getObjectType().toString());
                         		addObjectPoint(oid, refs, points);
                         	}
                         } else {
                         	ObjectIdentifier oid = (ObjectIdentifier) value;
+                        	//LOGGER.info(oid.getObjectType().toString());
                         	addObjectPoint(oid, refs, points);
                         }
                         return false;
@@ -267,8 +277,8 @@ public class DeviceFolder {
 	}
 	
 	void updatePointValue(BacnetPoint pt, PropertyIdentifier pid, Encodable encodable) {
-		
-		if (encodable instanceof BACnetError) return;
+		if (encodable instanceof BACnetError) 
+			return;
 		if (pid.equals(PropertyIdentifier.objectName)) {
 			String name = BacnetConn.toLegalName(PropertyValues.getString(encodable));
 			if (name.length() < 1) {
@@ -278,7 +288,7 @@ public class DeviceFolder {
 				pt.setObjectName(name);
 			}
     	} else if (pid.equals(PropertyIdentifier.presentValue) && ObjectType.schedule.intValue() == pt.getObjectTypeId()) {
-            handleAmbiguous((AmbiguousValue) encodable, pt, pid);
+            handleAmbiguous(encodable, pt, pid);
     	} else if (pid.equals(PropertyIdentifier.presentValue)) {
             pt.setPresentValue(PropertyValues.getString(encodable), pid);
     	} else if (pid.equals(PropertyIdentifier.modelName)) {
@@ -312,17 +322,57 @@ public class DeviceFolder {
             pt.setPresentValue(PropertyValues.getString(encodable), pid);
         } else if (pid.equals(PropertyIdentifier.logDeviceObjectProperty) && encodable instanceof DeviceObjectPropertyReference) {
             DeviceObjectPropertyReference ref = (DeviceObjectPropertyReference) encodable;
-            if (ref.getDeviceIdentifier() != null) {
-                pt.setReferenceDeviceId(ref.getDeviceIdentifier().getInstanceNumber());
-            } else {
-                if (root.device != null) pt.setReferenceDeviceId(root.device.getInstanceNumber());
-                pt.setReferenceObjectTypeId(ref.getObjectIdentifier().getObjectType().intValue());
-                pt.setReferenceObjectTypeDescription(ref.getObjectIdentifier().getObjectType().toString());
-                pt.setReferenceInstanceNumber(ref.getObjectIdentifier().getInstanceNumber());
-                pt.setDataType(getDataType(ref.getObjectIdentifier().getObjectType()));
+            if (ref.getDeviceIdentifier() != null) pt.setReferenceDevice(ref.getDeviceIdentifier().toString());
+            else if (root.device != null) pt.setReferenceDevice(root.device.getObjectIdentifier().toString());
+            if (ref.getObjectIdentifier() != null) {
+            	pt.setReferenceObject(ref.getObjectIdentifier().toString());
+            	pt.setDataType(getDataType(ref.getObjectIdentifier().getObjectType()));
             }
+            if (ref.getPropertyIdentifier() != null) pt.setReferenceProperty(ref.getPropertyIdentifier().toString());
         } else if (pid.equals(PropertyIdentifier.recordCount)) {
-            pt.setPresentValue(PropertyValues.getString(encodable), pid);
+            //pt.setPresentValue(PropertyValues.getString(encodable), pid);
+            pt.setRecordCount(((UnsignedInteger) encodable).intValue());
+        } else if (pid.equals(PropertyIdentifier.bufferSize)) {
+        	pt.setBufferSize(((UnsignedInteger) encodable).intValue());
+        } else if (pid.equals(PropertyIdentifier.startTime)) {
+        	pt.setStartTime(Utils.datetimeToString((DateTime) encodable));
+        } else if (pid.equals(PropertyIdentifier.stopTime)) {
+        	pt.setStopTime(Utils.datetimeToString((DateTime) encodable));
+        } else if (pid.equals(PropertyIdentifier.logBuffer)) {
+        	pt.setLogBuffer(PropertyValues.getString(encodable));
+        } else if (pid.equals(PropertyIdentifier.effectivePeriod)) {
+        	DateRange dr = (DateRange) encodable;
+        	pt.setEffectivePeriod(Utils.dateToString(dr.getStartDate()) + " - " + Utils.dateToString(dr.getEndDate()));
+        } else if (pid.equals(PropertyIdentifier.weeklySchedule)) {
+        	JsonArray jarr = new JsonArray();
+        	for (DailySchedule ds: (SequenceOf<DailySchedule>) encodable) {
+        		JsonArray darr = new JsonArray();
+        		for (TimeValue tv: ds.getDaySchedule()) {
+        			darr.add(Utils.timeValueToJson(tv));
+        		}
+        		jarr.add(darr);
+        	}
+        	pt.setWeeklySchedule(jarr); 
+        } else if (pid.equals(PropertyIdentifier.exceptionSchedule)) {
+        	JsonArray jarr = new JsonArray();
+        	for (SpecialEvent se: (SequenceOf<SpecialEvent>) encodable) {
+        		jarr.add(Utils.specialEventToString(se));
+        	}
+        	pt.setExceptionSchedule(jarr); // TODO
+        } else if (pid.equals(PropertyIdentifier.notificationClass)) {
+        	pt.setPresentValue(PropertyValues.getString(encodable), pid);
+        } else if (pid.equals(PropertyIdentifier.priority)) {
+        	pt.setPriority(PropertyValues.getString(encodable));
+        } else if (pid.equals(PropertyIdentifier.ackRequired)) {
+        	pt.setAckRequired(PropertyValues.getString(encodable));
+        } else if (pid.equals(PropertyIdentifier.recipientList)) {
+        	pt.setRecipientList(PropertyValues.getString(encodable));
+        } else if (pid.equals(PropertyIdentifier.dateList)) {
+        	JsonArray jarr = new JsonArray();
+        	for (CalendarEntry ce: (SequenceOf<CalendarEntry>) encodable) {
+        		jarr.add(Utils.calendarEntryToJson(ce));
+        	}
+        	pt.setDateList(jarr);
         }
 		pt.update();
 	}
@@ -340,7 +390,7 @@ public class DeviceFolder {
         points.put(oid, pt);
     }
 	
-	public static enum DataType {BINARY, MULTISTATE, NUMERIC, ALPHANUMERIC}
+	public static enum DataType {BINARY, MULTISTATE, NUMERIC, ALPHANUMERIC} 
 	
     public static DataType getDataType(ObjectType objectType) {
         if (isOneOf(objectType, ObjectType.binaryInput, ObjectType.binaryOutput,
@@ -349,6 +399,7 @@ public class DeviceFolder {
         else if (isOneOf(objectType, ObjectType.multiStateInput, ObjectType.multiStateOutput,
                 ObjectType.multiStateValue, ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone))
             return DataType.MULTISTATE;
+
         else
             return DataType.NUMERIC;
     }
@@ -397,21 +448,41 @@ public class DeviceFolder {
         }
         else if (isOneOf(type, ObjectType.schedule)) {
             refs.add(oid, PropertyIdentifier.presentValue);
+            refs.add(oid, PropertyIdentifier.effectivePeriod);
+            refs.add(oid, PropertyIdentifier.weeklySchedule);
+            refs.add(oid, PropertyIdentifier.exceptionSchedule);
         }
         else if (isOneOf(type, ObjectType.trendLog)) {
             refs.add(oid, PropertyIdentifier.logDeviceObjectProperty);
             refs.add(oid, PropertyIdentifier.recordCount);
+            refs.add(oid, PropertyIdentifier.startTime);
+            refs.add(oid, PropertyIdentifier.stopTime);
+            refs.add(oid, PropertyIdentifier.bufferSize);
+            //refs.add(oid, PropertyIdentifier.logBuffer);
+        } else if (isOneOf(type, ObjectType.notificationClass)) {
+        	refs.add(oid, PropertyIdentifier.notificationClass);
+        	refs.add(oid, PropertyIdentifier.priority);
+        	refs.add(oid, PropertyIdentifier.ackRequired);
+        	refs.add(oid, PropertyIdentifier.recipientList);
+        } else if (isOneOf(type, ObjectType.calendar)) {
+        	refs.add(oid, PropertyIdentifier.presentValue);
+        	refs.add(oid, PropertyIdentifier.dateList);
         }
     }
     
-    void handleAmbiguous(AmbiguousValue av, BacnetPoint pt, PropertyIdentifier pid) {
+    void handleAmbiguous(Encodable enc, BacnetPoint pt, PropertyIdentifier pid) {
         Primitive primitive;
-        try {
-            primitive = av.convertTo(Primitive.class);
-        }
-        catch (BACnetException e) {
-            pt.setPresentValue(e.getMessage(), pid);
-            return;
+        if (enc instanceof Primitive) {
+        	primitive = (Primitive) enc;
+        } else {
+	        try {
+	        	AmbiguousValue av = (AmbiguousValue) enc;
+	            primitive = av.convertTo(Primitive.class);
+	        }
+	        catch (BACnetException e) {
+	            pt.setPresentValue(e.getMessage(), pid);
+	            return;
+	        }
         }
         pt.setPresentValue(PropertyValues.getString(primitive), pid);
 

@@ -2,6 +2,9 @@ package bacnet;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -12,6 +15,7 @@ import com.serotonin.bacnet4j.transport.DefaultTransport;
 import com.serotonin.io.serial.SerialPortException;
 import com.serotonin.io.serial.SerialPortProxy;
 import com.serotonin.io.serial.SerialUtils;
+
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
@@ -95,6 +99,9 @@ class BacnetConn {
         String bip = node.getAttribute("broadcast ip").getString();
         int port = node.getAttribute("port").getNumber().intValue();
         String lba = node.getAttribute("local bind address").getString();
+        boolean isfd = node.getAttribute("register as foreign device in bbmd").getBool();
+		String bbmdip = node.getAttribute("bbmd ip").getString();
+		int bbmdport = node.getAttribute("bbmd port").getNumber().intValue();
         String commPort = node.getAttribute("comm port id").getString();
         int baud = node.getAttribute("baud rate").getNumber().intValue();
         int station = node.getAttribute("this station id").getNumber().intValue();
@@ -161,8 +168,16 @@ class BacnetConn {
 	        }
 	        //localDevice.setStrict(strict);
 	        try {
-	
 	            localDevice.initialize();
+	            if (isIP && isfd) {
+	                try {
+	     				((IpNetwork) network).registerAsForeignDevice(new InetSocketAddress(InetAddress.getByName(bbmdip), bbmdport), 100);
+	     			} catch (UnknownHostException e) {
+	     				LOGGER.debug("", e);
+	     			} catch (BACnetException e) {
+	     				LOGGER.debug("", e);
+	     			}
+	            }
 	            localDevice.sendGlobalBroadcast(localDevice.getIAm());
 	            //Thread.sleep(200000);
 	        } catch (Exception e) {
@@ -224,6 +239,9 @@ class BacnetConn {
             act.addParameter(new Parameter("broadcast ip", ValueType.STRING, node.getAttribute("broadcast ip")));
             act.addParameter(new Parameter("port", ValueType.NUMBER, node.getAttribute("port")));
             act.addParameter(new Parameter("local bind address", ValueType.STRING, node.getAttribute("local bind address")));
+            act.addParameter(new Parameter("register as foreign device in bbmd", ValueType.BOOL, node.getAttribute("register as foreign device in bbmd")));
+    		act.addParameter(new Parameter("bbmd ip", ValueType.STRING, node.getAttribute("bbmd ip")));
+    		act.addParameter(new Parameter("bbmd port", ValueType.NUMBER, node.getAttribute("bbmd port")));
         } else {
             Set<String> portids = BacnetLink.listPorts();
             if (portids.size() > 0) {
@@ -286,9 +304,16 @@ class BacnetConn {
                 String bip = event.getParameter("broadcast ip", ValueType.STRING).getString();
                 int port = event.getParameter("port", ValueType.NUMBER).getNumber().intValue();
                 String lba = event.getParameter("local bind address", ValueType.STRING).getString();
+                boolean isfd = event.getParameter("register as foreign device in bbmd", ValueType.BOOL).getBool();
+				String bbmdip = event.getParameter("bbmd ip", ValueType.STRING).getString();
+				int bbmdport = event.getParameter("bbmd port", ValueType.NUMBER).getNumber().intValue();
+                
                 node.setAttribute("broadcast ip", new Value(bip));
                 node.setAttribute("port", new Value(port));
                 node.setAttribute("local bind address", new Value(lba));
+                node.setAttribute("register as foreign device in bbmd", new Value(isfd));
+    			node.setAttribute("bbmd ip", new Value(bbmdip));
+    			node.setAttribute("bbmd port", new Value(bbmdport));
             } else {
                 String commPort = event.getParameter("comm port id", ValueType.STRING).getString();
                 int baud = event.getParameter("baud rate", ValueType.NUMBER).getNumber().intValue();

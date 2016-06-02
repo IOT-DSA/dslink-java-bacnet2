@@ -68,6 +68,9 @@ public class BacnetLink {
 		act.addParameter(new Parameter("port", ValueType.NUMBER, new Value(47808)));
 		act.addParameter(new Parameter("local bind address", ValueType.STRING, new Value("0.0.0.0")));
 		act.addParameter(new Parameter("local network number", ValueType.NUMBER, new Value(0)));
+		act.addParameter(new Parameter("register as foreign device in bbmd", ValueType.BOOL, new Value(false)));
+		act.addParameter(new Parameter("bbmd ip", ValueType.STRING));
+		act.addParameter(new Parameter("bbmd port", ValueType.NUMBER, new Value(47808)));
 		act.addParameter(new Parameter("strict device comparisons", ValueType.BOOL, new Value(true)));
 		act.addParameter(new Parameter("Timeout", ValueType.NUMBER, new Value(6000)));
 		act.addParameter(new Parameter("segment timeout", ValueType.NUMBER, new Value(5000)));
@@ -196,6 +199,12 @@ public class BacnetLink {
 			Value bip = child.getAttribute("broadcast ip");
 			Value port = child.getAttribute("port");
 			Value lba = child.getAttribute("local bind address");
+			Value isfd = child.getAttribute("register as foreign device in bbmd");
+			if (isfd == null) child.setAttribute("register as foreign device in bbmd", new Value(false));
+			Value bbmdip = child.getAttribute("bbmd ip");
+			if (bbmdip == null) child.setAttribute("bbmd ip", new Value(" "));
+			Value bbmdport = child.getAttribute("bbmd port");
+			if (bbmdport == null) child.setAttribute("bbmd port", new Value(0));
 			Value commPort = child.getAttribute("comm port id");
 			Value baud = child.getAttribute("baud rate");
 			Value station = child.getAttribute("this station id");
@@ -218,7 +227,7 @@ public class BacnetLink {
 				
 				BacnetConn bc = new BacnetConn(getMe(), child);
 				bc.restoreLastSession();
-			} else {
+			} else if (!child.getName().equals("defs")) {
 				node.removeChild(child);
 			}
 		}
@@ -269,10 +278,16 @@ public class BacnetLink {
 			String name = event.getParameter("name", ValueType.STRING).getString();
 			String bip= " "; int port = 0; String lba = " ";
 			String commPort = " "; int baud = 0; int station = 0; int ferc = 1;
+			boolean isfd = false; String bbmdip = " "; int bbmdport = 0;
 			if (isIP) {
 				bip = event.getParameter("broadcast ip", ValueType.STRING).getString();
 				port = event.getParameter("port", ValueType.NUMBER).getNumber().intValue();
 				lba = event.getParameter("local bind address", ValueType.STRING).getString();
+			
+				isfd = event.getParameter("register as foreign device in bbmd", ValueType.BOOL).getBool();
+				bbmdip = event.getParameter("bbmd ip", new Value(" ")).getString();
+				bbmdport = event.getParameter("bbmd port", ValueType.NUMBER).getNumber().intValue();
+				
 			} else {
 				commPort = event.getParameter("comm port id", ValueType.STRING).getString();
 				baud = event.getParameter("baud rate", ValueType.NUMBER).getNumber().intValue();
@@ -295,6 +310,9 @@ public class BacnetLink {
 			child.setAttribute("broadcast ip", new Value(bip));
 			child.setAttribute("port", new Value(port));
 			child.setAttribute("local bind address", new Value(lba));
+			child.setAttribute("register as foreign device in bbmd", new Value(isfd));
+			child.setAttribute("bbmd ip", new Value(bbmdip));
+			child.setAttribute("bbmd port", new Value(bbmdport));
 			child.setAttribute("comm port id", new Value(commPort));
 			child.setAttribute("baud rate", new Value(baud));
 			child.setAttribute("this station id", new Value(station));

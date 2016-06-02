@@ -19,18 +19,35 @@ import org.dsa.iot.dslink.node.Writable;
 import org.dsa.iot.dslink.node.actions.Action;
 import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
+import org.dsa.iot.dslink.node.actions.ResultType;
+import org.dsa.iot.dslink.node.actions.table.Row;
+import org.dsa.iot.dslink.node.actions.table.Table;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValuePair;
 import org.dsa.iot.dslink.node.value.ValueType;
+import org.dsa.iot.dslink.util.handler.CompleteHandler;
 import org.dsa.iot.dslink.util.handler.Handler;
+import org.dsa.iot.dslink.util.json.JsonArray;
+import org.dsa.iot.historian.database.Database;
+import org.dsa.iot.historian.database.DatabaseProvider;
+import org.dsa.iot.historian.stats.GetHistory;
+import org.dsa.iot.historian.utils.QueryData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.serotonin.bacnet4j.enums.Month;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.obj.ObjectProperties;
+import com.serotonin.bacnet4j.service.acknowledgement.ReadRangeAck;
+import com.serotonin.bacnet4j.service.confirmed.ReadRangeRequest;
+import com.serotonin.bacnet4j.service.confirmed.ReadRangeRequest.ByPosition;
+import com.serotonin.bacnet4j.service.confirmed.ReadRangeRequest.BySequenceNumber;
+import com.serotonin.bacnet4j.service.confirmed.ReadRangeRequest.ByTime;
 import com.serotonin.bacnet4j.service.confirmed.WritePropertyRequest;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.constructed.BACnetError;
+import com.serotonin.bacnet4j.type.constructed.DateTime;
+import com.serotonin.bacnet4j.type.constructed.LogRecord;
 import com.serotonin.bacnet4j.type.constructed.PriorityArray;
 import com.serotonin.bacnet4j.type.constructed.PropertyValue;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
@@ -38,9 +55,12 @@ import com.serotonin.bacnet4j.type.enumerated.BinaryPV;
 import com.serotonin.bacnet4j.type.enumerated.LifeSafetyState;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
+import com.serotonin.bacnet4j.type.primitive.Date;
 import com.serotonin.bacnet4j.type.primitive.Null;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.Real;
+import com.serotonin.bacnet4j.type.primitive.SignedInteger;
+import com.serotonin.bacnet4j.type.primitive.Time;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.PropertyReferences;
 import com.serotonin.bacnet4j.util.RequestUtils;
@@ -80,14 +100,33 @@ public class BacnetPoint {
     private boolean cov;
     private boolean settable;
     private String engineeringUnits;
+    
+    // for schedules
+    private String effectivePeriod = null;
+    private JsonArray weeklySchedule = null;
+    private JsonArray exceptionSchedule = null;
+    private JsonArray dateList = null;
+    
+    //for trend logs
+    private String startTime = null;
+    private String stopTime = null;
+    //private String logdevObject = null;
+    private int recordCount = -1;
+    private int bufferSize = -1;
+    private String logBuffer = null;
+    private String referenceDevice;
+    private String referenceObject;
+    private String referenceProperty;
+    
+    //for notification classes
+    private String priority = null;
+    private String ackRequired = null;
+    private String recipientList = null;
 
-    // Default values for points
     private DataType dataType;
     private List<String> unitsDescription = new ArrayList<String>();
-    private int referenceDeviceId;
-    private int referenceObjectTypeId;
-    private String referenceObjectTypeDescription;
-    private int referenceInstanceNumber;
+
+	private boolean historyInitialized = false;
 
     public BacnetPoint(DeviceFolder folder, Node parent, ObjectIdentifier oid) {
         this.folder = folder;
@@ -236,6 +275,43 @@ public class BacnetPoint {
         }
         node.getChild("present value").setWritable(Writable.NEVER);
         folder.conn.link.setupPoint(this, folder);
+        
+//        if (DeviceFolder.isOneOf(oid.getObjectType(), ObjectType.trendLog)) {
+//        	
+//        	Action act = new Action(Permission.READ, new GetLogHandler(0));
+//        	act.addParameter(new Parameter("position", ValueType.NUMBER, new Value(0)));
+//        	act.addParameter(new Parameter("count", ValueType.NUMBER, new Value(0)));
+//        	act.addResult(new Parameter("Timestamp", ValueType.STRING));
+//        	act.addResult(new Parameter("Status Flags", ValueType.STRING));
+//        	act.addResult(new Parameter("Data", ValueType.STRING));
+//			act.setResultType(ResultType.TABLE);
+//        	Node anode = node.getChild("Get Log by Position");
+//        	if (anode == null) node.createChild("Get Log by Position").setAction(act).build().setSerializable(false);
+//        	else anode.setAction(act);
+//        	
+//        	act = new Action(Permission.READ, new GetLogHandler(1));
+//        	act.addParameter(new Parameter("sequence number", ValueType.NUMBER, new Value(0)));
+//        	act.addParameter(new Parameter("count", ValueType.NUMBER, new Value(0)));
+//        	act.addResult(new Parameter("Timestamp", ValueType.STRING));
+//        	act.addResult(new Parameter("Status Flags", ValueType.STRING));
+//        	act.addResult(new Parameter("Data", ValueType.STRING));
+//			act.setResultType(ResultType.TABLE);
+//        	anode = node.getChild("Get Log by Sequence Number");
+//        	if (anode == null) node.createChild("Get Log by Sequence Number").setAction(act).build().setSerializable(false);
+//        	else anode.setAction(act);
+//        	
+//        	act = new Action(Permission.READ, new GetLogHandler(2));
+//        	act.addParameter(new Parameter("time", ValueType.STRING));
+//        	act.addParameter(new Parameter("count", ValueType.NUMBER, new Value(0)));
+//        	act.addResult(new Parameter("Timestamp", ValueType.STRING));
+//        	act.addResult(new Parameter("Status Flags", ValueType.STRING));
+//        	act.addResult(new Parameter("Data", ValueType.STRING));
+//			act.setResultType(ResultType.TABLE);
+//        	anode = node.getChild("Get Log by Time");
+//        	if (anode == null) node.createChild("Get Log by Time").setAction(act).build().setSerializable(false);
+//        	else anode.setAction(act);
+//        }
+        
 //        setObjectTypeId(objectTypeId);
 //        setInstanceNumber(instanceNumber);
 //        setObjectTypeDescription(objectTypeDescription);
@@ -303,6 +379,64 @@ public class BacnetPoint {
 //    	}
 //    }
 
+    private class GetLogHandler implements Handler<ActionResult> {
+    	private int choice;
+    	GetLogHandler(int c) {
+    		choice = c;
+    	}
+    	
+    	public void handle(ActionResult event) {
+    		ReadRangeRequest request = null;
+    		int count = event.getParameter("count", ValueType.NUMBER).getNumber().intValue();
+    		if (choice == 0) {
+    			int pos = event.getParameter("position", ValueType.NUMBER).getNumber().intValue();
+    			ByPosition bypos = new ByPosition(new UnsignedInteger(pos), new SignedInteger(count));
+    			request = new ReadRangeRequest(oid, PropertyIdentifier.logBuffer, null, bypos);
+    		} else if (choice == 1) {
+    			int seqnum = event.getParameter("sequence number", ValueType.NUMBER).getNumber().intValue();
+    			BySequenceNumber byseq = new BySequenceNumber(new UnsignedInteger(seqnum), new SignedInteger(count));
+    			request = new ReadRangeRequest(oid, PropertyIdentifier.logBuffer, null, byseq);
+    		} else if (choice == 2) {
+    			String dtstr = event.getParameter("time", ValueType.STRING).getString();
+    			Date d = new Date(Integer.parseInt(dtstr.substring(0, 4)), Month.valueOf(Integer.parseInt(dtstr.substring(5, 7))), Integer.parseInt(dtstr.substring(8, 10)), null);
+    			Time t = new Time(Integer.parseInt(dtstr.substring(11, 13)), Integer.parseInt(dtstr.substring(14, 16)), Integer.parseInt(dtstr.substring(17, 19)), Integer.parseInt(dtstr.substring(20, 23)));
+    			DateTime dt = new DateTime(d, t);
+    			ByTime bytime = new ByTime(dt, new SignedInteger(count));
+    			request = new ReadRangeRequest(oid, PropertyIdentifier.logBuffer, null, bytime);
+    		}
+    		
+    		if (request != null) {
+    			ReadRangeAck response = null;
+				try {
+					response = (ReadRangeAck) folder.conn.localDevice.send(folder.root.device, request).get();
+				} catch (BACnetException e) {
+					LOGGER.debug("", e);
+				}
+				
+				if (response != null) {
+					Table table = event.getTable();
+					for (LogRecord record: (SequenceOf<LogRecord>) response.getItemData()) {
+						Value ts = new Value(Utils.datetimeToString(record.getTimestamp()));
+						Value sf = new Value(record.getStatusFlags().toString());
+						Value data = new Value(record.getEncodable().toString());
+						Row row = Row.make(ts, sf, data);
+						table.addRow(row);
+					}
+				}
+    		}
+    	}
+    }
+    
+//    private class PropertySetHandler implements Handler<ValuePair> {
+//    	public void handle(ValuePair event) {
+//    		if (!event.isFromExternalSource()) {
+//                return;
+//            }
+//            Value newval = event.getCurrent();
+//            if (node != null) LOGGER.info("property set to " + newval.toString());
+//    	}
+//    }
+    
     private class RawSetHandler implements Handler<ValuePair> {
         private int priority;
 
@@ -433,6 +567,70 @@ public class BacnetPoint {
 //        	System.out.println("unitsDescription updated to " + unitsDescription);
 //        }
     }
+    
+    public String getEffectivePeriod() {
+    	return effectivePeriod;
+    }
+    
+    public void setEffectivePeriod(String ep) {
+    	this.effectivePeriod = ep;
+    }
+    
+    public JsonArray getWeeklySchedule() {
+    	return weeklySchedule;
+    }
+    
+    public void setWeeklySchedule(JsonArray ws) {
+    	this.weeklySchedule = ws;
+    }
+    
+    public JsonArray getExceptionSchedule() {
+    	return exceptionSchedule;
+    }
+    
+    public void setExceptionSchedule(JsonArray es) {
+    	this.exceptionSchedule = es;
+    }
+    
+    public JsonArray getDateList() {
+    	return dateList;
+    }
+    
+    public void setDateList(JsonArray dl) {
+    	this.dateList = dl;
+    }
+    
+    public void setStartTime(String start) {
+    	this.startTime = start;
+    }
+    
+    public void setStopTime(String stop) {
+    	this.stopTime = stop;
+    }
+    
+    public void setLogBuffer(String buff) {
+    	this.logBuffer = buff;
+    }
+    
+    public void setRecordCount(int count) {
+    	this.recordCount = count;
+    }
+    
+    public void setBufferSize(int size) {
+    	this.bufferSize = size;
+    }
+    
+    public void setPriority(String priority) {
+    	this.priority = priority;
+    }
+    
+    public void setAckRequired(String ackreq) {
+    	this.ackRequired = ackreq;
+    }
+    
+    public void setRecipientList(String reclist) {
+    	this.recipientList = reclist;
+    }
 
     public String getPresentValue() {
         return presentValue;
@@ -502,12 +700,12 @@ public class BacnetPoint {
 //        }
     }
 
-    public int getReferenceDeviceId() {
-        return referenceDeviceId;
+    public String getReferenceDevice() {
+        return referenceDevice;
     }
 
-    public void setReferenceDeviceId(int referenceDeviceId) {
-        this.referenceDeviceId = referenceDeviceId;
+    public void setReferenceDevice(String referenceDevice) {
+        this.referenceDevice = referenceDevice;
 //        if (node != null) {
 //        	Node vnode = node.getChild("referenceDeviceId");
 //        	if (vnode != null) vnode.setValue(new Value(referenceDeviceId));
@@ -516,26 +714,12 @@ public class BacnetPoint {
 //        }
     }
 
-    public int getReferenceObjectTypeId() {
-        return referenceObjectTypeId;
+    public String getReferenceObject() {
+        return referenceObject;
     }
 
-    public void setReferenceObjectTypeId(int referenceObjectTypeId) {
-        this.referenceObjectTypeId = referenceObjectTypeId;
-//        if (node != null) {
-//        	Node vnode = node.getChild("referenceObjectTypeId");
-//        	if (vnode != null) vnode.setValue(new Value(referenceObjectTypeId));
-//        	else node.createChild("referenceObjectTypeId").setValueType(ValueType.NUMBER).setValue(new Value(referenceObjectTypeId)).build();
-//        	System.out.println("referenceObjectTypeId updated to " + referenceObjectTypeId);
-//        }
-    }
-
-    public String getReferenceObjectTypeDescription() {
-        return referenceObjectTypeDescription;
-    }
-
-    public void setReferenceObjectTypeDescription(String referenceObjectTypeDescription) {
-        this.referenceObjectTypeDescription = referenceObjectTypeDescription;
+    public void setReferenceObject(String referenceObject) {
+        this.referenceObject = referenceObject;
 //        if (node != null && referenceObjectTypeDescription != null) {
 //        	Node vnode = node.getChild("referenceObjectTypeDescription");
 //        	if (vnode != null) vnode.setValue(new Value(referenceObjectTypeDescription));
@@ -544,18 +728,12 @@ public class BacnetPoint {
 //        }
     }
 
-    public int getReferenceInstanceNumber() {
-        return referenceInstanceNumber;
+    public String getReferenceProperty() {
+    	return referenceProperty;
     }
-
-    public void setReferenceInstanceNumber(int referenceInstanceNumber) {
-        this.referenceInstanceNumber = referenceInstanceNumber;
-//        if (node != null) {
-//        	Node vnode = node.getChild("referenceInstanceNumber");
-//        	if (vnode != null) vnode.setValue(new Value(referenceInstanceNumber));
-//        	else node.createChild("referenceInstanceNumber").setValueType(ValueType.NUMBER).setValue(new Value(referenceInstanceNumber)).build();
-//        	System.out.println("referenceInstanceNumber updated to " + referenceInstanceNumber);
-//        }
+    
+    public void setReferenceProperty(String referenceProperty) {
+    	this.referenceProperty = referenceProperty;
     }
 
     private Encodable valueToEncodable(Value value, ObjectType objectType, PropertyIdentifier pid) {
@@ -708,7 +886,10 @@ public class BacnetPoint {
                     vt = ValueType.makeEnum(enums);
                     int index = Integer.parseInt(presentValue) - 1;
                     if (index >= 0 && index < unitsDescription.size()) val = new Value(unitsDescription.get(index));
-                    else val = new Value(presentValue);
+                    else {
+                    	vt = ValueType.STRING;
+                    	val = new Value(presentValue);
+                    }
                     break;
                 }
                 case ALPHANUMERIC: {
@@ -750,7 +931,31 @@ public class BacnetPoint {
                 LOGGER.debug("presentValue set to " + val);
             }
         }
+        
+        updateProperty("effective period", effectivePeriod);
+        updateProperty("weekly schedule", weeklySchedule);
+        updateProperty("exception schedule", exceptionSchedule);
+        
+        updateProperty("date list", dateList);
+        
+        updateProperty("device reference", referenceDevice);
+        updateProperty("object reference", referenceObject);
+        updateProperty("property reference", referenceProperty);
+        updateProperty("start time", startTime);
+        updateProperty("stop time", stopTime);
+        updateProperty("record count", recordCount);
+        updateProperty("buffer size", bufferSize);
+        updateProperty("log buffer", logBuffer);
+        
+        updateProperty("priority", priority);
+        updateProperty("ack required", ackRequired);
+        updateProperty("recipient list", recipientList);
 
+        if (bufferSize > -1 && !historyInitialized ) {
+        	GetHistory.initAction(node, new Db());
+        	historyInitialized = true;
+        }
+        
         if (settable) {
             if (vnode.getWritable() != Writable.WRITE) {
                 makeSetAction(vnode, -1);
@@ -783,6 +988,40 @@ public class BacnetPoint {
             }
         }
 
+    }
+    
+    private void updateProperty(String name, String value) {
+    	Node propnode = node.getChild(name);
+    	if (value != null) {
+        	if (propnode != null) propnode.setValue(new Value(value));
+        	else node.createChild(name).setValueType(ValueType.STRING).setValue(new Value(value)).build();
+        } else {
+        	if (propnode != null) node.removeChild(propnode);
+        }
+    }
+    
+    private void updateProperty(String name, int value) {
+    	Node propnode = node.getChild(name);
+    	if (value >= 0) {
+        	if (propnode != null) propnode.setValue(new Value(value));
+        	else node.createChild(name).setValueType(ValueType.NUMBER).setValue(new Value(value)).build();
+        } else {
+        	if (propnode != null) node.removeChild(propnode);
+        }
+    }
+    
+    private void updateProperty(String name, JsonArray value) {
+    	Node propnode = node.getChild(name);
+    	if (value != null) {
+        	if (propnode != null) propnode.setValue(new Value(value));
+        	else node.createChild(name).setValueType(ValueType.ARRAY).setValue(new Value(value)).build();
+//        	if (propnode.getWritable() != Writable.WRITE) {
+//        		propnode.setWritable(Writable.WRITE);
+//        		propnode.getListener().setValueHandler(new PropertySetHandler());
+//        	}
+    	} else {
+        	if (propnode != null) node.removeChild(propnode);
+        }
     }
 
     private void refreshPriorities() {
@@ -1146,6 +1385,82 @@ public class BacnetPoint {
         DeviceFolder.addPropertyReferences(refs, oid);
         points.put(oid, point);
         devicefold.getProperties(refs, points);
+    }
+    
+    private class Db extends Database {
+
+		public Db() {
+			super(node.getName(), null);
+		}
+
+		@Override
+		public void write(String path, Value value, long ts) {
+			throw new UnsupportedOperationException();
+			
+		}
+
+		@Override
+		public void query(String path, long from, long to, CompleteHandler<QueryData> handler) {
+			DateTime start = new DateTime(from);
+//			LOGGER.info("start time: " + Utils.datetimeToString(start));
+			ByTime bytime = new ByTime(start, new SignedInteger(bufferSize));
+			ReadRangeRequest request = new ReadRangeRequest(oid, PropertyIdentifier.logBuffer, null, bytime);
+			try {
+				ReadRangeAck response = (ReadRangeAck) folder.conn.localDevice.send(folder.root.device, request).get();
+				for (LogRecord record: (SequenceOf<LogRecord>) response.getItemData()) {
+					long ts = record.getTimestamp().getGC().getTimeInMillis();
+					if (ts > to) continue;
+					Encodable enc = record.getEncodable();
+					Value v;
+					if (enc instanceof com.serotonin.bacnet4j.type.primitive.Boolean) {
+						v = new Value(((com.serotonin.bacnet4j.type.primitive.Boolean) enc).booleanValue());
+					} else if (enc instanceof Real) {
+						v = new Value(((Real) enc).floatValue());
+					} else if (enc instanceof UnsignedInteger) {
+						v = new Value(((UnsignedInteger) enc).bigIntegerValue());
+					} else if (enc instanceof SignedInteger) {
+						v = new Value(((SignedInteger) enc).bigIntegerValue());
+					} else {
+						v = new Value(enc.toString());
+					}
+					QueryData qd = new QueryData(v, record.getTimestamp().getGC().getTimeInMillis());
+					handler.handle(qd);
+				}
+			} catch (BACnetException e) {
+				LOGGER.debug("", e);
+			} finally {
+				handler.complete();
+			}
+		}
+
+		@Override
+		public QueryData queryFirst(String path) {
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public QueryData queryLast(String path) {
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public void close() throws Exception {
+			throw new UnsupportedOperationException();
+			
+		}
+
+		@Override
+		protected void performConnect() throws Exception {
+			throw new UnsupportedOperationException();
+			
+		}
+
+		@Override
+		public void initExtensions(Node node) {
+			throw new UnsupportedOperationException();
+			
+		}
+    	
     }
 }
 
