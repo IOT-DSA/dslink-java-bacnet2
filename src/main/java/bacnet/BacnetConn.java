@@ -49,6 +49,7 @@ import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.RequestListener;
 import com.serotonin.bacnet4j.util.RequestUtils;
+import com.serotonin.bacnet4j.util.sero.SerialPortWrapper;
 import com.serotonin.io.serial.SerialParameters;
 
 
@@ -136,22 +137,14 @@ class BacnetConn {
             network = new IpNetwork(bip, port, lba, lnn);
         } else {
             try {
-                SerialParameters params = new SerialParameters();
-                params.setCommPortId(commPort);
-                params.setBaudRate(baud);
-                params.setPortOwnerName("DSLink");
-                SerialPortProxy spp = SerialUtils.openSerialPort(params);
-                InputStream is = spp.getInputStream();
-                OutputStream out = spp.getOutputStream();
-                MasterNode mastnode = new MasterNode(is, out, (byte) station, ferc);
+                SerialPortWrapper wrapper = new SerialPortWrapperImpl(commPort, baud, "DSLink");
+                MasterNode mastnode = new MasterNode(wrapper, (byte) station, ferc);
                 network = new MstpNetwork(mastnode, lnn);
             } catch (SerialPortException e) {
                 LOGGER.debug("", e);
                 statnode.setValue(new Value("COM Port not found"));
                 network = null;
             }
-
-            
         }
         if (network != null) {
 	        Transport transport = new DefaultTransport(network);
@@ -230,6 +223,72 @@ class BacnetConn {
 
         }
 
+    }
+    
+    private static class SerialPortWrapperImpl extends SerialPortWrapper {
+    	
+    	private SerialParameters params;
+    	private SerialPortProxy spp = null;
+    	
+    	SerialPortWrapperImpl(String commPort, int baud, String owner) throws SerialPortException {
+    		params = new SerialParameters();
+            params.setCommPortId(commPort);
+            params.setBaudRate(baud);
+            params.setPortOwnerName(owner);
+    	}
+
+		@Override
+		public void close() throws Exception {
+			if (spp != null) SerialUtils.close(spp);
+			spp = null;
+			
+		}
+
+		@Override
+		public String getCommPortId() {
+			return params.getCommPortId();
+		}
+
+		@Override
+		public InputStream getInputStream() {
+			return (spp != null) ? spp.getInputStream() : null;
+		}
+
+		@Override
+		public OutputStream getOutputStream() {
+			return (spp != null) ? spp.getOutputStream() : null;
+		}
+
+		@Override
+		public void open() throws Exception {
+			spp = SerialUtils.openSerialPort(params);
+			
+		}
+		
+		@Override
+		public int getFlowControlIn(){
+		    return params.getFlowControlIn();
+		}
+		
+		@Override
+		public int getFlowControlOut(){
+		    return params.getFlowControlOut();
+		}
+		
+		@Override
+		public int getDataBits(){
+		    return params.getDataBits();
+		}
+
+		@Override
+		public int getStopBits(){
+		    return params.getStopBits();
+		}
+
+		@Override
+		public int getParity(){
+		    return params.getParity();
+		}
     }
 
     Action getEditAction() {
