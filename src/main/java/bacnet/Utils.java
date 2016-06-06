@@ -16,9 +16,11 @@ import com.serotonin.bacnet4j.type.constructed.DateRange;
 import com.serotonin.bacnet4j.type.constructed.DateTime;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.constructed.SpecialEvent;
+import com.serotonin.bacnet4j.type.constructed.TimeStamp;
 import com.serotonin.bacnet4j.type.constructed.TimeValue;
 import com.serotonin.bacnet4j.type.constructed.WeekNDay;
 import com.serotonin.bacnet4j.type.constructed.WeekNDay.WeekOfMonth;
+import com.serotonin.bacnet4j.type.enumerated.EventState;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.BitString;
@@ -66,8 +68,19 @@ public class Utils {
     public static String datetimeToString(DateTime dt) {
     	String dat = dateToString(dt.getDate());
     	String tim = unparseTime(dt.getTime());
-    	if (tim.equals("Unspecified")) return dat;
     	return dat + "T" + tim;
+    }
+    
+    public static DateTime datetimeFromString(String str) {
+    	String[] a = str.split("T");
+    	Date d = dateFromString(a[0]);
+    	Time t;
+    	if (a.length >= 2) {
+    		t = parseTime(a[1]);
+    	} else {
+    		t = Time.UNSPECIFIED;
+    	}
+    	return new DateTime(d, t);
     }
     
     public static String dateToString(Date date) {
@@ -110,26 +123,79 @@ public class Utils {
     }
     
     public static String unparseTime(Time time) {
-    	if (time.isHourUnspecified()) return "Unspecified";
     	String str = "";
-    	String part = ("00" + Integer.toString(time.getHour()));
+    	String part = (time.isHourUnspecified()) ? "???" : ("00" + Integer.toString(time.getHour()));
     	str += part.substring(part.length() - 2) + ":";
-    	part = (time.isMinuteUnspecified()) ? "000" : ("00" + Integer.toString(time.getMinute()));
+    	part = (time.isMinuteUnspecified()) ? "???" : ("00" + Integer.toString(time.getMinute()));
     	str += part.substring(part.length() - 2) + ":";
-    	part = (time.isSecondUnspecified()) ? "000" : ("00" + Integer.toString(time.getSecond()));
+    	part = (time.isSecondUnspecified()) ? "???" : ("00" + Integer.toString(time.getSecond()));
     	str += part.substring(part.length() - 2) + ".";
-    	part = (time.isHundredthUnspecified()) ? "0000" : (Integer.toString(time.getHundredth()) + "000");
+    	part = (time.isHundredthUnspecified()) ? "????" : (Integer.toString(time.getHundredth()) + "000");
     	str += part.substring(0, 3);
     	return str;
     	
     }
     
     public static Time parseTime(String str) {
-    	int hr = Integer.parseInt(str.substring(0, 2));
-    	int min = Integer.parseInt(str.substring(3, 5));
-    	int sec = Integer.parseInt(str.substring(6, 8));
-    	int hund = Integer.parseInt(str.substring(9, 11));
+    	int hr; int min; int sec; int hund;
+    	try {
+    		hr = Integer.parseInt(str.substring(0, 2));
+    	} catch (NumberFormatException e) {
+    		hr = 255;
+    	}
+    	try {
+    		min = Integer.parseInt(str.substring(3, 5));
+    	} catch (NumberFormatException e) {
+    		min = 255;
+    	}
+    	try {
+    		sec = Integer.parseInt(str.substring(6, 8));
+    	} catch (NumberFormatException e) {
+    		sec = 255;
+    	}
+    	try {
+    		hund = Integer.parseInt(str.substring(9, 11));
+    	} catch (NumberFormatException e) {
+    		hund = 255;
+    	}
     	return new Time(hr, min, sec, hund);
+    }
+    
+    public static String timestampToString(TimeStamp ts) {
+    	if (ts.isDateTime()) {
+    		return datetimeToString(ts.getDateTime());
+    	} 
+    	if (ts.isSequenceNumber()) {
+    		return ts.getSequenceNumber().toString();
+    	}
+    	if (ts.isTime()) {
+    		return unparseTime(ts.getTime());
+    	}
+    	return null;
+    }
+    
+    public static TimeStamp timestampFromString(String str) {
+    	try {
+    		UnsignedInteger num =  new UnsignedInteger(Integer.parseInt(str));
+    		return new TimeStamp(num);
+    	} catch (NumberFormatException e) {
+    	}
+    	if (str.length() > 12) {
+    		DateTime dt = datetimeFromString(str);
+    		return new TimeStamp(dt);
+    	}
+    	Time t = parseTime(str);
+    	return new TimeStamp(t);
+    }
+    
+    public static EventState eventStateFromString(String str) {
+    	if (str.equals("normal")) return new EventState(0);
+    	if (str.equals("fault")) return new EventState(1);
+    	if (str.equals("offnormal")) return new EventState(2);
+    	if (str.equals("highLimit")) return new EventState(3);
+    	if (str.equals("lowLimit")) return new EventState(4);
+    	if (str.equals("lifeSafetyAlarm")) return new EventState(5);
+    	return new EventState(0);
     }
     
     public static Object interpretPrimitive(Primitive p) {

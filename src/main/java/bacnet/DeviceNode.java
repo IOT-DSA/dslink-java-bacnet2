@@ -31,8 +31,20 @@ import com.serotonin.bacnet4j.ServiceFuture;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.service.acknowledgement.GetAlarmSummaryAck;
 import com.serotonin.bacnet4j.service.acknowledgement.GetAlarmSummaryAck.AlarmSummary;
+import com.serotonin.bacnet4j.service.acknowledgement.GetEventInformationAck;
+import com.serotonin.bacnet4j.service.acknowledgement.GetEventInformationAck.EventSummary;
+import com.serotonin.bacnet4j.service.confirmed.AcknowledgeAlarmRequest;
 import com.serotonin.bacnet4j.service.confirmed.GetAlarmSummaryRequest;
+import com.serotonin.bacnet4j.service.confirmed.GetEventInformationRequest;
+import com.serotonin.bacnet4j.type.constructed.DateTime;
+import com.serotonin.bacnet4j.type.constructed.EventTransitionBits;
+import com.serotonin.bacnet4j.type.constructed.TimeStamp;
+import com.serotonin.bacnet4j.type.enumerated.EventState;
+import com.serotonin.bacnet4j.type.enumerated.NotifyType;
+import com.serotonin.bacnet4j.type.enumerated.ObjectType;
+import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
+import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.PropertyReferences;
 
 public class DeviceNode extends DeviceFolder {
@@ -77,10 +89,7 @@ public class DeviceNode extends DeviceFolder {
 			});
 			node.createChild("disable").setAction(act).build().setSerializable(false);
 			
-			act = new Action(Permission.READ, new AlarmSummaryHandler());
-			act.addResult(new Parameter("Alarm", ValueType.STRING));
-			act.setResultType(ResultType.TABLE);
-			node.createChild("get alarm summary").setAction(act).build().setSerializable(false);
+			makeAlarmActions();
 		} else {
 			Action act = new Action(Permission.READ, new Handler<ActionResult>() {
 				public void handle(ActionResult event) {
@@ -139,6 +148,9 @@ public class DeviceNode extends DeviceFolder {
 			}
 		});
 		node.createChild("disable").setAction(act).build().setSerializable(false);
+		
+		makeAlarmActions();
+		
 		if (device == null) disable();
 	}
 	
@@ -232,6 +244,95 @@ public class DeviceNode extends DeviceFolder {
 		}
 	}
 	
+	private void makeAlarmActions() {
+		Action act = new Action(Permission.READ, new AlarmSummaryHandler());
+		act.addResult(new Parameter("Object", ValueType.STRING));
+		act.addResult(new Parameter("Alarm State", ValueType.STRING));
+		act.addResult(new Parameter("Acked Transitions: To-Offnormal", ValueType.BOOL));
+		act.addResult(new Parameter("Acked Transitions: To-Fault", ValueType.BOOL));
+		act.addResult(new Parameter("Acked Transitions: To-Normal", ValueType.BOOL));
+		act.setResultType(ResultType.TABLE);
+		node.createChild("get alarm summary").setAction(act).build().setSerializable(false);
+		
+		act = new Action(Permission.READ, new EventInfoHandler());
+		act.addResult(new Parameter("Object", ValueType.STRING));
+		act.addResult(new Parameter("Notify Type", ValueType.STRING));
+		act.addResult(new Parameter("Event State", ValueType.STRING));
+		act.addResult(new Parameter("Acked Transitions: To-Offnormal", ValueType.BOOL));
+		act.addResult(new Parameter("Acked Transitions: To-Fault", ValueType.BOOL));
+		act.addResult(new Parameter("Acked Transitions: To-Normal", ValueType.BOOL));
+		act.addResult(new Parameter("Event Enable: To-Offnormal", ValueType.BOOL));
+		act.addResult(new Parameter("Event Enable: To-Fault", ValueType.BOOL));
+		act.addResult(new Parameter("Event Enable: To-Normal", ValueType.BOOL));
+		act.addResult(new Parameter("Event Priority: To-Offnormal", ValueType.BOOL));
+		act.addResult(new Parameter("Event Priority: To-Fault", ValueType.BOOL));
+		act.addResult(new Parameter("Event Priority: To-Normal", ValueType.BOOL));
+		act.addResult(new Parameter("Event Timestamp: To-Offnormal", ValueType.BOOL));
+		act.addResult(new Parameter("Event Timestamp: To-Fault", ValueType.BOOL));
+		act.addResult(new Parameter("Event Timestamp: To-Normal", ValueType.BOOL));
+		act.setResultType(ResultType.TABLE);
+		node.createChild("get event information").setAction(act).build().setSerializable(false);
+		
+		act = new Action(Permission.READ, new AckAlarmHandler());
+		act.addParameter(new Parameter("Event Object Type", ValueType.makeEnum("Analog Input", "Analog Output", "Analog Value", "Binary Input", "Binary Output", "Binary Value", "Calendar", "Command", "Device", "Event Enrollment", "File", "Group", "Loop", "Multi-state Input", "Multi-state Output", "Notification Class", "Program", "Schedule", "Averaging", "Multi-state Value", "Trend Log", "Life Safety Point", "Life Safety Zone", "Accumulator", "Pulse Converter", "Event Log", "Trend Log Multiple", "Load Control", "Structured View", "Access Door")));
+		act.addParameter(new Parameter("Event Object Instance Number", ValueType.NUMBER, new Value(0)));
+		act.addParameter(new Parameter("Event State", ValueType.makeEnum("normal", "fault", "offnormal", "highLimit", "lowLimit", "lifeSafetyAlarm")));
+		act.addParameter(new Parameter("Event Timestamp", ValueType.STRING));
+		act.addParameter(new Parameter("Acknowledging Process Identifier", ValueType.NUMBER));
+		act.addParameter(new Parameter("Acknowledgment Source", ValueType.STRING));
+		node.createChild("acknowledge alarm").setAction(act).build().setSerializable(false);
+	}
+	
+	private class AckAlarmHandler implements Handler<ActionResult> {
+		public void handle(ActionResult event) {
+			ObjectType ot = DeviceFolder.parseObjectType(event.getParameter("Event Object Type").getString());
+			int inum = event.getParameter("Event Object Instance Number", ValueType.NUMBER).getNumber().intValue();
+			ObjectIdentifier oid = new ObjectIdentifier(ot, inum);
+			EventState estate = Utils.eventStateFromString(event.getParameter("Event State").getString());
+			TimeStamp ets = Utils.timestampFromString(event.getParameter("Event Timestamp", ValueType.STRING).getString());
+			UnsignedInteger ackid = new UnsignedInteger(event.getParameter("Acknowledging Process Identifier", ValueType.NUMBER).getNumber().intValue());
+			CharacterString acksrc = new CharacterString(event.getParameter("Acknowledgment Source", ValueType.STRING).getString());
+			TimeStamp ts = new TimeStamp(new DateTime());
+			
+			conn.localDevice.send(device, new AcknowledgeAlarmRequest(ackid, oid, estate, ets, acksrc, ts));
+		}
+	}
+	
+	private class EventInfoHandler implements Handler<ActionResult> {
+		public void handle(ActionResult event) {
+			try {
+				ServiceFuture resp = conn.localDevice.send(device, new GetEventInformationRequest(null));
+				GetEventInformationAck ack = (GetEventInformationAck) resp.get();
+				Table table = event.getTable();
+				for (EventSummary summ: ack.getListOfEventSummaries()) {
+					ObjectIdentifier oid = summ.getObjectIdentifier();
+					NotifyType ntype = summ.getNotifyType();
+					EventState estate =  summ.getEventState();
+					EventTransitionBits acktrans = summ.getAcknowledgedTransitions();
+					EventTransitionBits eenable = summ.getEventEnable();
+					UnsignedInteger onprio = summ.getEventPriorities().get(1);
+					UnsignedInteger fprio = summ.getEventPriorities().get(2);
+					UnsignedInteger nprio = summ.getEventPriorities().get(3);
+					TimeStamp onts = summ.getEventTimeStamps().get(1);
+					TimeStamp fts = summ.getEventTimeStamps().get(2);
+					TimeStamp nts = summ.getEventTimeStamps().get(3);
+					
+					Row row = Row.make(new Value(oid.toString()), new Value(ntype.toString()), 
+							new Value(estate.toString()), new Value(acktrans.isToOffnormal()), 
+							new Value(acktrans.isToFault()), new Value(acktrans.isToNormal()),
+							new Value(eenable.isToOffnormal()), new Value(eenable.isToFault()),
+							new Value(eenable.isToNormal()), new Value(onprio.intValue()),
+							new Value(fprio.intValue()), new Value(nprio.intValue()), 
+							new Value(Utils.timestampToString(onts)), new Value(Utils.timestampToString(fts)),
+							new Value(Utils.timestampToString(nts)));
+					table.addRow(row);
+				}
+			} catch (BACnetException e) {
+				LOGGER.debug("", e);
+			}
+		}
+	}
+	
 	private class AlarmSummaryHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			try {
@@ -243,7 +344,12 @@ public class DeviceNode extends DeviceFolder {
 				Table table = event.getTable();
 				for (AlarmSummary summ: ack.getValues()) {
 					//LOGGER.info(summ.toString());
-					Row row = Row.make(new Value(summ.toString()));
+					ObjectIdentifier oid = summ.getObjectIdentifier();
+					EventState astate = summ.getAlarmState();
+					EventTransitionBits acktrans = summ.getAcknowledgedTransitions();
+					Row row = Row.make(new Value(oid.toString()), new Value(astate.toString()), 
+							new Value(acktrans.isToOffnormal()), new Value(acktrans.isToFault()), 
+							new Value(acktrans.isToNormal()));
 					table.addRow(row);
 				}
 			} catch (BACnetException e) {
