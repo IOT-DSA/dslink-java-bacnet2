@@ -32,7 +32,9 @@ import com.serotonin.bacnet4j.type.constructed.CalendarEntry;
 import com.serotonin.bacnet4j.type.constructed.DailySchedule;
 import com.serotonin.bacnet4j.type.constructed.DateRange;
 import com.serotonin.bacnet4j.type.constructed.DateTime;
+import com.serotonin.bacnet4j.type.constructed.Destination;
 import com.serotonin.bacnet4j.type.constructed.DeviceObjectPropertyReference;
+import com.serotonin.bacnet4j.type.constructed.EventTransitionBits;
 import com.serotonin.bacnet4j.type.constructed.PropertyValue;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.constructed.SpecialEvent;
@@ -365,11 +367,23 @@ public class DeviceFolder {
         } else if (pid.equals(PropertyIdentifier.notificationClass)) {
         	pt.setPresentValue(PropertyValues.getString(encodable), pid);
         } else if (pid.equals(PropertyIdentifier.priority)) {
-        	pt.setPriority(PropertyValues.getString(encodable));
+        	JsonArray jarr = new JsonArray();
+        	for (UnsignedInteger n: (SequenceOf<UnsignedInteger>) encodable) {
+        		jarr.add(n.intValue());
+        	}
+        	pt.setPriority(jarr);
         } else if (pid.equals(PropertyIdentifier.ackRequired)) {
-        	pt.setAckRequired(PropertyValues.getString(encodable));
+        	JsonArray jarr = new JsonArray();
+        	for (int i=1; i<4; i++) {
+        		jarr.add(((EventTransitionBits) encodable).getValue(i));
+        	}
+        	pt.setAckRequired(jarr);
         } else if (pid.equals(PropertyIdentifier.recipientList)) {
-        	pt.setRecipientList(PropertyValues.getString(encodable));
+        	JsonArray jarr = new JsonArray();
+        	for (Destination dest: (SequenceOf<Destination>) encodable) {
+        		jarr.add(Utils.destinationToJson(dest));
+        	}
+        	pt.setRecipientList(jarr);
         } else if (pid.equals(PropertyIdentifier.dateList)) {
         	JsonArray jarr = new JsonArray();
         	for (CalendarEntry ce: (SequenceOf<CalendarEntry>) encodable) {

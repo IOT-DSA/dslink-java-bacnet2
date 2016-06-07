@@ -121,9 +121,9 @@ public class BacnetPoint {
     private String referenceProperty;
     
     //for notification classes
-    private String priority = null;
-    private String ackRequired = null;
-    private String recipientList = null;
+    private JsonArray priority = null;
+    private JsonArray ackRequired = null;
+    private JsonArray recipientList = null;
 
     private DataType dataType;
     private List<String> unitsDescription = new ArrayList<String>();
@@ -630,15 +630,15 @@ public class BacnetPoint {
     	this.bufferSize = size;
     }
     
-    public void setPriority(String priority) {
+    public void setPriority(JsonArray priority) {
     	this.priority = priority;
     }
     
-    public void setAckRequired(String ackreq) {
+    public void setAckRequired(JsonArray ackreq) {
     	this.ackRequired = ackreq;
     }
     
-    public void setRecipientList(String reclist) {
+    public void setRecipientList(JsonArray reclist) {
     	this.recipientList = reclist;
     }
 
@@ -957,9 +957,9 @@ public class BacnetPoint {
         updateProperty("buffer size", bufferSize);
         updateProperty("log buffer", logBuffer);
         
-        updateProperty("priority", priority);
-        updateProperty("ack required", ackRequired);
-        updateProperty("recipient list", recipientList);
+        updateProperty("priority", priority, PropertyIdentifier.priority);
+        updateProperty("ack required", ackRequired, PropertyIdentifier.ackRequired);
+        updateProperty("recipient list", recipientList, PropertyIdentifier.recipientList);
 
         if (bufferSize > -1 && !historyInitialized ) {
         	GetHistory.initAction(node, new Db());

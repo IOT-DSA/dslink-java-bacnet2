@@ -14,6 +14,10 @@ import com.serotonin.bacnet4j.type.constructed.CalendarEntry;
 import com.serotonin.bacnet4j.type.constructed.DailySchedule;
 import com.serotonin.bacnet4j.type.constructed.DateRange;
 import com.serotonin.bacnet4j.type.constructed.DateTime;
+import com.serotonin.bacnet4j.type.constructed.DaysOfWeek;
+import com.serotonin.bacnet4j.type.constructed.Destination;
+import com.serotonin.bacnet4j.type.constructed.EventTransitionBits;
+import com.serotonin.bacnet4j.type.constructed.Recipient;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.constructed.SpecialEvent;
 import com.serotonin.bacnet4j.type.constructed.TimeStamp;
@@ -424,6 +428,51 @@ public class Utils {
 		CalendarEntry entry = calendarEntryFromJson((JsonObject) calobj);
 		if (entry != null) return new SpecialEvent(entry, tvseq, epriority);
 		return null;
+	}
+	
+	public static JsonObject destinationToJson(Destination dest) {
+		JsonObject jo = new JsonObject();
+		jo.put("Valid Days", daysOfWeekToJson(dest.getValidDays()));
+		jo.put("From Time", unparseTime(dest.getFromTime()));
+		jo.put("To Time", unparseTime(dest.getToTime()));
+		jo.put("Recipient", recipientToJson(dest.getRecipient()));
+		jo.put("Process Identifier", dest.getProcessIdentifier().bigIntegerValue());
+		jo.put("Issue Confirmed Notifications", dest.getIssueConfirmedNotifications().booleanValue());
+		jo.put("Transitions", eventTransitionBitsToJson(dest.getTransitions()));
+		return jo;
+	}
+
+	private static JsonObject recipientToJson(Recipient recipient) {
+		JsonObject jo = new JsonObject();
+		if (recipient.isDevice()) {
+			jo.put("Object Identifier", recipient.getDevice().toString());
+		}
+		if (recipient.isAddress()) {
+			Address addr = recipient.getAddress();
+			jo.put("Network Number", addr.getNetworkNumber().bigIntegerValue());
+			jo.put("MAC Address", BACnetUtils.bytesToDottedString(addr.getMacAddress().getBytes()));
+		}
+		return jo;
+	}
+
+	private static JsonObject eventTransitionBitsToJson(EventTransitionBits transitions) {
+		JsonObject jo = new JsonObject();
+		jo.put("To Offnormal", transitions.isToOffnormal());
+		jo.put("To Fault", transitions.isToFault());
+		jo.put("To Normal", transitions.isToNormal());
+		return jo;
+	}
+
+	private static JsonObject daysOfWeekToJson(DaysOfWeek days) {
+		JsonObject jo = new JsonObject();
+		jo.put("Monday", days.isMonday());
+		jo.put("Tuesday", days.isTuesday());
+		jo.put("Wednesday", days.isWednesday());
+		jo.put("Thursday", days.isThursday());
+		jo.put("Friday", days.isFriday());
+		jo.put("Saturday", days.isSaturday());
+		jo.put("Sunday", days.isSunday());
+		return jo;
 	}
 
 	public static Encodable encodeJsonArray(JsonArray jarr, PropertyIdentifier prop, byte typeid) {
