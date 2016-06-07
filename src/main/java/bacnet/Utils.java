@@ -228,7 +228,11 @@ public class Utils {
     	if (o instanceof String) {
     		if (typeid == Date.TYPE_ID) return dateFromString((String) o);
     		if (typeid == Time.TYPE_ID) return parseTime((String) o);
-    		if (typeid == ObjectIdentifier.TYPE_ID) return oidFromString((String) o);
+    		if (typeid == ObjectIdentifier.TYPE_ID) {
+    			ObjectIdentifier oid = oidFromString((String) o);
+    			if (oid != null) return oid;
+    			else return  new CharacterString((String) o);
+    		}
     		if (typeid == OctetString.TYPE_ID) return octetStrFromString((String) o);
     		if (typeid == BitString.TYPE_ID) return bitStrFromString((String) o);
     		return new CharacterString((String) o);
@@ -255,8 +259,14 @@ public class Utils {
     public static ObjectIdentifier oidFromString(String str) {
     	String[] a = str.split(" ");
     	String numstr = a[a.length-1];
-    	int num = Integer.parseInt(numstr);
+    	int num;
+    	try {
+    		num = Integer.parseInt(numstr);
+    	} catch (NumberFormatException e) {
+    		return null;
+    	}
     	ObjectType ot = DeviceFolder.parseObjectType(str.substring(0, str.length() - numstr.length() - 1));
+    	if (ot == null) return null;
     	return new ObjectIdentifier(ot, num);
     }
     
@@ -421,7 +431,7 @@ public class Utils {
 		Object refobj = jobj.get("Calendar Reference");
 		if (refobj instanceof String) {
 			ObjectIdentifier ref = oidFromString((String) refobj);
-			return new SpecialEvent(ref, tvseq, epriority);
+			if (ref != null) return new SpecialEvent(ref, tvseq, epriority);
 		}
 		Object calobj = jobj.get("Calendar Entry");
 		if (!(calobj instanceof JsonObject)) return null;
@@ -441,6 +451,33 @@ public class Utils {
 		jo.put("Transitions", eventTransitionBitsToJson(dest.getTransitions()));
 		return jo;
 	}
+	
+	public static Destination destinationFromJson(JsonObject jo) {
+		Object vdobj = jo.get("Valid Days");
+		Object ftimeobj = jo.get("From Time");
+		Object ttimeobj = jo.get("To Time");
+		Object recipobj = jo.get("Recipient");
+		Object procidobj = jo.get("Process Identifier");
+		Object confirmedobj = jo.get("Issue Confirmed Notifications");
+		Object transobj = jo.get("Transitions");
+		if (!(recipobj instanceof JsonObject) || !(procidobj instanceof Number) || 
+				!(confirmedobj instanceof Boolean) || !(transobj instanceof JsonObject)) {
+			return null;
+		}
+		
+		Recipient recip = recipientFromJson((JsonObject) recipobj);
+		if (recip == null) return null;
+		UnsignedInteger procid = new UnsignedInteger(((Number) procidobj).intValue());
+		com.serotonin.bacnet4j.type.primitive.Boolean confirmedNotif = new com.serotonin.bacnet4j.type.primitive.Boolean(((Boolean) confirmedobj).booleanValue());
+		EventTransitionBits transitions = eventTransitionBitsFromJson((JsonObject) transobj);
+		if (vdobj instanceof JsonObject && ftimeobj instanceof String && ttimeobj instanceof String) {
+			DaysOfWeek validDays = daysOfWeekFromJson((JsonObject) vdobj);
+			Time fromTime = parseTime((String) ftimeobj);
+			Time toTime = parseTime((String) ttimeobj);
+			return new Destination(validDays, fromTime, toTime, recip, procid, confirmedNotif, transitions);
+		}
+		return new Destination(recip, procid, confirmedNotif, transitions);
+	}
 
 	private static JsonObject recipientToJson(Recipient recipient) {
 		JsonObject jo = new JsonObject();
@@ -454,6 +491,21 @@ public class Utils {
 		}
 		return jo;
 	}
+	
+	public static Recipient recipientFromJson(JsonObject jo) {
+		Object oidobj = jo.get("Object Identifier");
+		Object nnobj = jo.get("Network Number");
+		Object macobj = jo.get("MAC Address");
+		if (oidobj instanceof String) {
+			ObjectIdentifier oid = oidFromString((String) oidobj);
+			if (oid != null) return new Recipient(oid);
+		}
+		if (nnobj instanceof Number && macobj instanceof String) {
+			Address addr = toAddress(((Number) nnobj).intValue(), ((String) macobj));
+			return new Recipient(addr);
+		}
+		return null;
+	}
 
 	private static JsonObject eventTransitionBitsToJson(EventTransitionBits transitions) {
 		JsonObject jo = new JsonObject();
@@ -461,6 +513,16 @@ public class Utils {
 		jo.put("To Fault", transitions.isToFault());
 		jo.put("To Normal", transitions.isToNormal());
 		return jo;
+	}
+	
+	private static EventTransitionBits eventTransitionBitsFromJson(JsonObject jo) {
+		Object offnormobj = jo.get("To Offnormal");
+		Object faultobj = jo.get("To Fault");
+		Object normobj = jo.get("To Normal");
+		boolean offnorm = (offnormobj instanceof Boolean) ? ((Boolean) offnormobj).booleanValue() : false;
+		boolean fault = (faultobj instanceof Boolean) ? ((Boolean) faultobj).booleanValue() : false;
+		boolean norm = (normobj instanceof Boolean) ? ((Boolean) normobj).booleanValue() : false;
+		return new EventTransitionBits(offnorm, fault, norm);
 	}
 
 	private static JsonObject daysOfWeekToJson(DaysOfWeek days) {
@@ -474,6 +536,32 @@ public class Utils {
 		jo.put("Sunday", days.isSunday());
 		return jo;
 	}
+	
+	private static DaysOfWeek daysOfWeekFromJson(JsonObject jo) {
+		Object monobj = jo.get("Monday");
+		Object tuesobj = jo.get("Tuesday");
+		Object wedsobj = jo.get("Wednesday");
+		Object thursobj = jo.get("Thursday");
+		Object friobj = jo.get("Friday");
+		Object satobj = jo.get("Saturday");
+		Object sunobj = jo.get("Sunday");
+		boolean mon = (monobj instanceof Boolean) ? ((Boolean) monobj).booleanValue() : false;
+		boolean tues = (tuesobj instanceof Boolean) ? ((Boolean) tuesobj).booleanValue() : false;
+		boolean weds = (wedsobj instanceof Boolean) ? ((Boolean) wedsobj).booleanValue() : false;
+		boolean thurs = (thursobj instanceof Boolean) ? ((Boolean) thursobj).booleanValue() : false;
+		boolean fri = (friobj instanceof Boolean) ? ((Boolean) friobj).booleanValue() : false;
+		boolean sat = (satobj instanceof Boolean) ? ((Boolean) satobj).booleanValue() : false;
+		boolean sun = (sunobj instanceof Boolean) ? ((Boolean) sunobj).booleanValue() : false;
+		DaysOfWeek dow = new DaysOfWeek();
+		dow.setMonday(mon);
+		dow.setTuesday(tues);
+		dow.setWednesday(weds);
+		dow.setThursday(thurs);
+		dow.setFriday(fri);
+		dow.setSaturday(sat);
+		dow.setSunday(sun);
+		return dow;
+	}
 
 	public static Encodable encodeJsonArray(JsonArray jarr, PropertyIdentifier prop, byte typeid) {
 		if (prop.equals(PropertyIdentifier.weeklySchedule)) {
@@ -482,8 +570,66 @@ public class Utils {
 			return jsonArrayToExceptionSchedule(jarr, typeid);
 		} else if (prop.equals(PropertyIdentifier.dateList)) {
 			return jsonArrayToDateList(jarr);	
+		} else if (prop.equals(PropertyIdentifier.recipientList)) {
+			return jsonArrayToRecipientList(jarr);
+		} else if (prop.equals(PropertyIdentifier.priority)) {
+			return jsonArrayToPriority(jarr);
+		} else if (prop.equals(PropertyIdentifier.ackRequired)) {
+			return jsonArrayToAckRequired(jarr);
 		}
 		return null;
+	}
+	
+	public static EventTransitionBits jsonArrayToAckRequired(JsonArray jarr) {
+		Object obj0 = jarr.get(0);
+		Object obj1 = jarr.get(1);
+		Object obj2 = jarr.get(2);
+		if (obj0 instanceof String) {
+			obj0 = Boolean.parseBoolean((String) obj0);
+		}
+		if (!(obj0 instanceof Boolean)) return null;
+		
+		if (obj1 instanceof String) {
+			obj1 = Boolean.parseBoolean((String) obj1);
+		}
+		if (!(obj1 instanceof Boolean)) return null;
+		
+		if (obj2 instanceof String) {
+			obj2 = Boolean.parseBoolean((String) obj2);
+		}
+		if (!(obj2 instanceof Boolean)) return null;
+		
+		return new EventTransitionBits((Boolean) obj0, (Boolean) obj1, (Boolean) obj2);
+		
+	}
+	
+	public static SequenceOf<UnsignedInteger> jsonArrayToPriority(JsonArray jarr) {
+		SequenceOf<UnsignedInteger> seq = new SequenceOf<UnsignedInteger>();
+		for (Object obj: jarr) {
+			if (obj instanceof String) {
+				try {
+					obj = Integer.parseInt((String) obj);
+				} catch (NumberFormatException e) {}
+			}
+			if (obj instanceof Number) {
+				seq.add(new UnsignedInteger(((Number) obj).intValue()));
+			}
+		}
+		return seq;
+	}
+	
+	public static SequenceOf<Destination> jsonArrayToRecipientList(JsonArray jarr) {
+		SequenceOf<Destination> seq = new SequenceOf<Destination>();
+		for (Object obj: jarr) {
+			if (obj instanceof String) {
+				obj = new JsonObject((String) obj);
+			}
+			if (obj instanceof JsonObject) {
+				Destination dest = destinationFromJson((JsonObject) obj);
+				if (dest != null) seq.add(dest);
+			}
+		}
+		return seq;
 	}
 	
 	public static SequenceOf<DailySchedule> jsonArrayToWeeklySchedule(JsonArray jarr, byte typeid) {

@@ -441,6 +441,7 @@ public class BacnetPoint {
     		}
     		JsonArray newval = event.getCurrent().getArray();
     		Encodable enc = Utils.encodeJsonArray(newval, prop, typeid);
+    		if (enc == null) return;
     		
     		folder.conn.localDevice.send(folder.root.device, new WritePropertyRequest(oid, prop, null, enc, new UnsignedInteger(defaultPriority)));
     		
