@@ -190,6 +190,7 @@ class BacnetConn {
 	     				LOGGER.debug("", e);
 	     			}
 	            }
+	            localDevice.getEventHandler().addListener(new EventListenerImpl());
 	            localDevice.sendGlobalBroadcast(localDevice.getIAm());
 	            //Thread.sleep(200000);
 	        } catch (Exception e) {

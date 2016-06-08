@@ -129,7 +129,7 @@ public class DeviceFolder {
 		    	} else {
 		    		node.removeChild(child);
 		    	}
-			} else if (child.getAction() == null && child != root.statnode) {
+			} else if (child.getAction() == null && child != root.statnode && child != root.eventnode) {
 				node.removeChild(child);
 			}
 		}
