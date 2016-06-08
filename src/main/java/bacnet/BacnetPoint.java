@@ -255,6 +255,9 @@ public class BacnetPoint {
                     || objectTypeDescription.startsWith("Binary"))) {
                 name += " - " + objectTypeDescription;
             }
+            if (parent.getChild(name) != null) {
+            	name += oid.getInstanceNumber();
+            }
             NodeBuilder b = parent.createChild(name);
             b.setDisplayName(objectName);
             b.setValueType(ValueType.STRING);
