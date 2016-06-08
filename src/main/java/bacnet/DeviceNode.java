@@ -20,6 +20,7 @@ import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.util.Objects;
 import org.dsa.iot.dslink.util.handler.Handler;
+import org.dsa.iot.dslink.util.json.JsonArray;
 import org.dsa.iot.dslink.util.json.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,6 +55,7 @@ public class DeviceNode extends DeviceFolder {
 	}
 	
 	final Node statnode;
+	final Node eventnode;
 	private boolean enabled;
 	RemoteDevice device;
 	long interval;
@@ -67,6 +69,7 @@ public class DeviceNode extends DeviceFolder {
 		super(conn, node);
 		this.device = d;
 		this.root = this;
+		conn.deviceNodes.add(this);
 		
 		if (node.getChild("STATUS") != null) {
 			this.statnode = node.getChild("STATUS");
@@ -74,6 +77,12 @@ public class DeviceNode extends DeviceFolder {
 		} else {
 			this.statnode = node.createChild("STATUS").setValueType(ValueType.STRING).setValue(new Value("enabled")).build();
 			enabled = true;
+		}
+		
+		if (node.getChild("EVENTS") != null) {
+			this.eventnode = node.getChild("EVENTS");
+		} else {
+			this.eventnode = node.createChild("EVENTS").setValueType(ValueType.ARRAY).setValue(new Value(new JsonArray())).build();
 		}
 		
 		if (d == null) {
@@ -178,6 +187,7 @@ public class DeviceNode extends DeviceFolder {
 	protected void remove() {
 		super.remove();
 		if (conn.isIP) stpe.shutdown();
+		conn.deviceNodes.remove(this);
 	}
 	
 	private void makeEditAction() {

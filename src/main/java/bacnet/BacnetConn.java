@@ -5,6 +5,7 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.util.HashSet;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -26,24 +27,41 @@ import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.util.Objects;
 import org.dsa.iot.dslink.util.StringUtils;
 import org.dsa.iot.dslink.util.handler.Handler;
+import org.dsa.iot.dslink.util.json.JsonArray;
 import org.dsa.iot.dslink.util.json.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.RemoteDevice;
+import com.serotonin.bacnet4j.RemoteObject;
 import com.serotonin.bacnet4j.event.DeviceEventAdapter;
+import com.serotonin.bacnet4j.event.DeviceEventListener;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.npdu.Network;
 import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
 import com.serotonin.bacnet4j.npdu.mstp.MasterNode;
 import com.serotonin.bacnet4j.npdu.mstp.MstpNetwork;
+import com.serotonin.bacnet4j.obj.BACnetObject;
+import com.serotonin.bacnet4j.service.confirmed.ReinitializeDeviceRequest.ReinitializedStateOfDevice;
 import com.serotonin.bacnet4j.service.unconfirmed.WhoIsRequest;
 import com.serotonin.bacnet4j.transport.Transport;
 import com.serotonin.bacnet4j.type.constructed.Address;
 import com.serotonin.bacnet4j.type.constructed.BACnetError;
+import com.serotonin.bacnet4j.type.constructed.Choice;
+import com.serotonin.bacnet4j.type.constructed.DateTime;
+import com.serotonin.bacnet4j.type.constructed.PropertyValue;
+import com.serotonin.bacnet4j.type.constructed.Sequence;
+import com.serotonin.bacnet4j.type.constructed.SequenceOf;
+import com.serotonin.bacnet4j.type.constructed.TimeStamp;
+import com.serotonin.bacnet4j.type.enumerated.EventState;
+import com.serotonin.bacnet4j.type.enumerated.EventType;
+import com.serotonin.bacnet4j.type.enumerated.MessagePriority;
+import com.serotonin.bacnet4j.type.enumerated.NotifyType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.notificationParameters.NotificationParameters;
+import com.serotonin.bacnet4j.type.primitive.Boolean;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
@@ -63,6 +81,7 @@ class BacnetConn {
     BacnetLink link;
     boolean isIP;
     private int unnamedCount;
+    final Set<DeviceNode> deviceNodes = new HashSet<DeviceNode>();
 
     private final ScheduledThreadPoolExecutor stpe;
 
@@ -704,5 +723,107 @@ class BacnetConn {
         } else if (child.getAction() == null && !child.getName().equals("STATUS")) {
             node.removeChild(child);
         }
+    }
+    
+    
+    private class EventListenerImpl implements DeviceEventListener {
+
+		@Override
+		public boolean allowPropertyWrite(Address arg0, BACnetObject arg1,
+				PropertyValue arg2) {
+			// TODO Auto-generated method stub
+			return false;
+		}
+
+		@Override
+		public void covNotificationReceived(UnsignedInteger arg0,
+				RemoteDevice arg1, ObjectIdentifier arg2, UnsignedInteger arg3,
+				SequenceOf<PropertyValue> arg4) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void eventNotificationReceived(UnsignedInteger processIdentifier,
+				RemoteDevice initiatingDevice, ObjectIdentifier eventObjectIdentifier, 
+				TimeStamp timeStamp, UnsignedInteger notificationClass, UnsignedInteger priority, 
+				EventType eventType, CharacterString messageText, NotifyType notifyType, 
+				Boolean ackRequired, EventState fromState, EventState toState, 
+				NotificationParameters eventValues) {
+			
+			JsonObject jo = new JsonObject();
+			jo.put("Process Identifier", processIdentifier.intValue());
+			jo.put("Object", eventObjectIdentifier.toString());
+			jo.put("Timestamp", Utils.timestampToString(timeStamp));
+			jo.put("Notification Class", notificationClass.intValue());
+			jo.put("Notify Type", notifyType.toString());
+			jo.put("Event Type", eventType.toString());
+			jo.put("From Event State", fromState.toString());
+			jo.put("To Event State", toState.toString());
+			jo.put("Priority", priority.intValue());
+			jo.put("Ack Required", ackRequired.booleanValue());
+			jo.put("Message Text", messageText.toString());
+			
+			for (DeviceNode dn: deviceNodes) {
+				if (initiatingDevice.equals(dn.device)) {
+					JsonArray val = dn.eventnode.getValue().getArray();
+					val.add(jo);
+					dn.eventnode.setValue(new Value(val));
+				}
+			}
+		}
+
+		@Override
+		public void iAmReceived(RemoteDevice arg0) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void iHaveReceived(RemoteDevice arg0, RemoteObject arg1) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void listenerException(Throwable arg0) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void privateTransferReceived(Address arg0, UnsignedInteger arg1,
+				UnsignedInteger arg2, Sequence arg3) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void propertyWritten(Address arg0, BACnetObject arg1,
+				PropertyValue arg2) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void reinitializeDevice(Address arg0,
+				ReinitializedStateOfDevice arg1) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void synchronizeTime(Address arg0, DateTime arg1, boolean arg2) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void textMessageReceived(RemoteDevice arg0, Choice arg1,
+				MessagePriority arg2, CharacterString arg3) {
+			// TODO Auto-generated method stub
+			
+		}
+    	
     }
 }
