@@ -33,17 +33,17 @@ import com.serotonin.io.serial.CommPortProxy;
 
 public class BacnetLink {
 	private static final Logger LOGGER;
-	
+
 	private Node node;
 	final Map<BacnetPoint, ScheduledFuture<?>> futures;
 	final Set<BacnetConn> serialConns;
 	Serializer copySerializer;
 	Deserializer copyDeserializer;
-	
+
 	static {
 		LOGGER = LoggerFactory.getLogger(BacnetLink.class);
 	}
-	
+
 	private BacnetLink(Node node, Serializer ser, Deserializer deser) {
 		this.node = node;
 		this.futures = new ConcurrentHashMap<BacnetPoint, ScheduledFuture<?>>();
@@ -51,17 +51,17 @@ public class BacnetLink {
 		this.copySerializer = ser;
 		this.serialConns = new HashSet<BacnetConn>();
 	}
-	
+
 	public static void start(Node parent, Serializer ser, Deserializer deser) {
 		Node node = parent;
 		final BacnetLink link = new BacnetLink(node, ser, deser);
 		link.init();
 	}
-	
+
 	private void init() {
-		
+
 		restoreLastSession();
-		
+
 		Action act = new Action(Permission.READ, new AddConnHandler(true));
 		act.addParameter(new Parameter("name", ValueType.STRING));
 		act.addParameter(new Parameter("broadcast ip", ValueType.STRING, new Value("255.255.255.255")));
@@ -81,18 +81,21 @@ public class BacnetLink {
 		act.addParameter(new Parameter("local device vendor", ValueType.STRING, new Value("DGLogik Inc.")));
 		act.addParameter(new Parameter("default polling interval", ValueType.NUMBER, new Value(5)));
 		node.createChild("add ip connection").setAction(act).build().setSerializable(false);
-		
-//		act = new Action(Permission.READ, new RxtxSetupHandler());
-//		act.addParameter(new Parameter("Operating System", ValueType.makeEnum("Windows-x32", "Windows-x64", "Linux-x86", "Linux-x86_64", "Linux-ia64", "MacOSX")));
-//		node.createChild("setup rxtx").setAction(act).build().setSerializable(false);
-		
+
+		// act = new Action(Permission.READ, new RxtxSetupHandler());
+		// act.addParameter(new Parameter("Operating System",
+		// ValueType.makeEnum("Windows-x32", "Windows-x64", "Linux-x86",
+		// "Linux-x86_64", "Linux-ia64", "MacOSX")));
+		// node.createChild("setup
+		// rxtx").setAction(act).build().setSerializable(false);
+
 		act = getAddSerialAction();
 		node.createChild("add mstp connection").setAction(act).build().setSerializable(false);
-		
+
 		act = new Action(Permission.READ, new PortScanHandler());
 		node.createChild("scan for serial ports").setAction(act).build().setSerializable(false);
 	}
-	
+
 	private class PortScanHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			LOGGER.debug("port scan invoked");
@@ -104,24 +107,24 @@ public class BacnetLink {
 			} else {
 				anode.setAction(act);
 			}
-			
-			for (BacnetConn conn: serialConns) {
+
+			for (BacnetConn conn : serialConns) {
 				anode = conn.node.getChild("edit");
-				if (anode != null) { 
+				if (anode != null) {
 					act = conn.getEditAction();
 					anode.setAction(act);
 				}
 			}
 		}
 	}
-	
+
 	static Set<String> listPorts() {
 		Set<String> portids = new HashSet<String>();
 		try {
 			List<CommPortProxy> cports = getCommPorts();
-			for (CommPortProxy port: cports)  {
+			for (CommPortProxy port : cports) {
 				portids.add(port.getId());
-				LOGGER.debug("comm port found: " + port.getId() );
+				LOGGER.debug("comm port found: " + port.getId());
 			}
 		} catch (CommPortConfigException e) {
 			// TODO Auto-generated catch block
@@ -129,43 +132,43 @@ public class BacnetLink {
 		}
 		return portids;
 	}
-	
-	private static List<CommPortProxy> getCommPorts() throws CommPortConfigException {
-        try {
-            List<CommPortProxy> ports = new LinkedList<CommPortProxy>();
-            String[] portNames;
-            
-            switch(SerialNativeInterface.getOsType()){
-            	case SerialNativeInterface.OS_LINUX:
-            		portNames = SerialPortList.getPortNames(Pattern.compile("(cu|ttyS|ttyUSB|ttyACM|ttyAMA|rfcomm|ttyO)[0-9]{1,3}"));
-            		LOGGER.debug("got linux port names");
-            	break;
-            	case SerialNativeInterface.OS_MAC_OS_X:
-                    portNames = SerialPortList.getPortNames(Pattern.compile("(cu|tty)..*")); //Was "tty.(serial|usbserial|usbmodem).*")
-                    LOGGER.debug("got mac port names");
-                break;
-                default:
-                	 portNames = SerialPortList.getPortNames();
-                	 LOGGER.debug("got default (windows) port names");
-                break;
-            }
-            
-            for (String portName : portNames) {
-                CommPortIdentifier id = new CommPortIdentifier(portName, false);
-                ports.add(new CommPortProxy(id));
-            }
 
-            return ports;
-        }
-        catch (UnsatisfiedLinkError e) {
-            throw new CommPortConfigException(e.getMessage());
-        }
-        catch (NoClassDefFoundError e) {
-            throw new CommPortConfigException(
-                    "Comm configuration error. Check that rxtx DLL or libraries have been correctly installed.");
-        }
-    }
-	
+	private static List<CommPortProxy> getCommPorts() throws CommPortConfigException {
+		try {
+			List<CommPortProxy> ports = new LinkedList<CommPortProxy>();
+			String[] portNames;
+
+			switch (SerialNativeInterface.getOsType()) {
+			case SerialNativeInterface.OS_LINUX:
+				portNames = SerialPortList
+						.getPortNames(Pattern.compile("(cu|ttyS|ttyUSB|ttyACM|ttyAMA|rfcomm|ttyO)[0-9]{1,3}"));
+				LOGGER.debug("got linux port names");
+				break;
+			case SerialNativeInterface.OS_MAC_OS_X:
+				portNames = SerialPortList.getPortNames(Pattern.compile("(cu|tty)..*")); // Was
+																							// "tty.(serial|usbserial|usbmodem).*")
+				LOGGER.debug("got mac port names");
+				break;
+			default:
+				portNames = SerialPortList.getPortNames();
+				LOGGER.debug("got default (windows) port names");
+				break;
+			}
+
+			for (String portName : portNames) {
+				CommPortIdentifier id = new CommPortIdentifier(portName, false);
+				ports.add(new CommPortProxy(id));
+			}
+
+			return ports;
+		} catch (UnsatisfiedLinkError e) {
+			throw new CommPortConfigException(e.getMessage());
+		} catch (NoClassDefFoundError e) {
+			throw new CommPortConfigException(
+					"Comm configuration error. Check that rxtx DLL or libraries have been correctly installed.");
+		}
+	}
+
 	private Action getAddSerialAction() {
 		Action act = new Action(Permission.READ, new AddConnHandler(false));
 		act.addParameter(new Parameter("name", ValueType.STRING));
@@ -191,20 +194,24 @@ public class BacnetLink {
 		act.addParameter(new Parameter("default polling interval", ValueType.NUMBER, new Value(5)));
 		return act;
 	}
-	
+
 	public void restoreLastSession() {
-		if (node.getChildren() == null) return;
-		for (Node child: node.getChildren().values()) {
+		if (node.getChildren() == null)
+			return;
+		for (Node child : node.getChildren().values()) {
 			Value isip = child.getAttribute("isIP");
 			Value bip = child.getAttribute("broadcast ip");
 			Value port = child.getAttribute("port");
 			Value lba = child.getAttribute("local bind address");
 			Value isfd = child.getAttribute("register as foreign device in bbmd");
-			if (isfd == null) child.setAttribute("register as foreign device in bbmd", new Value(false));
+			if (isfd == null)
+				child.setAttribute("register as foreign device in bbmd", new Value(false));
 			Value bbmdip = child.getAttribute("bbmd ip");
-			if (bbmdip == null) child.setAttribute("bbmd ip", new Value(" "));
+			if (bbmdip == null)
+				child.setAttribute("bbmd ip", new Value(" "));
 			Value bbmdport = child.getAttribute("bbmd port");
-			if (bbmdport == null) child.setAttribute("bbmd port", new Value(0));
+			if (bbmdport == null)
+				child.setAttribute("bbmd port", new Value(0));
 			Value commPort = child.getAttribute("comm port id");
 			Value baud = child.getAttribute("baud rate");
 			Value station = child.getAttribute("this station id");
@@ -219,12 +226,11 @@ public class BacnetLink {
 			Value locdevName = child.getAttribute("local device name");
 			Value locdevVend = child.getAttribute("local device vendor");
 			Value interval = child.getAttribute("default polling interval");
-			if (isip!=null && bip!=null && port!=null && lba!=null && commPort!=null 
-					&& baud!=null && station!=null && ferc!=null && lnn!=null && 
-					strict!=null && timeout!=null && segtimeout!=null && segwin!=null 
-					&& retries!=null && locdevId!=null && locdevName!=null && 
-					locdevVend!=null && interval!=null) {
-				
+			if (isip != null && bip != null && port != null && lba != null && commPort != null && baud != null
+					&& station != null && ferc != null && lnn != null && strict != null && timeout != null
+					&& segtimeout != null && segwin != null && retries != null && locdevId != null && locdevName != null
+					&& locdevVend != null && interval != null) {
+
 				BacnetConn bc = new BacnetConn(getMe(), child);
 				bc.restoreLastSession();
 			} else if (!child.getName().equals("defs")) {
@@ -232,7 +238,7 @@ public class BacnetLink {
 			}
 		}
 	}
-	
+
 	void setupPoint(final BacnetPoint point, final DeviceFolder devicefold) {
 		if (devicefold.conn.localDevice == null) {
 			devicefold.conn.stop();
@@ -240,22 +246,27 @@ public class BacnetLink {
 		}
 		setupNode(point, devicefold, 0);
 		setupNode(point, devicefold, 1);
-    }
-	
+	}
+
 	private void setupNode(final BacnetPoint point, final DeviceFolder devicefold, final int nodeIndex) {
 		LOGGER.debug("setting up node " + nodeIndex + " of point " + point.node.getName());
 		final Node child;
 		switch (nodeIndex) {
-		case 0: child = point.node; break;
-		case 1: child = point.node.getChild("present value"); break;
-		default: return;
+		case 0:
+			child = point.node;
+			break;
+		case 1:
+			child = point.node.getChild("present value");
+			break;
+		default:
+			return;
 		}
 		child.getListener().setOnSubscribeHandler(new Handler<Node>() {
 			public void handle(final Node event) {
 				if (devicefold.root.covType != CovType.NONE && point.isCov()) {
 					LOGGER.debug("subscribed (with cov) to node " + child.getName());
 					point.subscribe(nodeIndex, true);
-				} else  {
+				} else {
 					LOGGER.debug("subscribed (without cov) to node " + child.getName());
 					point.subscribe(nodeIndex, false);
 				}
@@ -268,26 +279,35 @@ public class BacnetLink {
 			}
 		});
 	}
-	
+
 	private class AddConnHandler implements Handler<ActionResult> {
 		private boolean isIP;
+
 		AddConnHandler(boolean isIP) {
 			this.isIP = isIP;
 		}
+
 		public void handle(ActionResult event) {
 			String name = event.getParameter("name", ValueType.STRING).getString();
-			String bip= " "; int port = 0; String lba = " ";
-			String commPort = " "; int baud = 0; int station = 0; int ferc = 1;
-			boolean isfd = false; String bbmdip = " "; int bbmdport = 0;
+			String bip = " ";
+			int port = 0;
+			String lba = " ";
+			String commPort = " ";
+			int baud = 0;
+			int station = 0;
+			int ferc = 1;
+			boolean isfd = false;
+			String bbmdip = " ";
+			int bbmdport = 0;
 			if (isIP) {
 				bip = event.getParameter("broadcast ip", ValueType.STRING).getString();
 				port = event.getParameter("port", ValueType.NUMBER).getNumber().intValue();
 				lba = event.getParameter("local bind address", ValueType.STRING).getString();
-			
+
 				isfd = event.getParameter("register as foreign device in bbmd", ValueType.BOOL).getBool();
 				bbmdip = event.getParameter("bbmd ip", new Value(" ")).getString();
 				bbmdport = event.getParameter("bbmd port", ValueType.NUMBER).getNumber().intValue();
-				
+
 			} else {
 				commPort = event.getParameter("comm port id", ValueType.STRING).getString();
 				baud = event.getParameter("baud rate", ValueType.NUMBER).getNumber().intValue();
@@ -303,8 +323,9 @@ public class BacnetLink {
 			int locdevId = event.getParameter("local device id", ValueType.NUMBER).getNumber().intValue();
 			String locdevName = event.getParameter("local device name", ValueType.STRING).getString();
 			String locdevVend = event.getParameter("local device vendor", ValueType.STRING).getString();
-			long interval = (long) (1000*event.getParameter("default polling interval", ValueType.NUMBER).getNumber().doubleValue());
-			
+			long interval = (long) (1000
+					* event.getParameter("default polling interval", ValueType.NUMBER).getNumber().doubleValue());
+
 			Node child = node.createChild(name).build();
 			child.setAttribute("isIP", new Value(isIP));
 			child.setAttribute("broadcast ip", new Value(bip));
@@ -332,10 +353,9 @@ public class BacnetLink {
 			conn.init();
 		}
 	}
-	
+
 	private BacnetLink getMe() {
 		return this;
 	}
-	
 
 }

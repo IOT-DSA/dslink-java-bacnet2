@@ -50,46 +50,49 @@ import com.serotonin.bacnet4j.util.PropertyReferences;
 
 public class DeviceNode extends DeviceFolder {
 	private static final Logger LOGGER;
+
 	static {
 		LOGGER = LoggerFactory.getLogger(DeviceNode.class);
 	}
-	
+
 	final Node statnode;
 	final Node eventnode;
 	private boolean enabled;
 	RemoteDevice device;
 	long interval;
 	CovType covType;
-	
+
 	private final ScheduledThreadPoolExecutor stpe;
 	private final ConcurrentMap<ObjectIdentifier, BacnetPoint> subscribedPoints = new ConcurrentHashMap<ObjectIdentifier, BacnetPoint>();
 	private ScheduledFuture<?> future = null;
-	
+
 	DeviceNode(BacnetConn conn, Node node, RemoteDevice d) {
 		super(conn, node);
 		this.device = d;
 		this.root = this;
 		conn.deviceNodes.add(this);
-		
+
 		if (node.getChild("STATUS") != null) {
 			this.statnode = node.getChild("STATUS");
 			enabled = new Value("enabled").equals(statnode.getValue());
 		} else {
-			this.statnode = node.createChild("STATUS").setValueType(ValueType.STRING).setValue(new Value("enabled")).build();
+			this.statnode = node.createChild("STATUS").setValueType(ValueType.STRING).setValue(new Value("enabled"))
+					.build();
 			enabled = true;
 		}
-		
+
 		if (node.getChild("EVENTS") != null) {
 			this.eventnode = node.getChild("EVENTS");
 		} else {
-			this.eventnode = node.createChild("EVENTS").setValueType(ValueType.ARRAY).setValue(new Value(new JsonArray())).build();
+			this.eventnode = node.createChild("EVENTS").setValueType(ValueType.ARRAY)
+					.setValue(new Value(new JsonArray())).build();
 		}
-		
+
 		if (d == null) {
 			statnode.setValue(new Value("disabled"));
 			enabled = false;
 		}
-		
+
 		if (enabled) {
 			Action act = new Action(Permission.READ, new Handler<ActionResult>() {
 				public void handle(ActionResult event) {
@@ -97,7 +100,7 @@ public class DeviceNode extends DeviceFolder {
 				}
 			});
 			node.createChild("disable").setAction(act).build().setSerializable(false);
-			
+
 			makeAlarmActions();
 		} else {
 			Action act = new Action(Permission.READ, new Handler<ActionResult>() {
@@ -107,33 +110,36 @@ public class DeviceNode extends DeviceFolder {
 			});
 			node.createChild("enable").setAction(act).build().setSerializable(false);
 		}
-		
+
 		this.interval = node.getAttribute("polling interval").getNumber().longValue();
 		this.covType = CovType.NONE;
 		try {
 			this.covType = CovType.valueOf(node.getAttribute("cov usage").getString());
 		} catch (Exception e) {
 		}
-		
-		if (conn.isIP) this.stpe = Objects.createDaemonThreadPool();
-		else this.stpe = conn.getDaemonThreadPool();
-		
+
+		if (conn.isIP)
+			this.stpe = Objects.createDaemonThreadPool();
+		else
+			this.stpe = conn.getDaemonThreadPool();
+
 		makeEditAction();
 
 	}
-	
+
 	ScheduledThreadPoolExecutor getDaemonThreadPool() {
 		return stpe;
 	}
-	
+
 	private void enable() {
-		for (Node child: node.getChildren().values()) {
+		for (Node child : node.getChildren().values()) {
 			if (child.getAction() == null && child != statnode) {
 				child.removeConfig("disconnectedTs");
 			}
 		}
 		enabled = true;
-		if (future == null) startPolling();
+		if (future == null)
+			startPolling();
 		if (device == null) {
 			String mac = node.getAttribute("MAC address").getString();
 			int instNum = node.getAttribute("instance number").getNumber().intValue();
@@ -157,12 +163,13 @@ public class DeviceNode extends DeviceFolder {
 			}
 		});
 		node.createChild("disable").setAction(act).build().setSerializable(false);
-		
+
 		makeAlarmActions();
-		
-		if (device == null) disable();
+
+		if (device == null)
+			disable();
 	}
-	
+
 	private void disable() {
 		enabled = false;
 		stopPolling();
@@ -174,22 +181,24 @@ public class DeviceNode extends DeviceFolder {
 			}
 		});
 		node.createChild("enable").setAction(act).build().setSerializable(false);
-		if (node.getChildren() == null) return;
-		for (Node child: node.getChildren().values()) {
+		if (node.getChildren() == null)
+			return;
+		for (Node child : node.getChildren().values()) {
 			if (child.getAction() == null && child != statnode) {
 				String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(Calendar.getInstance().getTime());
 				child.setConfig("disconnectedTs", new Value(timeStamp));
 			}
 		}
 	}
-	
+
 	@Override
 	protected void remove() {
 		super.remove();
-		if (conn.isIP) stpe.shutdown();
+		if (conn.isIP)
+			stpe.shutdown();
 		conn.deviceNodes.remove(this);
 	}
-	
+
 	private void makeEditAction() {
 		Action act = new Action(Permission.READ, new EditHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
@@ -197,20 +206,24 @@ public class DeviceNode extends DeviceFolder {
 		act.addParameter(new Parameter("instance number", ValueType.NUMBER, node.getAttribute("instance number")));
 		act.addParameter(new Parameter("network number", ValueType.NUMBER, node.getAttribute("network number")));
 		act.addParameter(new Parameter("link service MAC", ValueType.STRING, node.getAttribute("link service MAC")));
-		double defint = node.getAttribute("polling interval").getNumber().doubleValue()/1000;
-	    act.addParameter(new Parameter("polling interval", ValueType.NUMBER, new Value(defint)));
-	    act.addParameter(new Parameter("cov usage", ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED"), node.getAttribute("cov usage")));
-	    act.addParameter(new Parameter("cov lease time (minutes)", ValueType.NUMBER, node.getAttribute("cov lease time (minutes)")));
-	    Node anode = node.getChild("edit");
-	    if (anode == null) node.createChild("edit").setAction(act).build().setSerializable(false);
-	    else anode.setAction(act);
+		double defint = node.getAttribute("polling interval").getNumber().doubleValue() / 1000;
+		act.addParameter(new Parameter("polling interval", ValueType.NUMBER, new Value(defint)));
+		act.addParameter(new Parameter("cov usage", ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED"),
+				node.getAttribute("cov usage")));
+		act.addParameter(new Parameter("cov lease time (minutes)", ValueType.NUMBER,
+				node.getAttribute("cov lease time (minutes)")));
+		Node anode = node.getChild("edit");
+		if (anode == null)
+			node.createChild("edit").setAction(act).build().setSerializable(false);
+		else
+			anode.setAction(act);
 	}
 
-	
 	private class EditHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			String name = event.getParameter("name", ValueType.STRING).getString();
-			long interv = (long) (1000*event.getParameter("polling interval", ValueType.NUMBER).getNumber().doubleValue());
+			long interv = (long) (1000
+					* event.getParameter("polling interval", ValueType.NUMBER).getNumber().doubleValue());
 			CovType covtype = CovType.NONE;
 			try {
 				covtype = CovType.valueOf(event.getParameter("cov usage").getString());
@@ -221,39 +234,40 @@ public class DeviceNode extends DeviceFolder {
 			int instNum = event.getParameter("instance number", new Value(-1)).getNumber().intValue();
 			int netNum = event.getParameter("network number", ValueType.NUMBER).getNumber().intValue();
 			String linkMac = event.getParameter("link service MAC", new Value("")).getString();
-			if (!mac.equals(node.getAttribute("MAC address").getString()) || 
-				!linkMac.equals(node.getAttribute("link service MAC").getString()) ||
-				netNum != node.getAttribute("network number").getNumber().intValue() ||
-				instNum != node.getAttribute("instance number").getNumber().intValue()) {
-				
-					final RemoteDevice d = conn.getDevice(mac, instNum, netNum, linkMac, interv, covtype, covlife);
-					conn.getDeviceProps(d);
-					device = d;
+			if (!mac.equals(node.getAttribute("MAC address").getString())
+					|| !linkMac.equals(node.getAttribute("link service MAC").getString())
+					|| netNum != node.getAttribute("network number").getNumber().intValue()
+					|| instNum != node.getAttribute("instance number").getNumber().intValue()) {
+
+				final RemoteDevice d = conn.getDevice(mac, instNum, netNum, linkMac, interv, covtype, covlife);
+				conn.getDeviceProps(d);
+				device = d;
 			}
 			interval = interv;
 			covType = covtype;
-//        	try {
-//        		mac = d.getAddress().getMacAddress().toIpPortString();
-//        	} catch (Exception e) {
-//        		mac = Byte.toString(d.getAddress().getMacAddress().getMstpAddress());
-//        	}
-        	node.setAttribute("MAC address", new Value(mac));
-        	node.setAttribute("instance number", new Value(instNum));
-	        node.setAttribute("polling interval", new Value(interval));
-	        node.setAttribute("cov usage", new Value(covtype.toString()));
-	        node.setAttribute("cov lease time (minutes)", new Value(covlife));
-	        
-	        if (!name.equals(node.getName())) {
+			// try {
+			// mac = d.getAddress().getMacAddress().toIpPortString();
+			// } catch (Exception e) {
+			// mac =
+			// Byte.toString(d.getAddress().getMacAddress().getMstpAddress());
+			// }
+			node.setAttribute("MAC address", new Value(mac));
+			node.setAttribute("instance number", new Value(instNum));
+			node.setAttribute("polling interval", new Value(interval));
+			node.setAttribute("cov usage", new Value(covtype.toString()));
+			node.setAttribute("cov lease time (minutes)", new Value(covlife));
+
+			if (!name.equals(node.getName())) {
 				rename(name);
 			}
-	        
-	        stopPolling();
-	        startPolling();
-	        
-	        makeEditAction();
+
+			stopPolling();
+			startPolling();
+
+			makeEditAction();
 		}
 	}
-	
+
 	private void makeAlarmActions() {
 		Action act = new Action(Permission.READ, new AlarmSummaryHandler());
 		act.addResult(new Parameter("Object", ValueType.STRING));
@@ -263,7 +277,7 @@ public class DeviceNode extends DeviceFolder {
 		act.addResult(new Parameter("Acked Transitions: To-Normal", ValueType.BOOL));
 		act.setResultType(ResultType.TABLE);
 		node.createChild("get alarm summary").setAction(act).build().setSerializable(false);
-		
+
 		act = new Action(Permission.READ, new EventInfoHandler());
 		act.addResult(new Parameter("Object", ValueType.STRING));
 		act.addResult(new Parameter("Notify Type", ValueType.STRING));
@@ -282,42 +296,52 @@ public class DeviceNode extends DeviceFolder {
 		act.addResult(new Parameter("Event Timestamp: To-Normal", ValueType.BOOL));
 		act.setResultType(ResultType.TABLE);
 		node.createChild("get event information").setAction(act).build().setSerializable(false);
-		
+
 		act = new Action(Permission.READ, new AckAlarmHandler());
-		act.addParameter(new Parameter("Event Object Type", ValueType.makeEnum("Analog Input", "Analog Output", "Analog Value", "Binary Input", "Binary Output", "Binary Value", "Calendar", "Command", "Device", "Event Enrollment", "File", "Group", "Loop", "Multi-state Input", "Multi-state Output", "Notification Class", "Program", "Schedule", "Averaging", "Multi-state Value", "Trend Log", "Life Safety Point", "Life Safety Zone", "Accumulator", "Pulse Converter", "Event Log", "Trend Log Multiple", "Load Control", "Structured View", "Access Door")));
+		act.addParameter(new Parameter("Event Object Type",
+				ValueType.makeEnum("Analog Input", "Analog Output", "Analog Value", "Binary Input", "Binary Output",
+						"Binary Value", "Calendar", "Command", "Device", "Event Enrollment", "File", "Group", "Loop",
+						"Multi-state Input", "Multi-state Output", "Notification Class", "Program", "Schedule",
+						"Averaging", "Multi-state Value", "Trend Log", "Life Safety Point", "Life Safety Zone",
+						"Accumulator", "Pulse Converter", "Event Log", "Trend Log Multiple", "Load Control",
+						"Structured View", "Access Door")));
 		act.addParameter(new Parameter("Event Object Instance Number", ValueType.NUMBER, new Value(0)));
-		act.addParameter(new Parameter("Event State", ValueType.makeEnum("normal", "fault", "offnormal", "highLimit", "lowLimit", "lifeSafetyAlarm")));
+		act.addParameter(new Parameter("Event State",
+				ValueType.makeEnum("normal", "fault", "offnormal", "highLimit", "lowLimit", "lifeSafetyAlarm")));
 		act.addParameter(new Parameter("Event Timestamp", ValueType.STRING));
 		act.addParameter(new Parameter("Acknowledging Process Identifier", ValueType.NUMBER));
 		act.addParameter(new Parameter("Acknowledgment Source", ValueType.STRING));
 		node.createChild("acknowledge alarm").setAction(act).build().setSerializable(false);
 	}
-	
+
 	private class AckAlarmHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			ObjectType ot = DeviceFolder.parseObjectType(event.getParameter("Event Object Type").getString());
 			int inum = event.getParameter("Event Object Instance Number", ValueType.NUMBER).getNumber().intValue();
 			ObjectIdentifier oid = new ObjectIdentifier(ot, inum);
 			EventState estate = Utils.eventStateFromString(event.getParameter("Event State").getString());
-			TimeStamp ets = Utils.timestampFromString(event.getParameter("Event Timestamp", ValueType.STRING).getString());
-			UnsignedInteger ackid = new UnsignedInteger(event.getParameter("Acknowledging Process Identifier", ValueType.NUMBER).getNumber().intValue());
-			CharacterString acksrc = new CharacterString(event.getParameter("Acknowledgment Source", ValueType.STRING).getString());
+			TimeStamp ets = Utils
+					.timestampFromString(event.getParameter("Event Timestamp", ValueType.STRING).getString());
+			UnsignedInteger ackid = new UnsignedInteger(
+					event.getParameter("Acknowledging Process Identifier", ValueType.NUMBER).getNumber().intValue());
+			CharacterString acksrc = new CharacterString(
+					event.getParameter("Acknowledgment Source", ValueType.STRING).getString());
 			TimeStamp ts = new TimeStamp(new DateTime());
-			
+
 			conn.localDevice.send(device, new AcknowledgeAlarmRequest(ackid, oid, estate, ets, acksrc, ts));
 		}
 	}
-	
+
 	private class EventInfoHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			try {
 				ServiceFuture resp = conn.localDevice.send(device, new GetEventInformationRequest(null));
 				GetEventInformationAck ack = (GetEventInformationAck) resp.get();
 				Table table = event.getTable();
-				for (EventSummary summ: ack.getListOfEventSummaries()) {
+				for (EventSummary summ : ack.getListOfEventSummaries()) {
 					ObjectIdentifier oid = summ.getObjectIdentifier();
 					NotifyType ntype = summ.getNotifyType();
-					EventState estate =  summ.getEventState();
+					EventState estate = summ.getEventState();
 					EventTransitionBits acktrans = summ.getAcknowledgedTransitions();
 					EventTransitionBits eenable = summ.getEventEnable();
 					UnsignedInteger onprio = summ.getEventPriorities().get(1);
@@ -326,15 +350,14 @@ public class DeviceNode extends DeviceFolder {
 					TimeStamp onts = summ.getEventTimeStamps().get(1);
 					TimeStamp fts = summ.getEventTimeStamps().get(2);
 					TimeStamp nts = summ.getEventTimeStamps().get(3);
-					
-					Row row = Row.make(new Value(oid.toString()), new Value(ntype.toString()), 
-							new Value(estate.toString()), new Value(acktrans.isToOffnormal()), 
+
+					Row row = Row.make(new Value(oid.toString()), new Value(ntype.toString()),
+							new Value(estate.toString()), new Value(acktrans.isToOffnormal()),
 							new Value(acktrans.isToFault()), new Value(acktrans.isToNormal()),
 							new Value(eenable.isToOffnormal()), new Value(eenable.isToFault()),
-							new Value(eenable.isToNormal()), new Value(onprio.intValue()),
-							new Value(fprio.intValue()), new Value(nprio.intValue()), 
-							new Value(Utils.timestampToString(onts)), new Value(Utils.timestampToString(fts)),
-							new Value(Utils.timestampToString(nts)));
+							new Value(eenable.isToNormal()), new Value(onprio.intValue()), new Value(fprio.intValue()),
+							new Value(nprio.intValue()), new Value(Utils.timestampToString(onts)),
+							new Value(Utils.timestampToString(fts)), new Value(Utils.timestampToString(nts)));
 					table.addRow(row);
 				}
 			} catch (BACnetException e) {
@@ -342,23 +365,23 @@ public class DeviceNode extends DeviceFolder {
 			}
 		}
 	}
-	
+
 	private class AlarmSummaryHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			try {
-				//LOGGER.info("getting alarm summary...");
+				// LOGGER.info("getting alarm summary...");
 				ServiceFuture resp = conn.localDevice.send(device, new GetAlarmSummaryRequest());
 				GetAlarmSummaryAck ack = (GetAlarmSummaryAck) resp.get();
-				//LOGGER.info("got alarm summary:");
-				//LOGGER.info(ack.getValues().toString());
+				// LOGGER.info("got alarm summary:");
+				// LOGGER.info(ack.getValues().toString());
 				Table table = event.getTable();
-				for (AlarmSummary summ: ack.getValues()) {
-					//LOGGER.info(summ.toString());
+				for (AlarmSummary summ : ack.getValues()) {
+					// LOGGER.info(summ.toString());
 					ObjectIdentifier oid = summ.getObjectIdentifier();
 					EventState astate = summ.getAlarmState();
 					EventTransitionBits acktrans = summ.getAcknowledgedTransitions();
-					Row row = Row.make(new Value(oid.toString()), new Value(astate.toString()), 
-							new Value(acktrans.isToOffnormal()), new Value(acktrans.isToFault()), 
+					Row row = Row.make(new Value(oid.toString()), new Value(astate.toString()),
+							new Value(acktrans.isToOffnormal()), new Value(acktrans.isToFault()),
 							new Value(acktrans.isToNormal()));
 					table.addRow(row);
 				}
@@ -366,9 +389,9 @@ public class DeviceNode extends DeviceFolder {
 				LOGGER.debug("", e);
 			}
 		}
-		
+
 	}
-	
+
 	@Override
 	protected void duplicate(String name) {
 		JsonObject jobj = conn.link.copySerializer.serialize();
@@ -379,25 +402,28 @@ public class DeviceNode extends DeviceFolder {
 		Node newnode = node.getParent().getChild(name);
 		conn.restoreDevice(newnode);
 		return;
-		
+
 	}
-	
+
 	protected JsonObject getParentJson(JsonObject jobj, Node n) {
 		return jobj.get(conn.node.getName());
 	}
-	
-	//polling
+
+	// polling
 	void addPointSub(BacnetPoint point) {
-		if (subscribedPoints.containsKey(point.oid)) return;
+		if (subscribedPoints.containsKey(point.oid))
+			return;
 		subscribedPoints.put(point.oid, point);
-		if (future == null) startPolling();
+		if (future == null)
+			startPolling();
 	}
-	
+
 	void removePointSub(BacnetPoint point) {
 		subscribedPoints.remove(point.oid);
-		if (subscribedPoints.size() == 0) stopPolling();
+		if (subscribedPoints.size() == 0)
+			stopPolling();
 	}
-	
+
 	private void stopPolling() {
 		if (future != null) {
 			LOGGER.debug("stopping polling for device " + node.getName());
@@ -405,10 +431,11 @@ public class DeviceNode extends DeviceFolder {
 			future = null;
 		}
 	}
-	
+
 	private void startPolling() {
-		if (!enabled || subscribedPoints.size() == 0) return;
-		
+		if (!enabled || subscribedPoints.size() == 0)
+			return;
+
 		LOGGER.debug("starting polling for device " + node.getName());
 		future = stpe.scheduleWithFixedDelay(new Runnable() {
 			public void run() {
@@ -417,15 +444,14 @@ public class DeviceNode extends DeviceFolder {
 					return;
 				}
 				PropertyReferences refs = new PropertyReferences();
-				for (ObjectIdentifier oid: subscribedPoints.keySet()) {
+				for (ObjectIdentifier oid : subscribedPoints.keySet()) {
 					DeviceFolder.addPropertyReferences(refs, oid);
 				}
 				LOGGER.debug("polling for device " + node.getName());
-		      	getProperties(refs, new ConcurrentHashMap<ObjectIdentifier, BacnetPoint>(subscribedPoints));
+				getProperties(refs, new ConcurrentHashMap<ObjectIdentifier, BacnetPoint>(subscribedPoints));
 			}
 		}, 0, interval, TimeUnit.MILLISECONDS);
-		
-		
+
 	}
-	
+
 }
