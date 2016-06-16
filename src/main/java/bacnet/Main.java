@@ -14,53 +14,48 @@ import org.dsa.iot.historian.stats.GetHistory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 public class Main extends DSLinkHandler {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
 
-    public static void main(String[] args) {
-        DSLinkFactory.start(args, new Main());
-    }
+	public static void main(String[] args) {
+		DSLinkFactory.start(args, new Main());
+	}
 
-    @Override
-    public boolean isResponder() {
-        return true;
-    }
+	@Override
+	public boolean isResponder() {
+		return true;
+	}
 
-    @Override
-    public void onResponderInitialized(DSLink link) {
-        LOGGER.info("Initialized");
+	@Override
+	public void onResponderInitialized(DSLink link) {
+		LOGGER.info("Initialized");
 
-        NodeManager manager = link.getNodeManager();
-        Node superRoot = manager.getNode("/").getNode();
-        Serializer copyser = new Serializer(manager);
-        Deserializer copydeser = new Deserializer(manager);
-        
-        {
-            
-            NodeBuilder b = superRoot.createChild("defs");
-            b.setSerializable(false);
-            b.setHidden(true);
-            Node node = b.build();
+		NodeManager manager = link.getNodeManager();
+		Node superRoot = manager.getNode("/").getNode();
+		Serializer copyser = new Serializer(manager);
+		Deserializer copydeser = new Deserializer(manager);
 
-            b = node.createChild("profile");
-            node = b.build();
+		NodeBuilder b = superRoot.createChild("defs");
+		b.setSerializable(false);
+		b.setHidden(true);
+		Node node = b.build();
 
-            b = node.createChild("getHistory_");
-            Action act = new Action(Permission.READ, null);
-            GetHistory.initProfile(act);
-            b.setAction(act);
-            b.build();
-            
-            }
-        
-        BacnetLink.start(superRoot, copyser, copydeser);
-    }
+		b = node.createChild("profile");
+		node = b.build();
 
-    @Override
-    public void onResponderConnected(DSLink link) {
-        LOGGER.info("Connected");
-    }
+		b = node.createChild("getHistory_");
+		Action act = new Action(Permission.READ, null);
+		GetHistory.initProfile(act);
+		b.setAction(act);
+		b.build();
+
+		BacnetLink.start(superRoot, copyser, copydeser);
+	}
+
+	@Override
+	public void onResponderConnected(DSLink link) {
+		LOGGER.info("Connected");
+	}
 
 }
