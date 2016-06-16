@@ -9,7 +9,9 @@ import java.util.HashSet;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import com.serotonin.bacnet4j.npdu.ip.IpNetworkUtils;
 import com.serotonin.bacnet4j.transport.DefaultTransport;
@@ -82,6 +84,8 @@ class BacnetConn {
     boolean isIP;
     private int unnamedCount;
     final Set<DeviceNode> deviceNodes = new HashSet<DeviceNode>();
+    private ScheduledFuture<?> reconnectFuture = null;
+    private int retryDelay = 1;
 
     private final ScheduledThreadPoolExecutor stpe;
 
@@ -113,6 +117,10 @@ class BacnetConn {
     }
 
     void init() {
+    	if (reconnectFuture != null) {
+    		reconnectFuture.cancel(false);
+    		reconnectFuture = null;
+    	}
         statnode.setValue(new Value("Setting up connection"));
 
         isIP = node.getAttribute("isIP").getBool();
@@ -207,7 +215,7 @@ class BacnetConn {
         	localDevice = null;
         }
 
-        if (localDevice != null) {
+        if (!"Stopped".equals(statnode.getValue().getString())) {
             act = new Action(Permission.READ, new StopHandler());
             anode = node.getChild("stop");
             if (anode == null) node.createChild("stop").setAction(act).build().setSerializable(false);
@@ -220,6 +228,7 @@ class BacnetConn {
         else anode.setAction(act);
 
         if (localDevice != null) {
+        	retryDelay = 1;
             act = new Action(Permission.READ, new DeviceDiscoveryHandler());
             anode = node.getChild("discover devices");
             if (anode == null) node.createChild("discover devices").setAction(act).build().setSerializable(false);
@@ -241,7 +250,23 @@ class BacnetConn {
             else anode.setAction(act);
             statnode.setValue(new Value("Connected"));
 
+        } else {
+        	ScheduledThreadPoolExecutor gstpe = Objects.getDaemonThreadPool();
+        	gstpe.schedule(new Runnable() {
+
+				@Override
+				public void run() {
+					Value stat = statnode.getValue();
+					if (stat == null || !("Connected".equals(stat.getString()) || "Setting up connection".equals(stat.getString()))) {
+						restoreLastSession();
+					}
+				}
+        		
+        	}, retryDelay, TimeUnit.SECONDS);
+        	if (retryDelay < 60) retryDelay += 2;
+        	
         }
+        
 
     }
     
@@ -360,6 +385,7 @@ class BacnetConn {
 
     private class RestartHandler implements Handler<ActionResult> {
         public void handle(ActionResult event) {
+        	retryDelay = 1;
             stop();
             restoreLastSession();
         }
@@ -696,6 +722,14 @@ class BacnetConn {
     }
 
     void restoreDevice(Node child) {
+    	if (localDevice != null) {
+	    	for (DeviceNode dn: deviceNodes) {
+	    		if (child == dn.node && !dn.enabled) {
+	    			dn.enable();
+	    			return;
+	    		}
+	    	}
+    	}
         Value mac = child.getAttribute("MAC address");
         Value instanceNum = child.getAttribute("instance number");
         Value netNum = child.getAttribute("network number");

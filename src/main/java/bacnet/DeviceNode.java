@@ -56,7 +56,7 @@ public class DeviceNode extends DeviceFolder {
 	
 	final Node statnode;
 	final Node eventnode;
-	private boolean enabled;
+	boolean enabled;
 	RemoteDevice device;
 	long interval;
 	CovType covType;
@@ -126,7 +126,7 @@ public class DeviceNode extends DeviceFolder {
 		return stpe;
 	}
 	
-	private void enable() {
+	void enable() {
 		for (Node child: node.getChildren().values()) {
 			if (child.getAction() == null && child != statnode) {
 				child.removeConfig("disconnectedTs");
