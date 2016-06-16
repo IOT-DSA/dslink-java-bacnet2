@@ -261,9 +261,9 @@ class BacnetConn {
 				anode.setAction(act);
 			statnode.setValue(new Value("Connected"));
 
-		} else {
+		} else if (!"Stopped".equals(statnode.getValue().getString())) {
 			ScheduledThreadPoolExecutor gstpe = Objects.getDaemonThreadPool();
-			gstpe.schedule(new Runnable() {
+			reconnectFuture = gstpe.schedule(new Runnable() {
 
 				@Override
 				public void run() {
@@ -396,6 +396,10 @@ class BacnetConn {
 
 	private class StopHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
+			if (reconnectFuture != null) {
+				reconnectFuture.cancel(false);
+				reconnectFuture = null;
+			}
 			stop();
 		}
 	}
@@ -754,40 +758,54 @@ class BacnetConn {
 		}
 	}
 
-	void restoreDevice(Node child) {
+	void restoreDevice(final Node child) {
 		if (localDevice != null) {
 			for (DeviceNode dn: deviceNodes) {
 				if (child == dn.node && !dn.enabled) {
-					dn.enable();
+					dn.enable(true);
 					return;
 				}
 			}
 		}
-		Value mac = child.getAttribute("MAC address");
-		Value instanceNum = child.getAttribute("instance number");
-		Value netNum = child.getAttribute("network number");
-		Value linkMac = child.getAttribute("link service MAC");
-		Value refint = child.getAttribute("polling interval");
+		final Value mac = child.getAttribute("MAC address");
+		final Value instanceNum = child.getAttribute("instance number");
+		final Value netNum = child.getAttribute("network number");
+		final Value linkMac = child.getAttribute("link service MAC");
+		final Value refint = child.getAttribute("polling interval");
 		Value covtype = child.getAttribute("cov usage");
-		Value covlife = child.getAttribute("cov lease time (minutes)");
+		final Value covlife = child.getAttribute("cov lease time (minutes)");
 		if (mac != null && instanceNum != null && netNum != null && linkMac != null && refint != null && covtype != null && covlife != null) {
-			CovType ct = CovType.NONE;
+			CovType ctype = CovType.NONE;
 			try {
-				ct = CovType.valueOf(covtype.getString());
+				ctype = CovType.valueOf(covtype.getString());
 			} catch (Exception e) {
 			}
+			final CovType ct = ctype;
 
-			boolean disabled = child.getChild("STATUS") != null && new Value("disabled").equals(child.getChild("STATUS").getValue());
+			boolean disabled = child.getChild("STATUS") != null && 
+					(new Value("disabled").equals(child.getChild("STATUS").getValue()) || new Value("not connected").equals(child.getChild("STATUS").getValue()) );
 			DeviceNode dn = null;
 			if (!disabled) {
-				RemoteDevice dev = getDevice(mac.getString(), instanceNum.getNumber().intValue(), netNum.getNumber().intValue(), linkMac.getString(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
-				dn = setupDeviceNode(dev, child, child.getName(), mac.getString(), instanceNum.getNumber().intValue(), netNum.getNumber().intValue(), linkMac.getString(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
+				ScheduledThreadPoolExecutor gstpe = Objects.getDaemonThreadPool();
+				gstpe.schedule(new Runnable() {
+
+					@Override
+					public void run() {
+						RemoteDevice dev = getDevice(mac.getString(), instanceNum.getNumber().intValue(), netNum.getNumber().intValue(), linkMac.getString(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
+						DeviceNode dn = setupDeviceNode(dev, child, child.getName(), mac.getString(), instanceNum.getNumber().intValue(), netNum.getNumber().intValue(), linkMac.getString(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
+						if (dn != null) dn.restoreLastSession();
+						else node.removeChild(child);
+						
+					}
+					
+				}, 0, TimeUnit.SECONDS);
+				
 			} else {
 				dn = setupDeviceNode(null, child, child.getName(), mac.getString(), instanceNum.getNumber().intValue(), netNum.getNumber().intValue(), linkMac.getString(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
+				if (dn != null) dn.restoreLastSession();
+				else node.removeChild(child);
 			}
 
-			if (dn != null) dn.restoreLastSession();
-			else node.removeChild(child);
 		} else if (child.getAction() == null && !child.getName().equals("STATUS")) {
 			node.removeChild(child);
 		}
