@@ -223,8 +223,10 @@ class BacnetConn {
 		if (!"Stopped".equals(statnode.getValue().getString())) {
 			act = new Action(Permission.READ, new StopHandler());
 			anode = node.getChild("stop");
-			if (anode == null) node.createChild("stop").setAction(act).build().setSerializable(false);
-			else anode.setAction(act);
+			if (anode == null)
+				node.createChild("stop").setAction(act).build().setSerializable(false);
+			else
+				anode.setAction(act);
 		}
 
 		act = new Action(Permission.READ, new RestartHandler());
@@ -238,8 +240,10 @@ class BacnetConn {
 			retryDelay = 1;
 			act = new Action(Permission.READ, new DeviceDiscoveryHandler());
 			anode = node.getChild("discover devices");
-			if (anode == null) node.createChild("discover devices").setAction(act).build().setSerializable(false);
-			else anode.setAction(act);
+			if (anode == null)
+				node.createChild("discover devices").setAction(act).build().setSerializable(false);
+			else
+				anode.setAction(act);
 
 			act = new Action(Permission.READ, new AddDeviceHandler());
 			act.addParameter(new Parameter("name", ValueType.STRING));
@@ -268,13 +272,15 @@ class BacnetConn {
 				@Override
 				public void run() {
 					Value stat = statnode.getValue();
-					if (stat == null || !("Connected".equals(stat.getString()) || "Setting up connection".equals(stat.getString()))) {
+					if (stat == null || !("Connected".equals(stat.getString())
+							|| "Setting up connection".equals(stat.getString()))) {
 						restoreLastSession();
 					}
 				}
 
 			}, retryDelay, TimeUnit.SECONDS);
-			if (retryDelay < 60) retryDelay += 2;        	
+			if (retryDelay < 60)
+				retryDelay += 2;
 		}
 	}
 
@@ -752,7 +758,8 @@ class BacnetConn {
 
 	public void restoreLastSession() {
 		init();
-		if (node.getChildren() == null) return;
+		if (node.getChildren() == null)
+			return;
 		for (Node child : node.getChildren().values()) {
 			restoreDevice(child);
 		}
@@ -760,7 +767,7 @@ class BacnetConn {
 
 	void restoreDevice(final Node child) {
 		if (localDevice != null) {
-			for (DeviceNode dn: deviceNodes) {
+			for (DeviceNode dn : deviceNodes) {
 				if (child == dn.node && !dn.enabled) {
 					dn.enable(true);
 					return;
@@ -774,7 +781,8 @@ class BacnetConn {
 		final Value refint = child.getAttribute("polling interval");
 		Value covtype = child.getAttribute("cov usage");
 		final Value covlife = child.getAttribute("cov lease time (minutes)");
-		if (mac != null && instanceNum != null && netNum != null && linkMac != null && refint != null && covtype != null && covlife != null) {
+		if (mac != null && instanceNum != null && netNum != null && linkMac != null && refint != null && covtype != null
+				&& covlife != null) {
 			CovType ctype = CovType.NONE;
 			try {
 				ctype = CovType.valueOf(covtype.getString());
@@ -782,8 +790,9 @@ class BacnetConn {
 			}
 			final CovType ct = ctype;
 
-			boolean disabled = child.getChild("STATUS") != null && 
-					(new Value("disabled").equals(child.getChild("STATUS").getValue()) || new Value("not connected").equals(child.getChild("STATUS").getValue()) );
+			boolean disabled = child.getChild("STATUS") != null
+					&& (new Value("disabled").equals(child.getChild("STATUS").getValue())
+							|| new Value("not connected").equals(child.getChild("STATUS").getValue()));
 			DeviceNode dn = null;
 			if (!disabled) {
 				ScheduledThreadPoolExecutor gstpe = Objects.getDaemonThreadPool();
@@ -791,26 +800,35 @@ class BacnetConn {
 
 					@Override
 					public void run() {
-						RemoteDevice dev = getDevice(mac.getString(), instanceNum.getNumber().intValue(), netNum.getNumber().intValue(), linkMac.getString(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
-						DeviceNode dn = setupDeviceNode(dev, child, child.getName(), mac.getString(), instanceNum.getNumber().intValue(), netNum.getNumber().intValue(), linkMac.getString(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
-						if (dn != null) dn.restoreLastSession();
-						else node.removeChild(child);
-						
+						RemoteDevice dev = getDevice(mac.getString(), instanceNum.getNumber().intValue(),
+								netNum.getNumber().intValue(), linkMac.getString(), refint.getNumber().longValue(), ct,
+								covlife.getNumber().intValue());
+						DeviceNode dn = setupDeviceNode(dev, child, child.getName(), mac.getString(),
+								instanceNum.getNumber().intValue(), netNum.getNumber().intValue(), linkMac.getString(),
+								refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
+						if (dn != null)
+							dn.restoreLastSession();
+						else
+							node.removeChild(child);
+
 					}
-					
+
 				}, 0, TimeUnit.SECONDS);
-				
+
 			} else {
-				dn = setupDeviceNode(null, child, child.getName(), mac.getString(), instanceNum.getNumber().intValue(), netNum.getNumber().intValue(), linkMac.getString(), refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
-				if (dn != null) dn.restoreLastSession();
-				else node.removeChild(child);
+				dn = setupDeviceNode(null, child, child.getName(), mac.getString(), instanceNum.getNumber().intValue(),
+						netNum.getNumber().intValue(), linkMac.getString(), refint.getNumber().longValue(), ct,
+						covlife.getNumber().intValue());
+				if (dn != null)
+					dn.restoreLastSession();
+				else
+					node.removeChild(child);
 			}
 
 		} else if (child.getAction() == null && !child.getName().equals("STATUS")) {
 			node.removeChild(child);
 		}
 	}
-
 
 	private class EventListenerImpl implements DeviceEventListener {
 

@@ -104,7 +104,7 @@ public class DeviceNode extends DeviceFolder {
 			node.createChild("disable").setAction(act).build().setSerializable(false);
 
 			makeAlarmActions();
-		} 
+		}
 		if (!"enabled".equals(statnode.getValue().getString())) {
 			Action act = new Action(Permission.READ, new Handler<ActionResult>() {
 				public void handle(ActionResult event) {
@@ -127,7 +127,7 @@ public class DeviceNode extends DeviceFolder {
 			this.stpe = conn.getDaemonThreadPool();
 
 		makeEditAction();
-		
+
 		if ("not connected".equals(statnode.getValue().getString())) {
 			scheduleRetry();
 		}
@@ -137,14 +137,15 @@ public class DeviceNode extends DeviceFolder {
 	ScheduledThreadPoolExecutor getDaemonThreadPool() {
 		return stpe;
 	}
-	
+
 	void enable(boolean userDriven) {
 		if (reconnectFuture != null) {
 			reconnectFuture.cancel(false);
 			reconnectFuture = null;
 		}
-		if (userDriven) retryDelay = 1;
-		for (Node child: node.getChildren().values()) {
+		if (userDriven)
+			retryDelay = 1;
+		for (Node child : node.getChildren().values()) {
 			if (child.getAction() == null && child != statnode) {
 				child.removeConfig("disconnectedTs");
 			}
@@ -195,8 +196,7 @@ public class DeviceNode extends DeviceFolder {
 				reconnectFuture.cancel(false);
 				reconnectFuture = null;
 			}
-		}
-		else {
+		} else {
 			statnode.setValue(new Value("not connected"));
 		}
 		node.removeChild("disable");
@@ -215,7 +215,7 @@ public class DeviceNode extends DeviceFolder {
 			}
 		}
 	}
-	
+
 	private void scheduleRetry() {
 		ScheduledThreadPoolExecutor gstpe = Objects.getDaemonThreadPool();
 		reconnectFuture = gstpe.schedule(new Runnable() {
@@ -229,7 +229,8 @@ public class DeviceNode extends DeviceFolder {
 			}
 
 		}, retryDelay, TimeUnit.SECONDS);
-		if (retryDelay < 60) retryDelay += 2;  
+		if (retryDelay < 60)
+			retryDelay += 2;
 	}
 
 	@Override
