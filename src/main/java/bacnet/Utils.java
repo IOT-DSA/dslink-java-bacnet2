@@ -1,5 +1,8 @@
 package bacnet;
 
+import java.util.Arrays;
+
+import org.dsa.iot.dslink.util.StringUtils;
 import org.dsa.iot.dslink.util.json.JsonArray;
 import org.dsa.iot.dslink.util.json.JsonObject;
 
@@ -39,6 +42,7 @@ import com.serotonin.bacnet4j.type.primitive.Real;
 import com.serotonin.bacnet4j.type.primitive.SignedInteger;
 import com.serotonin.bacnet4j.type.primitive.Time;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
+import com.serotonin.bacnet4j.util.PropertyReferences;
 
 /**
  * @author Samuel Grenier
@@ -755,5 +759,155 @@ public class Utils {
 			}
 		}
 		return seq;
+	}
+
+	public static <E> String[] enumNames(Class<E> enumData) {
+		String valuesStr = Arrays.toString(enumData.getEnumConstants());
+		return valuesStr.substring(1, valuesStr.length() - 1).replace(" ", "").split(",");
+	}
+
+	public static DataType getDataType(ObjectType objectType) {
+		if (isOneOf(objectType, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue))
+			return DataType.BINARY;
+		else if (isOneOf(objectType, ObjectType.multiStateInput, ObjectType.multiStateOutput,
+				ObjectType.multiStateValue, ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone))
+			return DataType.MULTISTATE;
+
+		else
+			return DataType.NUMERIC;
+	}
+
+	public static ObjectType parseObjectType(String otStr) {
+		switch (otStr) {
+		case "Analog Input":
+			return ObjectType.analogInput;
+		case "Analog Output":
+			return ObjectType.analogOutput;
+		case "Analog Value":
+			return ObjectType.analogValue;
+		case "Binary Input":
+			return ObjectType.binaryInput;
+		case "Binary Output":
+			return ObjectType.binaryOutput;
+		case "Binary Value":
+			return ObjectType.binaryValue;
+		case "Calendar":
+			return ObjectType.calendar;
+		case "Command":
+			return ObjectType.command;
+		case "Device":
+			return ObjectType.device;
+		case "Event Enrollment":
+			return ObjectType.eventEnrollment;
+		case "File":
+			return ObjectType.file;
+		case "Group":
+			return ObjectType.group;
+		case "Loop":
+			return ObjectType.loop;
+		case "Multi-state Input":
+			return ObjectType.multiStateInput;
+		case "Multi-state Output":
+			return ObjectType.multiStateOutput;
+		case "Notification Class":
+			return ObjectType.notificationClass;
+		case "Program":
+			return ObjectType.program;
+		case "Schedule":
+			return ObjectType.schedule;
+		case "Averaging":
+			return ObjectType.averaging;
+		case "Multi-state Value":
+			return ObjectType.multiStateValue;
+		case "Trend Log":
+			return ObjectType.trendLog;
+		case "Life Safety Point":
+			return ObjectType.lifeSafetyPoint;
+		case "Life Safety Zone":
+			return ObjectType.lifeSafetyZone;
+		case "Accumulator":
+			return ObjectType.accumulator;
+		case "Pulse Converter":
+			return ObjectType.pulseConverter;
+		case "Event Log":
+			return ObjectType.eventLog;
+		case "Trend Log Multiple":
+			return ObjectType.trendLogMultiple;
+		case "Load Control":
+			return ObjectType.loadControl;
+		case "Structured View":
+			return ObjectType.structuredView;
+		case "Access Door":
+			return ObjectType.accessDoor;
+		default:
+			return null;
+		}
+	}
+
+	public static void addPropertyReferences(PropertyReferences refs, ObjectIdentifier oid) {
+		refs.add(oid, PropertyIdentifier.objectName);
+
+		ObjectType type = oid.getObjectType();
+		if (isOneOf(type, ObjectType.accumulator)) {
+			refs.add(oid, PropertyIdentifier.units);
+			refs.add(oid, PropertyIdentifier.presentValue);
+		} else if (isOneOf(type, ObjectType.analogInput, ObjectType.analogOutput, ObjectType.analogValue,
+				ObjectType.pulseConverter)) {
+			refs.add(oid, PropertyIdentifier.units);
+			refs.add(oid, PropertyIdentifier.presentValue);
+		} else if (isOneOf(type, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
+			refs.add(oid, PropertyIdentifier.inactiveText);
+			refs.add(oid, PropertyIdentifier.activeText);
+			refs.add(oid, PropertyIdentifier.presentValue);
+		} else if (isOneOf(type, ObjectType.device)) {
+			refs.add(oid, PropertyIdentifier.modelName);
+		} else if (isOneOf(type, ObjectType.lifeSafetyPoint)) {
+			refs.add(oid, PropertyIdentifier.units);
+			refs.add(oid, PropertyIdentifier.presentValue);
+		} else if (isOneOf(type, ObjectType.loop)) {
+			refs.add(oid, PropertyIdentifier.outputUnits);
+			refs.add(oid, PropertyIdentifier.presentValue);
+		} else if (isOneOf(type, ObjectType.multiStateInput, ObjectType.multiStateOutput, ObjectType.multiStateValue)) {
+			refs.add(oid, PropertyIdentifier.stateText);
+			refs.add(oid, PropertyIdentifier.presentValue);
+		} else if (isOneOf(type, ObjectType.schedule)) {
+			refs.add(oid, PropertyIdentifier.presentValue);
+			refs.add(oid, PropertyIdentifier.effectivePeriod);
+			refs.add(oid, PropertyIdentifier.weeklySchedule);
+			refs.add(oid, PropertyIdentifier.exceptionSchedule);
+		} else if (isOneOf(type, ObjectType.trendLog)) {
+			refs.add(oid, PropertyIdentifier.logDeviceObjectProperty);
+			refs.add(oid, PropertyIdentifier.recordCount);
+			refs.add(oid, PropertyIdentifier.startTime);
+			refs.add(oid, PropertyIdentifier.stopTime);
+			refs.add(oid, PropertyIdentifier.bufferSize);
+			// refs.add(oid, PropertyIdentifier.logBuffer);
+		} else if (isOneOf(type, ObjectType.notificationClass)) {
+			refs.add(oid, PropertyIdentifier.notificationClass);
+			refs.add(oid, PropertyIdentifier.priority);
+			refs.add(oid, PropertyIdentifier.ackRequired);
+			refs.add(oid, PropertyIdentifier.recipientList);
+		} else if (isOneOf(type, ObjectType.calendar)) {
+			refs.add(oid, PropertyIdentifier.presentValue);
+			refs.add(oid, PropertyIdentifier.dateList);
+		}
+	}
+
+	public static boolean isOneOf(int objectTypeId, ObjectType... types) {
+		for (ObjectType type : types) {
+			if (type.intValue() == objectTypeId)
+				return true;
+		}
+		return false;
+	}
+
+	public static boolean isOneOf(ObjectType objectType, ObjectType... types) {
+		return isOneOf(objectType.intValue(), types);
+	}
+
+	public static String toLegalName(String s) {
+		if (s == null)
+			return "";
+		return StringUtils.encodeName(s);
 	}
 }
