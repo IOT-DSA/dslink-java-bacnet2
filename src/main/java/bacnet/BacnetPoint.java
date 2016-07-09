@@ -1494,9 +1494,12 @@ public class BacnetPoint {
 				SequenceOf<PropertyValue> listOfValues = covEv.poll();
 				if (listOfValues != null) {
 					for (PropertyValue pv : listOfValues) {
-						if (node != null)
-							LOGGER.debug("got cov for " + node.getName());
-						folder.updatePointValue(getMe(), pv.getPropertyIdentifier(), pv.getValue());
+						if (node != null) LOGGER.debug("got cov for " + node.getName());
+						try{
+							folder.updatePointValue(getMe(), pv.getPropertyIdentifier(), pv.getValue());
+						} catch (Exception e) {
+							LOGGER.debug("" ,e);
+						}
 					}
 				}
 			}
@@ -1520,7 +1523,11 @@ public class BacnetPoint {
 		ObjectIdentifier oid = point.oid;
 		DeviceFolder.addPropertyReferences(refs, oid);
 		points.put(oid, point);
-		devicefold.getProperties(refs, points);
+		try {
+			devicefold.getProperties(refs, points);
+		} catch (Exception e) {
+			LOGGER.debug("", e);
+		}
 	}
 
 	private class Db extends Database {

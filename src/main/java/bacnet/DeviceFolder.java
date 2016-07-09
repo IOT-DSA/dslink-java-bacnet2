@@ -284,8 +284,12 @@ public class DeviceFolder {
 				public boolean requestProgress(double prog, ObjectIdentifier oid, PropertyIdentifier pid,
 						UnsignedInteger unsignedinteger, Encodable encodable) {
 					BacnetPoint pt = points.get(oid);
-
-					updatePointValue(pt, pid, encodable);
+					
+					try {
+						updatePointValue(pt, pid, encodable);
+					} catch (Exception e) {
+						LOGGER.debug("", e);
+					}
 
 					return prog == 1;
 				}
