@@ -295,6 +295,7 @@ public class DeviceNode extends DeviceFolder {
 			// }
 			node.setAttribute("MAC address", new Value(mac));
 			node.setAttribute("instance number", new Value(instNum));
+			node.setAttribute("network number", new Value(netNum));
 			node.setAttribute("polling interval", new Value(interval));
 			node.setAttribute("cov usage", new Value(covtype.toString()));
 			node.setAttribute("cov lease time (minutes)", new Value(covlife));

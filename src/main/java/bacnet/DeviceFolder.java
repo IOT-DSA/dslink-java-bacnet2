@@ -97,6 +97,7 @@ public class DeviceFolder {
 		act.addParameter(new Parameter("object instance number", ValueType.NUMBER, new Value(0)));
 		act.addParameter(new Parameter("use COV", ValueType.BOOL, new Value(false)));
 		act.addParameter(new Parameter("settable", ValueType.BOOL, new Value(false)));
+		act.addParameter(new Parameter("default priority", ValueType.NUMBER, new Value(8)));
 		node.createChild("add object").setAction(act).build().setSerializable(false);
 
 		act = new Action(Permission.READ, new CopyHandler());
@@ -150,6 +151,7 @@ public class DeviceFolder {
 			int instNum = event.getParameter("object instance number", ValueType.NUMBER).getNumber().intValue();
 			boolean cov = event.getParameter("use COV", ValueType.BOOL).getBool();
 			boolean sett = event.getParameter("settable", ValueType.BOOL).getBool();
+			int defprio = event.getParameter("default priority", ValueType.NUMBER).getNumber().intValue();
 
 			Node pnode = node.createChild(name).build();
 			pnode.setAttribute("object type", new Value(ot.toString()));
@@ -157,6 +159,7 @@ public class DeviceFolder {
 			pnode.setAttribute("use COV", new Value(cov));
 			pnode.setAttribute("settable", new Value(sett));
 			pnode.setAttribute("restore type", new Value("point"));
+			pnode.setAttribute("default priority", new Value(defprio));
 
 			new BacnetPoint(getMe(), node, pnode);
 			// conn.link.setupPoint(pt, getMe());
