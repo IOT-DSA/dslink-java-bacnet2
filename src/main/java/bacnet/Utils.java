@@ -1,5 +1,11 @@
 package bacnet;
 
+import java.util.Arrays;
+import java.util.List;
+
+import org.dsa.iot.dslink.node.value.Value;
+import org.dsa.iot.dslink.node.value.ValueType;
+import org.dsa.iot.dslink.util.StringUtils;
 import org.dsa.iot.dslink.util.json.JsonArray;
 import org.dsa.iot.dslink.util.json.JsonObject;
 
@@ -8,6 +14,7 @@ import com.serotonin.bacnet4j.base.BACnetUtils;
 import com.serotonin.bacnet4j.enums.DayOfWeek;
 import com.serotonin.bacnet4j.enums.Month;
 import com.serotonin.bacnet4j.npdu.ip.IpNetworkUtils;
+import com.serotonin.bacnet4j.obj.ObjectProperties;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.constructed.Address;
 import com.serotonin.bacnet4j.type.constructed.CalendarEntry;
@@ -24,7 +31,10 @@ import com.serotonin.bacnet4j.type.constructed.TimeStamp;
 import com.serotonin.bacnet4j.type.constructed.TimeValue;
 import com.serotonin.bacnet4j.type.constructed.WeekNDay;
 import com.serotonin.bacnet4j.type.constructed.WeekNDay.WeekOfMonth;
+import com.serotonin.bacnet4j.type.enumerated.BinaryPV;
+import com.serotonin.bacnet4j.type.enumerated.EngineeringUnits;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
+import com.serotonin.bacnet4j.type.enumerated.LifeSafetyState;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.BitString;
@@ -39,6 +49,7 @@ import com.serotonin.bacnet4j.type.primitive.Real;
 import com.serotonin.bacnet4j.type.primitive.SignedInteger;
 import com.serotonin.bacnet4j.type.primitive.Time;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
+import com.serotonin.bacnet4j.util.PropertyReferences;
 
 /**
  * @author Samuel Grenier
@@ -756,4 +767,207 @@ public class Utils {
 		}
 		return seq;
 	}
+
+	public static <E> String[] enumNames(Class<E> enumData) {
+		String valuesStr = Arrays.toString(enumData.getEnumConstants());
+		return valuesStr.substring(1, valuesStr.length() - 1).replace(" ", "").split(",");
+	}
+	
+	public  static String[] enumeratedObjectTypeNames(){
+		String valuesStr = Arrays.toString(ObjectType.ALL);
+		return valuesStr.substring(1, valuesStr.length() - 1).replace(" ", "").split(",");
+	}
+	
+	public static  ObjectType parseObjectType(String typeString) {
+
+        for (ObjectType type: ObjectType.ALL){
+        	if (type.toString().replace(" ", "").equals(typeString.replace(" ", ""))){
+        		return type;
+        	}
+        }	
+
+		return null;
+
+	}
+	public static DataType getDataType(ObjectType objectType) {
+		if (isOneOf(objectType, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue))
+			return DataType.BINARY;
+		else if (isOneOf(objectType, ObjectType.multiStateInput, ObjectType.multiStateOutput,
+				ObjectType.multiStateValue, ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone))
+			return DataType.MULTISTATE;
+
+		else
+			return DataType.NUMERIC;
+	}
+
+	public static void addPropertyReferences(PropertyReferences refs, ObjectIdentifier oid) {
+		refs.add(oid, PropertyIdentifier.objectName);
+
+		ObjectType type = oid.getObjectType();
+		if (isOneOf(type, ObjectType.accumulator)) {
+			refs.add(oid, PropertyIdentifier.units);
+			refs.add(oid, PropertyIdentifier.presentValue);
+		} else if (isOneOf(type, ObjectType.analogInput, ObjectType.analogOutput, ObjectType.analogValue,
+				ObjectType.pulseConverter)) {
+			refs.add(oid, PropertyIdentifier.units);
+			refs.add(oid, PropertyIdentifier.presentValue);
+		} else if (isOneOf(type, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
+			refs.add(oid, PropertyIdentifier.inactiveText);
+			refs.add(oid, PropertyIdentifier.activeText);
+			refs.add(oid, PropertyIdentifier.presentValue);
+		} else if (isOneOf(type, ObjectType.device)) {
+			refs.add(oid, PropertyIdentifier.modelName);
+		} else if (isOneOf(type, ObjectType.lifeSafetyPoint)) {
+			refs.add(oid, PropertyIdentifier.units);
+			refs.add(oid, PropertyIdentifier.presentValue);
+		} else if (isOneOf(type, ObjectType.loop)) {
+			refs.add(oid, PropertyIdentifier.outputUnits);
+			refs.add(oid, PropertyIdentifier.presentValue);
+		} else if (isOneOf(type, ObjectType.multiStateInput, ObjectType.multiStateOutput, ObjectType.multiStateValue)) {
+			refs.add(oid, PropertyIdentifier.stateText);
+			refs.add(oid, PropertyIdentifier.presentValue);
+		} else if (isOneOf(type, ObjectType.schedule)) {
+			refs.add(oid, PropertyIdentifier.presentValue);
+			refs.add(oid, PropertyIdentifier.effectivePeriod);
+			refs.add(oid, PropertyIdentifier.weeklySchedule);
+			refs.add(oid, PropertyIdentifier.exceptionSchedule);
+		} else if (isOneOf(type, ObjectType.trendLog)) {
+			refs.add(oid, PropertyIdentifier.logDeviceObjectProperty);
+			refs.add(oid, PropertyIdentifier.recordCount);
+			refs.add(oid, PropertyIdentifier.startTime);
+			refs.add(oid, PropertyIdentifier.stopTime);
+			refs.add(oid, PropertyIdentifier.bufferSize);
+			// refs.add(oid, PropertyIdentifier.logBuffer);
+		} else if (isOneOf(type, ObjectType.notificationClass)) {
+			refs.add(oid, PropertyIdentifier.notificationClass);
+			refs.add(oid, PropertyIdentifier.priority);
+			refs.add(oid, PropertyIdentifier.ackRequired);
+			refs.add(oid, PropertyIdentifier.recipientList);
+		} else if (isOneOf(type, ObjectType.calendar)) {
+			refs.add(oid, PropertyIdentifier.presentValue);
+			refs.add(oid, PropertyIdentifier.dateList);
+		}
+	}
+
+	public static boolean isOneOf(int objectTypeId, ObjectType... types) {
+		for (ObjectType type : types) {
+			if (type.intValue() == objectTypeId)
+				return true;
+		}
+		return false;
+	}
+
+	public static boolean isOneOf(ObjectType objectType, ObjectType... types) {
+		return isOneOf(objectType.intValue(), types);
+	}
+
+	public static String toLegalName(String s) {
+		if (s == null)
+			return "";
+		return StringUtils.encodeName(s);
+	}
+	
+	public static Encodable valueToEncodable(DataType dataType, Value value, ObjectType objectType, PropertyIdentifier propertyId, List<String> unitsDescription) {
+		Class<? extends Encodable> clazz = ObjectProperties.getPropertyTypeDefinition(objectType, propertyId)
+				.getClazz();
+
+		switch (dataType) {
+		case BINARY: {
+			boolean b;
+			if (value.getType().compare(ValueType.BOOL))
+				b = value.getBool();
+			else
+				b = (Boolean.parseBoolean(value.getString()) || value.getString().equals("1"));
+			if (clazz == BinaryPV.class) {
+				if (b)
+					return BinaryPV.active;
+				return BinaryPV.inactive;
+			}
+
+			if (clazz == UnsignedInteger.class)
+				return new UnsignedInteger(b ? 1 : 0);
+
+			if (clazz == LifeSafetyState.class)
+				return new LifeSafetyState(b ? 1 : 0);
+
+			if (clazz == Real.class)
+				return new Real(b ? 1 : 0);
+		}
+		case NUMERIC: {
+			double d;
+			if (value.getType() == ValueType.NUMBER)
+				d = value.getNumber().doubleValue();
+			else
+				d = Double.parseDouble(value.getString());
+			if (clazz == BinaryPV.class) {
+				if (d != 0)
+					return BinaryPV.active;
+				return BinaryPV.inactive;
+			}
+
+			if (clazz == UnsignedInteger.class)
+				return new UnsignedInteger((int) d);
+
+			if (clazz == LifeSafetyState.class)
+				return new LifeSafetyState((int) d);
+
+			if (clazz == Real.class)
+				return new Real((float) d);
+		}
+		case ALPHANUMERIC: {
+			if (clazz == BinaryPV.class) {
+				boolean b;
+				if (value.getType().compare(ValueType.BOOL))
+					b = value.getBool();
+				else
+					b = (Boolean.parseBoolean(value.getString()) || value.getString().equals("1"));
+				if (b)
+					return BinaryPV.active;
+				return BinaryPV.inactive;
+			}
+
+			if (clazz == UnsignedInteger.class) {
+				int i = Integer.parseInt(value.getString());
+				if (value.getType() == ValueType.NUMBER)
+					i = value.getNumber().intValue();
+				return new UnsignedInteger(i);
+			}
+			if (clazz == LifeSafetyState.class) {
+				int i = Integer.parseInt(value.getString());
+				if (value.getType() == ValueType.NUMBER)
+					i = value.getNumber().intValue();
+				return new LifeSafetyState(i);
+			}
+			if (clazz == Real.class) {
+				float f = (float) Double.parseDouble(value.getString());
+				if (value.getType() == ValueType.NUMBER)
+					f = value.getNumber().floatValue();
+				return new Real(f);
+			}
+		}
+		case MULTISTATE: {
+			int i = Integer.parseInt(value.getString());
+			if (value.getType().compare(ValueType.ENUM))
+				i = unitsDescription.indexOf(value.getString());
+			if (clazz == BinaryPV.class) {
+				if (i != 0)
+					return BinaryPV.active;
+				return BinaryPV.inactive;
+			}
+
+			if (clazz == UnsignedInteger.class)
+				return new UnsignedInteger(i);
+
+			if (clazz == LifeSafetyState.class)
+				return new LifeSafetyState(i);
+
+			if (clazz == Real.class)
+				return new Real(i);
+		}
+		default:
+			return BinaryPV.inactive;
+		}
+
+	}
+
 }
