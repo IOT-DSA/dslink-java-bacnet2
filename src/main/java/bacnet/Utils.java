@@ -1,7 +1,10 @@
 package bacnet;
 
 import java.util.Arrays;
+import java.util.List;
 
+import org.dsa.iot.dslink.node.value.Value;
+import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.util.StringUtils;
 import org.dsa.iot.dslink.util.json.JsonArray;
 import org.dsa.iot.dslink.util.json.JsonObject;
@@ -11,6 +14,7 @@ import com.serotonin.bacnet4j.base.BACnetUtils;
 import com.serotonin.bacnet4j.enums.DayOfWeek;
 import com.serotonin.bacnet4j.enums.Month;
 import com.serotonin.bacnet4j.npdu.ip.IpNetworkUtils;
+import com.serotonin.bacnet4j.obj.ObjectProperties;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.constructed.Address;
 import com.serotonin.bacnet4j.type.constructed.CalendarEntry;
@@ -27,7 +31,10 @@ import com.serotonin.bacnet4j.type.constructed.TimeStamp;
 import com.serotonin.bacnet4j.type.constructed.TimeValue;
 import com.serotonin.bacnet4j.type.constructed.WeekNDay;
 import com.serotonin.bacnet4j.type.constructed.WeekNDay.WeekOfMonth;
+import com.serotonin.bacnet4j.type.enumerated.BinaryPV;
+import com.serotonin.bacnet4j.type.enumerated.EngineeringUnits;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
+import com.serotonin.bacnet4j.type.enumerated.LifeSafetyState;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.BitString;
@@ -765,7 +772,23 @@ public class Utils {
 		String valuesStr = Arrays.toString(enumData.getEnumConstants());
 		return valuesStr.substring(1, valuesStr.length() - 1).replace(" ", "").split(",");
 	}
+	
+	public  static String[] enumeratedObjectTypeNames(){
+		String valuesStr = Arrays.toString(ObjectType.ALL);
+		return valuesStr.substring(1, valuesStr.length() - 1).replace(" ", "").split(",");
+	}
+	
+	public static  ObjectType parseObjectType(String typeString) {
 
+        for (ObjectType type: ObjectType.ALL){
+        	if (type.toString().replace(" ", "").equals(typeString.replace(" ", ""))){
+        		return type;
+        	}
+        }	
+
+		return null;
+
+	}
 	public static DataType getDataType(ObjectType objectType) {
 		if (isOneOf(objectType, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue))
 			return DataType.BINARY;
@@ -775,73 +798,6 @@ public class Utils {
 
 		else
 			return DataType.NUMERIC;
-	}
-
-	public static ObjectType parseObjectType(String otStr) {
-		switch (otStr) {
-		case "Analog Input":
-			return ObjectType.analogInput;
-		case "Analog Output":
-			return ObjectType.analogOutput;
-		case "Analog Value":
-			return ObjectType.analogValue;
-		case "Binary Input":
-			return ObjectType.binaryInput;
-		case "Binary Output":
-			return ObjectType.binaryOutput;
-		case "Binary Value":
-			return ObjectType.binaryValue;
-		case "Calendar":
-			return ObjectType.calendar;
-		case "Command":
-			return ObjectType.command;
-		case "Device":
-			return ObjectType.device;
-		case "Event Enrollment":
-			return ObjectType.eventEnrollment;
-		case "File":
-			return ObjectType.file;
-		case "Group":
-			return ObjectType.group;
-		case "Loop":
-			return ObjectType.loop;
-		case "Multi-state Input":
-			return ObjectType.multiStateInput;
-		case "Multi-state Output":
-			return ObjectType.multiStateOutput;
-		case "Notification Class":
-			return ObjectType.notificationClass;
-		case "Program":
-			return ObjectType.program;
-		case "Schedule":
-			return ObjectType.schedule;
-		case "Averaging":
-			return ObjectType.averaging;
-		case "Multi-state Value":
-			return ObjectType.multiStateValue;
-		case "Trend Log":
-			return ObjectType.trendLog;
-		case "Life Safety Point":
-			return ObjectType.lifeSafetyPoint;
-		case "Life Safety Zone":
-			return ObjectType.lifeSafetyZone;
-		case "Accumulator":
-			return ObjectType.accumulator;
-		case "Pulse Converter":
-			return ObjectType.pulseConverter;
-		case "Event Log":
-			return ObjectType.eventLog;
-		case "Trend Log Multiple":
-			return ObjectType.trendLogMultiple;
-		case "Load Control":
-			return ObjectType.loadControl;
-		case "Structured View":
-			return ObjectType.structuredView;
-		case "Access Door":
-			return ObjectType.accessDoor;
-		default:
-			return null;
-		}
 	}
 
 	public static void addPropertyReferences(PropertyReferences refs, ObjectIdentifier oid) {
@@ -910,4 +866,108 @@ public class Utils {
 			return "";
 		return StringUtils.encodeName(s);
 	}
+	
+	public static Encodable valueToEncodable(DataType dataType, Value value, ObjectType objectType, PropertyIdentifier propertyId, List<String> unitsDescription) {
+		Class<? extends Encodable> clazz = ObjectProperties.getPropertyTypeDefinition(objectType, propertyId)
+				.getClazz();
+
+		switch (dataType) {
+		case BINARY: {
+			boolean b;
+			if (value.getType().compare(ValueType.BOOL))
+				b = value.getBool();
+			else
+				b = (Boolean.parseBoolean(value.getString()) || value.getString().equals("1"));
+			if (clazz == BinaryPV.class) {
+				if (b)
+					return BinaryPV.active;
+				return BinaryPV.inactive;
+			}
+
+			if (clazz == UnsignedInteger.class)
+				return new UnsignedInteger(b ? 1 : 0);
+
+			if (clazz == LifeSafetyState.class)
+				return new LifeSafetyState(b ? 1 : 0);
+
+			if (clazz == Real.class)
+				return new Real(b ? 1 : 0);
+		}
+		case NUMERIC: {
+			double d;
+			if (value.getType() == ValueType.NUMBER)
+				d = value.getNumber().doubleValue();
+			else
+				d = Double.parseDouble(value.getString());
+			if (clazz == BinaryPV.class) {
+				if (d != 0)
+					return BinaryPV.active;
+				return BinaryPV.inactive;
+			}
+
+			if (clazz == UnsignedInteger.class)
+				return new UnsignedInteger((int) d);
+
+			if (clazz == LifeSafetyState.class)
+				return new LifeSafetyState((int) d);
+
+			if (clazz == Real.class)
+				return new Real((float) d);
+		}
+		case ALPHANUMERIC: {
+			if (clazz == BinaryPV.class) {
+				boolean b;
+				if (value.getType().compare(ValueType.BOOL))
+					b = value.getBool();
+				else
+					b = (Boolean.parseBoolean(value.getString()) || value.getString().equals("1"));
+				if (b)
+					return BinaryPV.active;
+				return BinaryPV.inactive;
+			}
+
+			if (clazz == UnsignedInteger.class) {
+				int i = Integer.parseInt(value.getString());
+				if (value.getType() == ValueType.NUMBER)
+					i = value.getNumber().intValue();
+				return new UnsignedInteger(i);
+			}
+			if (clazz == LifeSafetyState.class) {
+				int i = Integer.parseInt(value.getString());
+				if (value.getType() == ValueType.NUMBER)
+					i = value.getNumber().intValue();
+				return new LifeSafetyState(i);
+			}
+			if (clazz == Real.class) {
+				float f = (float) Double.parseDouble(value.getString());
+				if (value.getType() == ValueType.NUMBER)
+					f = value.getNumber().floatValue();
+				return new Real(f);
+			}
+		}
+		case MULTISTATE: {
+			int i = Integer.parseInt(value.getString());
+			if (value.getType().compare(ValueType.ENUM))
+				i = unitsDescription.indexOf(value.getString());
+			if (clazz == BinaryPV.class) {
+				if (i != 0)
+					return BinaryPV.active;
+				return BinaryPV.inactive;
+			}
+
+			if (clazz == UnsignedInteger.class)
+				return new UnsignedInteger(i);
+
+			if (clazz == LifeSafetyState.class)
+				return new LifeSafetyState(i);
+
+			if (clazz == Real.class)
+				return new Real(i);
+		}
+		default:
+			return BinaryPV.inactive;
+		}
+
+	}
+
 }

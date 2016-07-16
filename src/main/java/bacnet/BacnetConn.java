@@ -5,7 +5,9 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -13,11 +15,12 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import com.serotonin.bacnet4j.npdu.ip.IpNetworkUtils;
 import com.serotonin.bacnet4j.transport.DefaultTransport;
 import com.serotonin.io.serial.SerialPortException;
 import com.serotonin.io.serial.SerialPortProxy;
 import com.serotonin.io.serial.SerialUtils;
+
+import bacnet.properties.LocalPresentValueProperty;
 
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
@@ -75,6 +78,10 @@ import com.serotonin.io.serial.SerialParameters;
 class BacnetConn {
 	private static final Logger LOGGER;
 
+	static final String ACTION_ADD_LOCAL_SLAVE = "set up ip slave";
+	static final String ATTRIBUTE_NAME = "name";
+
+	
 	Node node;
 	private final Node statnode;
 	LocalDevice localDevice;
@@ -83,6 +90,8 @@ class BacnetConn {
 	boolean isIP;
 	private int unnamedCount;
 	final Set<DeviceNode> deviceNodes = new HashSet<DeviceNode>();
+    Map<BACnetObject, EditablePoint> ObjectToPoint = new HashMap<BACnetObject, EditablePoint>();
+
 	private ScheduledFuture<?> reconnectFuture = null;
 	private int retryDelay = 1;
 
@@ -95,7 +104,7 @@ class BacnetConn {
 	BacnetConn(BacnetLink link, Node node) {
 		this.node = node;
 		this.link = link;
-
+        
 		isIP = node.getAttribute("isIP").getBool();
 		defaultInterval = node.getAttribute("default polling interval").getNumber().longValue();
 
@@ -210,7 +219,7 @@ class BacnetConn {
 				// e.printStackTrace();
 				// remove();
 				LOGGER.debug("error: ", e);
-				statnode.setValue(new Value("Error initializing local device"));
+				statnode.setValue(new Value("Error in initializing local device :" + e.getMessage()));
 				localDevice.terminate();
 				localDevice = null;
 			} finally {
@@ -245,6 +254,9 @@ class BacnetConn {
 			else
 				anode.setAction(act);
 
+			act = getMakeSlaveAction();
+			node.createChild(ACTION_ADD_LOCAL_SLAVE).setAction(act).build().setSerializable(false);
+			
 			act = new Action(Permission.READ, new AddDeviceHandler());
 			act.addParameter(new Parameter("name", ValueType.STRING));
 			String defMac = "10";
@@ -351,6 +363,13 @@ class BacnetConn {
 		}
 	}
 
+	private Action getMakeSlaveAction() {
+		Action act = new Action(Permission.READ, new MakeSlaveHandler());
+		act.addParameter(new Parameter(ATTRIBUTE_NAME, ValueType.STRING));
+		
+		return act;
+	}
+	
 	Action getEditAction() {
 		Action act = new Action(Permission.READ, new EditHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
@@ -609,6 +628,18 @@ class BacnetConn {
 		return devs.poll();
 	}
 
+	private class MakeSlaveHandler implements Handler<ActionResult> {
+
+		public void handle(ActionResult event) {
+
+			String name = event.getParameter(ATTRIBUTE_NAME, ValueType.STRING).getString();
+			Node slaveNode;
+			slaveNode = node.createChild(name).build();
+
+			new LocalDeviceNode(getMe(), slaveNode, localDevice);
+		}
+	}	
+	
 	private class DeviceDiscoveryHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			ConcurrentLinkedQueue<RemoteDevice> devs = new ConcurrentLinkedQueue<RemoteDevice>();
@@ -834,8 +865,8 @@ class BacnetConn {
 
 		@Override
 		public boolean allowPropertyWrite(Address arg0, BACnetObject arg1, PropertyValue arg2) {
-			// TODO Auto-generated method stub
-			return false;
+			// May configurable
+			return true;
 		}
 
 		@Override
@@ -876,13 +907,13 @@ class BacnetConn {
 		@Override
 		public void iAmReceived(RemoteDevice arg0) {
 			// TODO Auto-generated method stub
-
+			
 		}
 
 		@Override
 		public void iHaveReceived(RemoteDevice arg0, RemoteObject arg1) {
 			// TODO Auto-generated method stub
-
+			
 		}
 
 		@Override
@@ -899,8 +930,21 @@ class BacnetConn {
 
 		@Override
 		public void propertyWritten(Address arg0, BACnetObject arg1, PropertyValue arg2) {
-			// TODO Auto-generated method stub
+            EditablePoint objectPoint = null;
+            LocalPresentValueProperty presentProperty = null;
+            
+            objectPoint = ObjectToPoint.get(arg1);
+            
+            PropertyIdentifier pid = arg2.getPropertyIdentifier();
+            if (pid.equals(PropertyIdentifier.presentValue)){
+               
+               presentProperty = (LocalPresentValueProperty)objectPoint.getProperty(pid);  
+               presentProperty.update();
+            }
 
+
+
+            
 		}
 
 		@Override
@@ -921,5 +965,13 @@ class BacnetConn {
 
 		}
 
+	}
+	
+    public LocalDevice getLocalDevice(){
+    	return this.localDevice;
+    }
+    
+	public Map<BACnetObject, EditablePoint> getObjectToPoint() {
+		return ObjectToPoint;
 	}
 }
