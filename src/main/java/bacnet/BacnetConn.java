@@ -81,7 +81,6 @@ class BacnetConn {
 	static final String ACTION_ADD_LOCAL_SLAVE = "set up ip slave";
 	static final String ATTRIBUTE_NAME = "name";
 
-	
 	Node node;
 	private final Node statnode;
 	LocalDevice localDevice;
@@ -90,12 +89,13 @@ class BacnetConn {
 	boolean isIP;
 	private int unnamedCount;
 	final Set<DeviceNode> deviceNodes = new HashSet<DeviceNode>();
-    Map<BACnetObject, EditablePoint> ObjectToPoint = new HashMap<BACnetObject, EditablePoint>();
+	Map<BACnetObject, EditablePoint> ObjectToPoint = new HashMap<BACnetObject, EditablePoint>();
 
 	private ScheduledFuture<?> reconnectFuture = null;
 	private int retryDelay = 1;
 
 	private final ScheduledThreadPoolExecutor stpe;
+	DeviceEventListener listener;
 
 	static {
 		LOGGER = LoggerFactory.getLogger(BacnetConn.class);
@@ -104,7 +104,7 @@ class BacnetConn {
 	BacnetConn(BacnetLink link, Node node) {
 		this.node = node;
 		this.link = link;
-        
+
 		isIP = node.getAttribute("isIP").getBool();
 		defaultInterval = node.getAttribute("default polling interval").getNumber().longValue();
 
@@ -118,6 +118,7 @@ class BacnetConn {
 		this.statnode.setSerializable(false);
 
 		unnamedCount = 0;
+		this.listener = new EventListenerImpl();
 	}
 
 	ScheduledThreadPoolExecutor getDaemonThreadPool() {
@@ -212,7 +213,7 @@ class BacnetConn {
 						LOGGER.debug("", e);
 					}
 				}
-				localDevice.getEventHandler().addListener(new EventListenerImpl());
+				localDevice.getEventHandler().addListener(this.listener);
 				localDevice.sendGlobalBroadcast(localDevice.getIAm());
 				// Thread.sleep(200000);
 			} catch (Exception e) {
@@ -256,7 +257,7 @@ class BacnetConn {
 
 			act = getMakeSlaveAction();
 			node.createChild(ACTION_ADD_LOCAL_SLAVE).setAction(act).build().setSerializable(false);
-			
+
 			act = new Action(Permission.READ, new AddDeviceHandler());
 			act.addParameter(new Parameter("name", ValueType.STRING));
 			String defMac = "10";
@@ -366,10 +367,10 @@ class BacnetConn {
 	private Action getMakeSlaveAction() {
 		Action act = new Action(Permission.READ, new MakeSlaveHandler());
 		act.addParameter(new Parameter(ATTRIBUTE_NAME, ValueType.STRING));
-		
+
 		return act;
 	}
-	
+
 	Action getEditAction() {
 		Action act = new Action(Permission.READ, new EditHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
@@ -638,8 +639,8 @@ class BacnetConn {
 
 			new LocalDeviceNode(getMe(), slaveNode, localDevice);
 		}
-	}	
-	
+	}
+
 	private class DeviceDiscoveryHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			ConcurrentLinkedQueue<RemoteDevice> devs = new ConcurrentLinkedQueue<RemoteDevice>();
@@ -865,7 +866,7 @@ class BacnetConn {
 
 		@Override
 		public boolean allowPropertyWrite(Address arg0, BACnetObject arg1, PropertyValue arg2) {
-			// May configurable
+			// May be configurable
 			return true;
 		}
 
@@ -907,13 +908,13 @@ class BacnetConn {
 		@Override
 		public void iAmReceived(RemoteDevice arg0) {
 			// TODO Auto-generated method stub
-			
+
 		}
 
 		@Override
 		public void iHaveReceived(RemoteDevice arg0, RemoteObject arg1) {
 			// TODO Auto-generated method stub
-			
+
 		}
 
 		@Override
@@ -929,22 +930,19 @@ class BacnetConn {
 		}
 
 		@Override
-		public void propertyWritten(Address arg0, BACnetObject arg1, PropertyValue arg2) {
-            EditablePoint objectPoint = null;
-            LocalPresentValueProperty presentProperty = null;
-            
-            objectPoint = ObjectToPoint.get(arg1);
-            
-            PropertyIdentifier pid = arg2.getPropertyIdentifier();
-            if (pid.equals(PropertyIdentifier.presentValue)){
-               
-               presentProperty = (LocalPresentValueProperty)objectPoint.getProperty(pid);  
-               presentProperty.update();
-            }
+		public void propertyWritten(Address adress, BACnetObject bacnetObj, PropertyValue propVal) {
+			EditablePoint objectPoint = null;
+			Encodable enc = propVal.getValue();
 
+			objectPoint = ObjectToPoint.get(bacnetObj);
+			objectPoint.updatePointValue(enc);
 
+			PropertyIdentifier pid = propVal.getPropertyIdentifier();
+			if (pid.equals(PropertyIdentifier.presentValue)) {
+				LocalPresentValueProperty presentProperty = (LocalPresentValueProperty) objectPoint.getProperty(pid);
+				presentProperty.updatePropertyValue(enc);
+			}
 
-            
 		}
 
 		@Override
@@ -966,12 +964,17 @@ class BacnetConn {
 		}
 
 	}
-	
-    public LocalDevice getLocalDevice(){
-    	return this.localDevice;
-    }
-    
+
+	public LocalDevice getLocalDevice() {
+		return this.localDevice;
+	}
+
 	public Map<BACnetObject, EditablePoint> getObjectToPoint() {
 		return ObjectToPoint;
 	}
+
+	// // Not production code, for lisener's mockup test only
+	// public DeviceEventListener getListener() {
+	// return this.listener;
+	// }
 }

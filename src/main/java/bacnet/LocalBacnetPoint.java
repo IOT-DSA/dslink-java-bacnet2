@@ -69,10 +69,6 @@ public class LocalBacnetPoint extends EditablePoint {
 	private List<String> unitsDescription = new ArrayList<String>();
 
 	public LocalBacnetPoint(LocalDeviceFolder folder, Node parent, ObjectIdentifier objectId) {
-		// this.folder = folder;
-		// // this.listener = folder.new CovListener(this);
-		// this.parent = parent;
-		// this.node = null;
 		super(folder, parent);
 
 		this.objectId = objectId;
@@ -100,7 +96,8 @@ public class LocalBacnetPoint extends EditablePoint {
 		boolean settable = node.getAttribute("settable").getBool();
 
 		this.objectId = new ObjectIdentifier(objectType, instNum);
-		this.propertyId = new PropertyIdentifier(PropertyIdentifier.presentValue.intValue());
+		// this.propertyId = new
+		// PropertyIdentifier(PropertyIdentifier.presentValue.intValue());
 		String name = node.getName();
 
 		this.bacnetObj = new BACnetObject(objectType, instNum, name);
@@ -108,8 +105,8 @@ public class LocalBacnetPoint extends EditablePoint {
 		bacnetObj.addListener(listener);
 		bacnetObj.setLocalDevice(folder.getLocalDevice());
 
-		this.pidToLocalProperty = new HashMap<>();
-		
+		this.propertyIdToLocalProperty = new HashMap<>();
+
 		setCov(useCov);
 		setSettable(settable);
 
@@ -196,24 +193,24 @@ public class LocalBacnetPoint extends EditablePoint {
 	}
 
 	private void setupPresentValueProperty() {
-		Node vnode = node.getChild(PROPERTY_PRESENT_VALUE);
+		Node presentValueNode = node.getChild(PROPERTY_PRESENT_VALUE);
 
-		if (null == vnode) {
-			vnode = node.createChild(PROPERTY_PRESENT_VALUE).setValueType(ValueType.STRING).setValue(new Value(""))
-					.build();
+		if (null == presentValueNode) {
+			presentValueNode = node.createChild(PROPERTY_PRESENT_VALUE).setValueType(ValueType.STRING)
+					.setValue(new Value("")).build();
 
-			LocalPresentValueProperty presentValueProperty = new LocalPresentValueProperty(objectId, propertyId, this,
-					node, vnode);
-			
-	        this.pidToLocalProperty.put(propertyId, presentValueProperty);
+			LocalPresentValueProperty presentValueProperty = new LocalPresentValueProperty(objectId,
+					PropertyIdentifier.presentValue, this, node, presentValueNode);
+
+			propertyIdToLocalProperty.put(PropertyIdentifier.presentValue, presentValueProperty);
 
 		}
 
-		vnode.setWritable(Writable.NEVER);
+		presentValueNode.setWritable(Writable.NEVER);
 
 		Value oldval = null;
-		if (vnode != null)
-			oldval = vnode.getValue();
+		if (presentValueNode != null)
+			oldval = presentValueNode.getValue();
 
 		if (presentValue != null) {
 
@@ -259,6 +256,7 @@ public class LocalBacnetPoint extends EditablePoint {
 				node.setValueType(vt);
 				node.setValue(val);
 			}
+
 			Value units = null;
 			if (!(Utils.isOneOf(objectTypeId, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue,
 					ObjectType.multiStateInput, ObjectType.multiStateOutput, ObjectType.multiStateValue,
@@ -266,28 +264,28 @@ public class LocalBacnetPoint extends EditablePoint {
 					&& unitsDescription.size() > 0) {
 				units = new Value(unitsDescription.get(0));
 			}
-			Node unode = node.getChild(PROPERTY_UNITS);
-			if (unode != null) {
+			Node unitsNode = node.getChild(PROPERTY_UNITS);
+			if (unitsNode != null) {
 				if (units == null)
 					node.removeChild(PROPERTY_UNITS);
-				else if (!units.equals(unode.getValue()))
-					unode.setValue(units);
+				else if (!units.equals(unitsNode.getValue()))
+					unitsNode.setValue(units);
 			} else {
 				if (units != null)
 					node.createChild(PROPERTY_UNITS).setValueType(ValueType.STRING).setValue(units).build();
 			}
-			if (vnode != null) {
-				if (!areEqual(vt, vnode.getValueType()) || !val.equals(vnode.getValue())) {
-					vnode.setValueType(vt);
-					vnode.setValue(val);
+			if (presentValueNode != null) {
+				if (!areEqual(vt, presentValueNode.getValueType()) || !val.equals(presentValueNode.getValue())) {
+					presentValueNode.setValueType(vt);
+					presentValueNode.setValue(val);
 					LOGGER.debug("presentValue updated to " + val);
 				}
 			}
 		}
 
 		if (settable) {
-			if (vnode.getWritable() != Writable.WRITE) {
-				makeSetAction(vnode, -1);
+			if (presentValueNode.getWritable() != Writable.WRITE) {
+				makeSetAction(presentValueNode, -1);
 				makeSetAction(node, -1);
 				PriorityArray pa = null;
 
@@ -297,21 +295,21 @@ public class LocalBacnetPoint extends EditablePoint {
 					LOGGER.debug("error", e.getMessage());
 					return;
 				}
-				Value newVal = vnode.getValue();
-				if (pa != null && (!newVal.equals(oldval) || vnode.getChildren() == null
-						|| vnode.getChildren().size() < pa.getCount() + 3)) {
-					makeRelinquishAction(vnode, -1);
+				Value newVal = presentValueNode.getValue();
+				if (pa != null && (!newVal.equals(oldval) || presentValueNode.getChildren() == null
+						|| presentValueNode.getChildren().size() < pa.getCount() + 3)) {
+					makeRelinquishAction(presentValueNode, -1);
 					Action act = new Action(Permission.READ, new RelinquishAllHandler());
-					vnode.createChild(PROPERTY_RELINQUISH_ALL).setAction(act).build().setSerializable(false);
+					presentValueNode.createChild(PROPERTY_RELINQUISH_ALL).setAction(act).build().setSerializable(false);
 					refreshPriorities(pa);
 				}
 			} else {
 				refreshPriorities();
 			}
 		} else {
-			if (vnode.getWritable() != Writable.NEVER) {
-				vnode.clearChildren();
-				vnode.setWritable(Writable.NEVER);
+			if (presentValueNode.getWritable() != Writable.NEVER) {
+				presentValueNode.clearChildren();
+				presentValueNode.setWritable(Writable.NEVER);
 			}
 		}
 
@@ -361,8 +359,9 @@ public class LocalBacnetPoint extends EditablePoint {
 					.setValue(new Value(EngineeringUnits.degreeDaysFahrenheit.toString())).build();
 		}
 
-		LocalUnitsProperty unitsProperty = new LocalUnitsProperty(objectId, propertyId, this, node, propertyNode);
-		this.pidToLocalProperty.put(propertyId, unitsProperty);
+		LocalUnitsProperty unitsProperty = new LocalUnitsProperty(objectId, PropertyIdentifier.units, this, node,
+				propertyNode);
+		propertyIdToLocalProperty.put(PropertyIdentifier.units, unitsProperty);
 	}
 
 	protected void setupEventStateProperty(String name) {
@@ -374,9 +373,9 @@ public class LocalBacnetPoint extends EditablePoint {
 					.setValue(new Value(EventState.normal.toString())).build();
 		}
 
-		LocalEventStateProperty eventStateProperty = new LocalEventStateProperty(objectId, propertyId, this, node,
-				propertyNode);
-		this.pidToLocalProperty.put(propertyId, eventStateProperty);
+		LocalEventStateProperty eventStateProperty = new LocalEventStateProperty(objectId,
+				PropertyIdentifier.eventState, this, node, propertyNode);
+		propertyIdToLocalProperty.put(PropertyIdentifier.eventState, eventStateProperty);
 	}
 
 	protected void setupStatusFlagsProperty(String name) {
@@ -388,10 +387,10 @@ public class LocalBacnetPoint extends EditablePoint {
 			propertyNode = node.createChild(name).setValueType(ValueType.STRING).setValue(new Value(status)).build();
 		}
 
-		LocalStatusFlagsProperty statusFlagsProperty = new LocalStatusFlagsProperty(objectId, propertyId, this, node,
-				propertyNode);
+		LocalStatusFlagsProperty statusFlagsProperty = new LocalStatusFlagsProperty(objectId,
+				PropertyIdentifier.statusFlags, this, node, propertyNode);
 
-		this.pidToLocalProperty.put(propertyId, statusFlagsProperty);
+		propertyIdToLocalProperty.put(PropertyIdentifier.statusFlags, statusFlagsProperty);
 	}
 
 	protected void setupOutOfServiceProperty(String name) {
@@ -404,10 +403,10 @@ public class LocalBacnetPoint extends EditablePoint {
 					.setValue(new Value(Boolean.FALSE.toString())).build();
 		}
 
-		LocalOutOfServiceProperty outOfServiceProperty = new LocalOutOfServiceProperty(objectId, propertyId, this, node,
-				propertyNode);
+		LocalOutOfServiceProperty outOfServiceProperty = new LocalOutOfServiceProperty(objectId,
+				PropertyIdentifier.outOfService, this, node, propertyNode);
 
-		this.pidToLocalProperty.put(propertyId, outOfServiceProperty);
+		propertyIdToLocalProperty.put(PropertyIdentifier.outOfService, outOfServiceProperty);
 	}
 
 	private void setupRequiredProperty() {
@@ -527,44 +526,11 @@ public class LocalBacnetPoint extends EditablePoint {
 		this.unitsDescription = unitsDescription;
 	}
 
-	// public String getEffectivePeriod() {
-	// return effectivePeriod;
-	// }
-	//
-	// public void setEffectivePeriod(String ep) {
-	// this.effectivePeriod = ep;
-	// }
-
-	// public JsonArray getWeeklySchedule() {
-	// return weeklySchedule;
-	// }
-	//
-	// public void setWeeklySchedule(JsonArray ws) {
-	// this.weeklySchedule = ws;
-	// }
-	//
-	// public JsonArray getExceptionSchedule() {
-	// return exceptionSchedule;
-	// }
-	//
-	// public void setExceptionSchedule(JsonArray es) {
-	// this.exceptionSchedule = es;
-	// }
-
-	// public JsonArray getDateList() {
-	// return dateList;
-	// }
-	//
-	// public void setDateList(JsonArray dl) {
-	// this.dateList = dl;
-	// }
-
 	public String getPresentValue() {
 		return presentValue;
 	}
 
 	public void setPresentValue(String presentValue, PropertyIdentifier propertyId) {
-		this.propertyId = propertyId;
 		node.setAttribute("pid", new Value(propertyId.intValue()));
 		this.presentValue = presentValue;
 		setDataType(dataType);
@@ -831,5 +797,55 @@ public class LocalBacnetPoint extends EditablePoint {
 	protected void makeCopy() {
 		// TODO Auto-generated method stub
 
+	}
+
+	public void updatePointValue(Encodable enc) {
+		String presentValue = enc.toString();
+		if (presentValue != null) {
+
+			ValueType vt;
+			Value val;
+			
+			switch (dataType) {
+			case BINARY: {
+				String off = (unitsDescription.size() > 0) ? unitsDescription.get(0) : "0";
+				String on = (unitsDescription.size() > 1) ? unitsDescription.get(1) : "1";
+				vt = ValueType.makeBool(on, off);
+				val = new Value(Boolean.parseBoolean(presentValue) || presentValue.equals("1")
+						|| presentValue.equals("Active"));
+				break;
+			}
+			case NUMERIC: {
+				vt = ValueType.NUMBER;
+				val = new Value(Double.parseDouble(presentValue));
+				break;
+			}
+			case MULTISTATE: {
+				Set<String> enums = new HashSet<String>(unitsDescription);
+				vt = ValueType.makeEnum(enums);
+				int index = Integer.parseInt(presentValue) - 1;
+				if (index >= 0 && index < unitsDescription.size())
+					val = new Value(unitsDescription.get(index));
+				else {
+					vt = ValueType.STRING;
+					val = new Value(presentValue);
+				}
+				break;
+			}
+			case ALPHANUMERIC: {
+				vt = ValueType.STRING;
+				val = new Value(presentValue);
+				break;
+			}
+			default: {
+				vt = ValueType.STRING;
+				val = new Value(presentValue);
+			}
+			}
+			if (!areEqual(vt, node.getValueType()) || !val.equals(node.getValue())) {
+				node.setValueType(vt);
+				node.setValue(val);
+			}
+		}
 	}
 }

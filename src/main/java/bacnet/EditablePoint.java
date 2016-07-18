@@ -1,6 +1,5 @@
 package bacnet;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -22,7 +21,7 @@ import com.serotonin.bacnet4j.exception.BACnetServiceException;
 import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.obj.ObjectProperties;
 import com.serotonin.bacnet4j.obj.PropertyTypeDefinition;
-
+import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
@@ -55,9 +54,9 @@ public abstract class EditablePoint {
 	
 	private int defaultPriority;
 	ObjectIdentifier objectId;
-	PropertyIdentifier propertyId;
+//	PropertyIdentifier propertyId;
 	int id;
-	Map<PropertyIdentifier, LocalBacnetProperty> pidToLocalProperty; 
+	Map<PropertyIdentifier, LocalBacnetProperty> propertyIdToLocalProperty; 
 	
 	public EditablePoint(EditableFolder folder, Node parent){
 		this.folder = folder;
@@ -167,22 +166,6 @@ public abstract class EditablePoint {
 				node = parent.createChild(newname).build();
 			}
 			
-//			settable = event.getParameter("settable", ValueType.BOOL).getBool();
-//			cov = event.getParameter("use COV", ValueType.BOOL).getBool();
-//			defaultPriority = event.getParameter("default priority", ValueType.NUMBER).getNumber().intValue();
-//			ObjectType ot = DeviceFolder
-//					.parseObjectType(event.getParameter("object type", ValueType.STRING).getString());
-//			instanceNumber = event.getParameter("object instance number", ValueType.NUMBER).getNumber().intValue();
-//			objectId = new ObjectIdentifier(ot, instanceNumber);
-//			setObjectTypeId(ot.intValue());
-//			setObjectTypeDescription(ot.toString());
-//			setDataType(Utils.getDataType(ot));
-//
-//			if (DeviceFolder.isOneOf(ot, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
-//				getUnitsDescription().add("0");
-//				getUnitsDescription().add("1");
-//			}
-			
 			setupNode();
 
 		}
@@ -250,6 +233,10 @@ public abstract class EditablePoint {
 	
 	public LocalBacnetProperty getProperty(PropertyIdentifier pid) {
 
-		return pidToLocalProperty.get(pid);
+		return propertyIdToLocalProperty.get(pid);
+	}
+
+	public void updatePointValue(Encodable enc) {
+
 	}
 }
