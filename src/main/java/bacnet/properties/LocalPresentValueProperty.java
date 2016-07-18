@@ -5,11 +5,13 @@ import org.dsa.iot.dslink.node.value.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.serotonin.bacnet4j.exception.BACnetServiceException;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
+import com.serotonin.bacnet4j.type.primitive.Real;
+import com.serotonin.bacnet4j.type.primitive.SignedInteger;
+import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 
 import bacnet.DataType;
 import bacnet.LocalBacnetPoint;
@@ -37,8 +39,8 @@ public class LocalPresentValueProperty extends LocalBacnetProperty {
 			Node node) {
 		super(oid, pid, point, parent, node);
 
-		Value v = new Value(String.valueOf(DEFAULT_ROOM_TEMPERATURE));
-		node.setValue(v);
+		Value v = new Value(DEFAULT_ROOM_TEMPERATURE); 
+		node.setValue(new Value(String.valueOf(DEFAULT_ROOM_TEMPERATURE)));
 		
 		Encodable enc = Utils.valueToEncodable(DataType.NUMERIC, v, objectId.getObjectType(),
 				PropertyIdentifier.presentValue, null);
@@ -46,18 +48,23 @@ public class LocalPresentValueProperty extends LocalBacnetProperty {
 
 	}
 	
-	public void update(){
+	public void updatePropertyValue(Encodable enc){
 
-		Encodable enc = null;
-		try {
-			enc = bacnetObj.getProperty(PropertyIdentifier.presentValue);
-		} catch (BACnetServiceException e) {
-            LOGGER.debug("error: ", e);
-		}
-		
 		if ( null != enc){
-			Value newVal = new Value(enc.toString());
-			node.setValue(newVal);	
+			Value val;
+			if (enc instanceof com.serotonin.bacnet4j.type.primitive.Boolean) {
+				val = new Value(((com.serotonin.bacnet4j.type.primitive.Boolean) enc).booleanValue());
+			} else if (enc instanceof Real) {
+				val = new Value(((Real) enc).floatValue());
+			} else if (enc instanceof UnsignedInteger) {
+				val = new Value(((UnsignedInteger) enc).bigIntegerValue());
+			} else if (enc instanceof SignedInteger) {
+				val = new Value(((SignedInteger) enc).bigIntegerValue());
+			} else {
+				val = new Value(enc.toString());
+			}
+
+			node.setValue(new Value(String.valueOf(val)));
 		}
 
 	}

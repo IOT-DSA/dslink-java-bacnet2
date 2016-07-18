@@ -19,7 +19,7 @@ import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.type.AmbiguousValue;
 import com.serotonin.bacnet4j.type.Encodable;
-
+import com.serotonin.bacnet4j.type.constructed.PropertyValue;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
@@ -137,6 +137,12 @@ public class LocalDeviceFolder extends EditableFolder {
 		BACnetObject bacnetObj = bacnetPoint.getBacnetObj();
 	    Map<BACnetObject, EditablePoint> ObjectToPoint = conn.getObjectToPoint();
 	    ObjectToPoint.put(bacnetObj, bacnetPoint);
+	    
+//	    // Not production code, for lisener's mockup test only
+//		Value v = new Value(70); 	
+//		Encodable enc = Utils.valueToEncodable(DataType.NUMERIC, v, ObjectType.analogInput,
+//				PropertyIdentifier.presentValue, null);		
+//	    this.getConnection().getListener().propertyWritten(null, bacnetObj, new PropertyValue(PropertyIdentifier.presentValue, enc));
 	}
 
 	@Override
