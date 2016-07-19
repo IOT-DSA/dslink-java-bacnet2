@@ -8,14 +8,12 @@ import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
 import org.dsa.iot.dslink.node.Node;
+import org.dsa.iot.dslink.node.NodeBuilder;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.Writable;
 import org.dsa.iot.dslink.node.actions.Action;
-
 import org.dsa.iot.dslink.node.value.Value;
-
 import org.dsa.iot.dslink.node.value.ValueType;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,22 +23,21 @@ import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.obj.BACnetObjectListener;
 import com.serotonin.bacnet4j.obj.ObjectProperties;
 import com.serotonin.bacnet4j.obj.PropertyTypeDefinition;
-
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.constructed.BACnetError;
 import com.serotonin.bacnet4j.type.constructed.PriorityArray;
-
 import com.serotonin.bacnet4j.type.enumerated.EngineeringUnits;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
 import com.serotonin.bacnet4j.type.enumerated.LifeSafetyState;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
-
+import com.serotonin.bacnet4j.type.enumerated.Polarity;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
-
 import com.serotonin.bacnet4j.type.primitive.Null;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
+
 import bacnet.properties.LocalEventStateProperty;
 import bacnet.properties.LocalOutOfServiceProperty;
+import bacnet.properties.LocalPolarityProperty;
 import bacnet.properties.LocalPresentValueProperty;
 import bacnet.properties.LocalStatusFlagsProperty;
 import bacnet.properties.LocalUnitsProperty;
@@ -366,16 +363,34 @@ public class LocalBacnetPoint extends EditablePoint {
 
 	protected void setupEventStateProperty(String name) {
 		Node propertyNode = node.getChild(name);
+		NodeBuilder b = null;
 		if (null != propertyNode) {
 
 		} else {
-			propertyNode = node.createChild(name).setValueType(ValueType.STRING)
-					.setValue(new Value(EventState.normal.toString())).build();
+			b = node.createChild(name);
+			propertyNode = b.getChild();
 		}
 
 		LocalEventStateProperty eventStateProperty = new LocalEventStateProperty(objectId,
 				PropertyIdentifier.eventState, this, node, propertyNode);
+		if (b != null) b.build();
 		propertyIdToLocalProperty.put(PropertyIdentifier.eventState, eventStateProperty);
+	}
+	
+	protected void setupPolarityProperty(String name) {
+		Node propertyNode = node.getChild(name);
+		NodeBuilder b = null;
+		if (null != propertyNode) {
+			
+		} else {
+			b = node.createChild(name);
+			propertyNode = b.getChild();
+		}
+		
+		LocalPolarityProperty polarityProperty = new LocalPolarityProperty(objectId,
+				PropertyIdentifier.polarity, this, node, propertyNode);
+		if (b != null) b.build();
+		propertyIdToLocalProperty.put(PropertyIdentifier.polarity, polarityProperty);
 	}
 
 	protected void setupStatusFlagsProperty(String name) {
@@ -456,6 +471,8 @@ public class LocalBacnetPoint extends EditablePoint {
 			setupEventStateProperty(PropertyIdentifier.eventState.toString());
 		} else if (propId.equals(PropertyIdentifier.outOfService)) {
 			setupOutOfServiceProperty(PropertyIdentifier.outOfService.toString());
+		} else if (propId.equals(PropertyIdentifier.polarity)) {
+			setupPolarityProperty(PropertyIdentifier.polarity.toString());
 		}
 
 	}

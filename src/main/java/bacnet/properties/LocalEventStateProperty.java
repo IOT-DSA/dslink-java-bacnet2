@@ -3,11 +3,9 @@ package bacnet.properties;
 import java.util.Arrays;
 
 import org.dsa.iot.dslink.node.Node;
-import org.dsa.iot.dslink.node.Permission;
-import org.dsa.iot.dslink.node.actions.Action;
-import org.dsa.iot.dslink.node.actions.ActionResult;
-import org.dsa.iot.dslink.node.actions.Parameter;
+import org.dsa.iot.dslink.node.Writable;
 import org.dsa.iot.dslink.node.value.Value;
+import org.dsa.iot.dslink.node.value.ValuePair;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.util.handler.Handler;
 import org.slf4j.Logger;
@@ -41,7 +39,10 @@ public class LocalEventStateProperty extends LocalBacnetProperty{
 		super(oid, pid, point, parent, node);
 		
 		bacnetObj.writeProperty(PropertyIdentifier.eventState, EventState.normal);
-		makeEditAction();
+		node.setValueType(ValueType.makeEnum(enumeratedNames()));
+		node.setValue(new Value(EventState.normal.toString()));
+		node.setWritable(Writable.WRITE);
+		node.getListener().setValueHandler(new SetHandler());
 	}
 
 	private  String[] enumeratedNames(){
@@ -49,33 +50,20 @@ public class LocalEventStateProperty extends LocalBacnetProperty{
 		return valuesStr.substring(1, valuesStr.length() - 1).replace(" ", "").split(",");
 	}
 	
-	protected void makeEditAction() {
-		Action act = new Action(Permission.READ, new EditHandler());
-		act.addParameter(
-				new Parameter(ATTRIBUTE_EVENT_STATE, ValueType.makeEnum(enumeratedNames()),
-						node.getAttribute(ATTRIBUTE_EVENT_STATE)));
-
-		Node editNode = node.getChild(ACTION_EDIT);
-		if (editNode == null)
-			node.createChild(ACTION_EDIT).setAction(act).build().setSerializable(false);
-		else
-			editNode.setAction(act);
-	}
-
-	private class EditHandler implements Handler<ActionResult> {
+	private class SetHandler implements Handler<ValuePair> {
 
 		@Override
-		public void handle(ActionResult event) {
-			state = parseEventState(
-					event.getParameter(ATTRIBUTE_EVENT_STATE, ValueType.STRING).getString());
+		public void handle(ValuePair event) {
+			if (!event.isFromExternalSource()) return;
+			Value newVal = event.getCurrent();
+			state = parseEventState(newVal.getString());
 			
 			bacnetObj.writeProperty(PropertyIdentifier.eventState, state);
 			
-			Value newVal = new Value(state.toString());
 			node.setAttribute(ATTRIBUTE_EVENT_STATE, newVal);
-			node.setValue(newVal);
 		}
 	}
+
 
 	protected EventState parseEventState(String eventString) {
 
