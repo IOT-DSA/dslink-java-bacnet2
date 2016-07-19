@@ -1,6 +1,8 @@
 package bacnet.properties;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Writable;
@@ -12,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.enumerated.EngineeringUnits;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
@@ -46,9 +49,12 @@ public class LocalEventStateProperty extends LocalBacnetProperty{
 		node.getListener().setValueHandler(new SetHandler());
 	}
 
-	private  String[] enumeratedNames(){
-		String valuesStr = Arrays.toString(EventState.ALL);
-		return valuesStr.substring(1, valuesStr.length() - 1).replace(" ", "").split(",");
+	private  List<String> enumeratedNames(){
+		List<String> lst = new ArrayList<String>();
+		for (EventState u: EventState.ALL) {
+			lst.add(u.toString());
+		}
+		return lst;
 	}
 	
 	private class SetHandler implements Handler<ValuePair> {
