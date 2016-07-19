@@ -11,6 +11,7 @@ import org.dsa.iot.dslink.util.handler.Handler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.constructed.StatusFlags;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
@@ -33,10 +34,10 @@ public class LocalStatusFlagsProperty extends LocalBacnetProperty {
 	static final String ACTION_EDIT = "edit";
 
 	StatusFlags flags;
-	boolean inAlarm;
-	boolean fault;
-	boolean overridden;
-	boolean outOfService;
+	boolean inAlarm = false;
+	boolean fault = false;
+	boolean overridden = false;
+	boolean outOfService = false;
 
 	public LocalStatusFlagsProperty(LocalBacnetPoint point, Node parent, Node node) {
 		super(point, parent, node);
@@ -91,6 +92,21 @@ public class LocalStatusFlagsProperty extends LocalBacnetProperty {
 			node.setAttribute(ATTRIBUTE_STATUS_FLAG_OVERRIDDEN, new Value(overridden));
 			node.setAttribute(ATTRIBUTE_STATUS_FLAG_OUTOFSERVICE, new Value(outOfService));
 		}
+	}
+
+	@Override
+	public void updatePropertyValue(Encodable enc) {
+		if (enc instanceof StatusFlags) {
+			flags = (StatusFlags) enc;
+			inAlarm = flags.isInAlarm();
+			fault = flags.isFault();
+			overridden = flags.isOverridden();
+			outOfService = flags.isOutOfService();
+			String strFlags = "inAlarm: " + inAlarm + " fault: " + fault + " overridden: " + overridden
+					+ " outOfService: " + outOfService;
+			node.setValue(new Value(strFlags));
+		}
+		
 	}
 
 }

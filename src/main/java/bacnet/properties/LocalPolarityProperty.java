@@ -11,6 +11,7 @@ import org.dsa.iot.dslink.util.handler.Handler;
 
 import bacnet.LocalBacnetPoint;
 
+import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.enumerated.Polarity;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
@@ -66,5 +67,13 @@ public class LocalPolarityProperty extends LocalBacnetProperty {
 		}
 
 		return null;
+	}
+
+	@Override
+	public void updatePropertyValue(Encodable enc) {
+		if (enc instanceof Polarity) {
+			polarity = (Polarity) enc;
+			node.setValue(new Value(polarity.toString()));
+		}
 	}
 }

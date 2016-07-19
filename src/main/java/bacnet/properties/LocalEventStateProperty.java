@@ -11,6 +11,7 @@ import org.dsa.iot.dslink.util.handler.Handler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
@@ -74,5 +75,12 @@ public class LocalEventStateProperty extends LocalBacnetProperty{
 		}
 
 		return null;
+	}
+	
+	public void updatePropertyValue(Encodable enc) {
+		if (enc instanceof EventState) {
+			state = (EventState) enc;
+			node.setValue(new Value(state.toString()));
+		}
 	}
 }

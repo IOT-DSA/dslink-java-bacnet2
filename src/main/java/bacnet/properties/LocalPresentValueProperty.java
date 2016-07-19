@@ -28,7 +28,7 @@ public class LocalPresentValueProperty extends LocalBacnetProperty {
 	static final String ATTRIBUTE_EVENT_STATE = "event state";
 	static final String ACTION_EDIT = "edit";
 
-	EventState state;
+//	EventState state;
 
 	public LocalPresentValueProperty(LocalBacnetPoint point, Node parent, Node node) {
 		super(point, parent, node);

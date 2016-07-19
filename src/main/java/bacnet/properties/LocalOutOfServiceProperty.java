@@ -12,6 +12,7 @@ import org.dsa.iot.dslink.util.handler.Handler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.Boolean;
@@ -78,5 +79,13 @@ public class LocalOutOfServiceProperty extends LocalBacnetProperty{
         	return Boolean.FALSE;
         }
 
+	}
+
+	@Override
+	public void updatePropertyValue(Encodable enc) {
+		if (enc instanceof Boolean) {
+			
+		}
+		
 	}
 }

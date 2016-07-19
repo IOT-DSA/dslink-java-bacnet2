@@ -1,21 +1,27 @@
 package bacnet.properties;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
+import org.dsa.iot.dslink.node.Writable;
 import org.dsa.iot.dslink.node.actions.Action;
 import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
+import org.dsa.iot.dslink.node.value.ValuePair;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.util.handler.Handler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.enumerated.EngineeringUnits;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
+import com.serotonin.bacnet4j.type.primitive.Real;
 
 import bacnet.LocalBacnetPoint;
 
@@ -25,9 +31,6 @@ public class LocalUnitsProperty extends LocalBacnetProperty {
 	static {
 		LOGGER = LoggerFactory.getLogger(LocalUnitsProperty.class);
 	}
-
-	static final String ATTRIBUTE_ENGINEERING_UNITS = "engineering units";
-	static final String ACTION_EDIT = "edit";
 
 	EngineeringUnits units;
 
@@ -40,39 +43,31 @@ public class LocalUnitsProperty extends LocalBacnetProperty {
 		super(oid, pid, point, parent, node);
 		
 		bacnetObj.writeProperty(PropertyIdentifier.units, EngineeringUnits.degreeDaysCelsius);
-		makeEditAction();
+		node.setValueType(ValueType.makeEnum(enumeratedNames()));
+		node.setValue(new Value(EngineeringUnits.degreeDaysCelsius.toString()));
+		node.setWritable(Writable.WRITE);
+		node.getListener().setValueHandler(new SetHandler());
 	}
 
-	private  String[] enumeratedNames(){
-		String valuesStr = Arrays.toString(EngineeringUnits.ALL);
-		return valuesStr.substring(1, valuesStr.length() - 1).replace(" ", "").split(",");
+	private List<String> enumeratedNames(){
+		List<String> lst = new ArrayList<String>();
+		for (EngineeringUnits u: EngineeringUnits.ALL) {
+			lst.add(u.toString());
+		}
+		return lst;
 	}
 	
-	protected void makeEditAction() {
-		Action act = new Action(Permission.READ, new EditHandler());
-		act.addParameter(
-				new Parameter(ATTRIBUTE_ENGINEERING_UNITS, ValueType.makeEnum(enumeratedNames()),
-						node.getAttribute(ATTRIBUTE_ENGINEERING_UNITS)));
-
-		Node editNode = node.getChild(ACTION_EDIT);
-		if (editNode == null)
-			node.createChild(ACTION_EDIT).setAction(act).build().setSerializable(false);
-		else
-			editNode.setAction(act);
-	}
-
-	private class EditHandler implements Handler<ActionResult> {
+	private class SetHandler implements Handler<ValuePair> {
 
 		@Override
-		public void handle(ActionResult event) {
-			units = parseEngineeringUnits(
-					event.getParameter(ATTRIBUTE_ENGINEERING_UNITS, ValueType.STRING).getString());
-
-			bacnetObj.writeProperty(PropertyIdentifier.units, units);
+		public void handle(ValuePair event) {
+			if (!event.isFromExternalSource()) return;
+			Value newVal = event.getCurrent();
+			units = parseEngineeringUnits(newVal.getString());
 			
-			Value newVal = new Value(units.toString()); 
-			node.setAttribute(ATTRIBUTE_ENGINEERING_UNITS, newVal);
-			node.setValue(newVal);
+			bacnetObj.writeProperty(propertyId, units);
+			
+			node.setAttribute(propertyId.toString(), newVal);
 		}
 	}
 
@@ -85,5 +80,14 @@ public class LocalUnitsProperty extends LocalBacnetProperty {
         }	
 
 		return null;
+	}
+
+	@Override
+	public void updatePropertyValue(Encodable enc) {
+		if (enc instanceof EngineeringUnits) {
+			units = (EngineeringUnits) enc;
+			node.setValue(new Value(units.toString()));
+		}
+		
 	}
 }

@@ -193,11 +193,11 @@ public abstract class EditablePoint {
 	}
 
 
-	protected class RelinquishHandler implements Handler<ActionResult> {
-		private int priority;
+	protected static class RelinquishHandler implements Handler<ActionResult> {
+		//private int priority;
 
 		RelinquishHandler(int p) {
-			priority = p;
+			//priority = p;
 		}
 
 		public void handle(ActionResult event) {
@@ -205,7 +205,7 @@ public abstract class EditablePoint {
 		}
 	}
 
-	protected class RelinquishAllHandler implements Handler<ActionResult> {
+	protected static class RelinquishAllHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			
 		}

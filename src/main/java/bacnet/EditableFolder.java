@@ -84,7 +84,7 @@ public abstract class EditableFolder {
 			edit(event);
 		}
 	}
-	protected class CopyHandler implements Handler<ActionResult> {
+	protected static class CopyHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 //			String newname = event.getParameter("name", ValueType.STRING).getString();
 //			if (newname.length() > 0 && !newname.equals(node.getName()))

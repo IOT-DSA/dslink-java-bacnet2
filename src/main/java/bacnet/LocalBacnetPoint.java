@@ -35,12 +35,19 @@ import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.Null;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 
+import bacnet.properties.LocalBacnetProperty;
+import bacnet.properties.LocalBinaryPVProperty;
+import bacnet.properties.LocalBooleanProperty;
+import bacnet.properties.LocalCharacterStringProperty;
 import bacnet.properties.LocalEventStateProperty;
+import bacnet.properties.LocalNumberOfStatesProperty;
 import bacnet.properties.LocalOutOfServiceProperty;
 import bacnet.properties.LocalPolarityProperty;
 import bacnet.properties.LocalPresentValueProperty;
+import bacnet.properties.LocalRealProperty;
 import bacnet.properties.LocalStatusFlagsProperty;
 import bacnet.properties.LocalUnitsProperty;
+import bacnet.properties.LocalUnsignedIntegerProperty;
 
 public class LocalBacnetPoint extends EditablePoint {
 	private static final Logger LOGGER;
@@ -51,7 +58,7 @@ public class LocalBacnetPoint extends EditablePoint {
 
 	private static PointCounter numPoints = new PointCounter();
 
-	byte typeId = Null.TYPE_ID;
+//	byte typeId = Null.TYPE_ID;
 
 	private int defaultPriority;
 	private int objectTypeId;
@@ -191,125 +198,33 @@ public class LocalBacnetPoint extends EditablePoint {
 
 	private void setupPresentValueProperty() {
 		Node presentValueNode = node.getChild(PROPERTY_PRESENT_VALUE);
-
+		NodeBuilder b = null;
+		
 		if (null == presentValueNode) {
-			presentValueNode = node.createChild(PROPERTY_PRESENT_VALUE).setValueType(ValueType.STRING)
-					.setValue(new Value("")).build();
-
-			LocalPresentValueProperty presentValueProperty = new LocalPresentValueProperty(objectId,
-					PropertyIdentifier.presentValue, this, node, presentValueNode);
-
-			propertyIdToLocalProperty.put(PropertyIdentifier.presentValue, presentValueProperty);
-
+			b = node.createChild(PROPERTY_PRESENT_VALUE);
+			presentValueNode = b.getChild();
 		}
-
-		presentValueNode.setWritable(Writable.NEVER);
-
-		Value oldval = null;
-		if (presentValueNode != null)
-			oldval = presentValueNode.getValue();
-
-		if (presentValue != null) {
-
-			ValueType vt;
-			Value val;
-			switch (dataType) {
-			case BINARY: {
-				String off = (unitsDescription.size() > 0) ? unitsDescription.get(0) : "0";
-				String on = (unitsDescription.size() > 1) ? unitsDescription.get(1) : "1";
-				vt = ValueType.makeBool(on, off);
-				val = new Value(Boolean.parseBoolean(presentValue) || presentValue.equals("1")
-						|| presentValue.equals("Active"));
-				break;
-			}
-			case NUMERIC: {
-				vt = ValueType.NUMBER;
-				val = new Value(Double.parseDouble(presentValue));
-				break;
-			}
-			case MULTISTATE: {
-				Set<String> enums = new HashSet<String>(unitsDescription);
-				vt = ValueType.makeEnum(enums);
-				int index = Integer.parseInt(presentValue) - 1;
-				if (index >= 0 && index < unitsDescription.size())
-					val = new Value(unitsDescription.get(index));
-				else {
-					vt = ValueType.STRING;
-					val = new Value(presentValue);
-				}
-				break;
-			}
-			case ALPHANUMERIC: {
-				vt = ValueType.STRING;
-				val = new Value(presentValue);
-				break;
-			}
-			default: {
-				vt = ValueType.STRING;
-				val = new Value(presentValue);
-			}
-			}
-			if (!areEqual(vt, node.getValueType()) || !val.equals(node.getValue())) {
-				node.setValueType(vt);
-				node.setValue(val);
-			}
-
-			Value units = null;
-			if (!(Utils.isOneOf(objectTypeId, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue,
-					ObjectType.multiStateInput, ObjectType.multiStateOutput, ObjectType.multiStateValue,
-					ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone, ObjectType.trendLog))
-					&& unitsDescription.size() > 0) {
-				units = new Value(unitsDescription.get(0));
-			}
-			Node unitsNode = node.getChild(PROPERTY_UNITS);
-			if (unitsNode != null) {
-				if (units == null)
-					node.removeChild(PROPERTY_UNITS);
-				else if (!units.equals(unitsNode.getValue()))
-					unitsNode.setValue(units);
-			} else {
-				if (units != null)
-					node.createChild(PROPERTY_UNITS).setValueType(ValueType.STRING).setValue(units).build();
-			}
-			if (presentValueNode != null) {
-				if (!areEqual(vt, presentValueNode.getValueType()) || !val.equals(presentValueNode.getValue())) {
-					presentValueNode.setValueType(vt);
-					presentValueNode.setValue(val);
-					LOGGER.debug("presentValue updated to " + val);
-				}
-			}
+		LocalBacnetProperty presentValueProperty = null;
+		switch (dataType) {
+		case BINARY: {
+			presentValueProperty = new LocalBinaryPVProperty(objectId, PropertyIdentifier.presentValue, this, node, presentValueNode, true);
+			break;
 		}
-
-		if (settable) {
-			if (presentValueNode.getWritable() != Writable.WRITE) {
-				makeSetAction(presentValueNode, -1);
-				makeSetAction(node, -1);
-				PriorityArray pa = null;
-
-				try {
-					pa = getPriorityArray();
-				} catch (BACnetException e) {
-					LOGGER.debug("error", e.getMessage());
-					return;
-				}
-				Value newVal = presentValueNode.getValue();
-				if (pa != null && (!newVal.equals(oldval) || presentValueNode.getChildren() == null
-						|| presentValueNode.getChildren().size() < pa.getCount() + 3)) {
-					makeRelinquishAction(presentValueNode, -1);
-					Action act = new Action(Permission.READ, new RelinquishAllHandler());
-					presentValueNode.createChild(PROPERTY_RELINQUISH_ALL).setAction(act).build().setSerializable(false);
-					refreshPriorities(pa);
-				}
-			} else {
-				refreshPriorities();
-			}
-		} else {
-			if (presentValueNode.getWritable() != Writable.NEVER) {
-				presentValueNode.clearChildren();
-				presentValueNode.setWritable(Writable.NEVER);
-			}
+		case NUMERIC: {
+			presentValueProperty = new LocalRealProperty(objectId, PropertyIdentifier.presentValue, this, node, presentValueNode);
+			break;
 		}
-
+		case MULTISTATE: {
+			presentValueProperty = new LocalUnsignedIntegerProperty(objectId, PropertyIdentifier.presentValue, this, node, presentValueNode, true);
+			break;
+		}
+		case ALPHANUMERIC: {
+			presentValueProperty = new LocalCharacterStringProperty(objectId, PropertyIdentifier.presentValue, this, node, presentValueNode);
+			break;
+		}
+		}
+		if (b != null) b.build();
+		if (presentValueProperty != null) propertyIdToLocalProperty.put(PropertyIdentifier.presentValue, presentValueProperty);
 	}
 
 	private void setupDataTypeProperty() {
@@ -349,15 +264,17 @@ public class LocalBacnetPoint extends EditablePoint {
 
 	protected void setupUnitsProperty(String name) {
 		Node propertyNode = node.getChild(name);
+		NodeBuilder b = null;
 		if (null != propertyNode) {
 
 		} else {
-			propertyNode = node.createChild(name).setValueType(ValueType.STRING)
-					.setValue(new Value(EngineeringUnits.degreeDaysFahrenheit.toString())).build();
+			b = node.createChild(name);
+			propertyNode = b.getChild();
 		}
 
 		LocalUnitsProperty unitsProperty = new LocalUnitsProperty(objectId, PropertyIdentifier.units, this, node,
 				propertyNode);
+		if (b != null) b.build();
 		propertyIdToLocalProperty.put(PropertyIdentifier.units, unitsProperty);
 	}
 
@@ -392,6 +309,55 @@ public class LocalBacnetPoint extends EditablePoint {
 		if (b != null) b.build();
 		propertyIdToLocalProperty.put(PropertyIdentifier.polarity, polarityProperty);
 	}
+	
+	protected void setupRelinquishDefaultProperty(String name) {
+		Node propertyNode = node.getChild(name);
+		NodeBuilder b = null;
+		if (null != propertyNode) {
+			
+		} else {
+			b = node.createChild(name);
+			propertyNode = b.getChild();
+		}
+		
+		LocalBacnetProperty relinqProperty = null;
+		switch (dataType) {
+		case BINARY: {
+			relinqProperty = new LocalBinaryPVProperty(objectId, PropertyIdentifier.relinquishDefault, this, node, propertyNode, true);
+			break;
+		}
+		case NUMERIC: {
+			relinqProperty = new LocalRealProperty(objectId, PropertyIdentifier.relinquishDefault, this, node, propertyNode);
+			break;
+		}
+		case MULTISTATE: {
+			relinqProperty = new LocalUnsignedIntegerProperty(objectId, PropertyIdentifier.relinquishDefault, this, node, propertyNode, true);
+			break;
+		}
+		case ALPHANUMERIC: {
+			relinqProperty = new LocalCharacterStringProperty(objectId, PropertyIdentifier.relinquishDefault, this, node, propertyNode);
+			break;
+		}
+		}
+		if (b != null) b.build();
+		if (relinqProperty != null) propertyIdToLocalProperty.put(PropertyIdentifier.relinquishDefault, relinqProperty);
+	}
+	
+	protected void setupNumberOfStatesProperty(String name) {
+		Node propertyNode = node.getChild(name);
+		NodeBuilder b = null;
+		if (null != propertyNode) {
+			
+		} else {
+			b = node.createChild(name);
+			propertyNode = b.getChild();
+		}
+		LocalUnsignedIntegerProperty nosProperty = new LocalNumberOfStatesProperty(objectId, PropertyIdentifier.numberOfStates, this, node, propertyNode, false);
+		propertyNode.setValue(new Value(3));
+		nosProperty.set(new Value(3));
+		if (b != null) b.build();
+		propertyIdToLocalProperty.put(PropertyIdentifier.numberOfStates, nosProperty);
+	}
 
 	protected void setupStatusFlagsProperty(String name) {
 		Node propertyNode = node.getChild(name);
@@ -409,18 +375,19 @@ public class LocalBacnetPoint extends EditablePoint {
 	}
 
 	protected void setupOutOfServiceProperty(String name) {
-
 		Node propertyNode = node.getChild(name);
+		NodeBuilder b = null;
+		
 		if (null != propertyNode) {
 
 		} else {
-			propertyNode = node.createChild(name).setValueType(ValueType.STRING)
-					.setValue(new Value(Boolean.FALSE.toString())).build();
+			b = node.createChild(name);
+			propertyNode = b.getChild();
 		}
 
-		LocalOutOfServiceProperty outOfServiceProperty = new LocalOutOfServiceProperty(objectId,
+		LocalBooleanProperty outOfServiceProperty = new LocalBooleanProperty(objectId,
 				PropertyIdentifier.outOfService, this, node, propertyNode);
-
+		if (b != null) b.build();
 		propertyIdToLocalProperty.put(PropertyIdentifier.outOfService, outOfServiceProperty);
 	}
 
@@ -473,6 +440,10 @@ public class LocalBacnetPoint extends EditablePoint {
 			setupOutOfServiceProperty(PropertyIdentifier.outOfService.toString());
 		} else if (propId.equals(PropertyIdentifier.polarity)) {
 			setupPolarityProperty(PropertyIdentifier.polarity.toString());
+		} else if (propId.equals(PropertyIdentifier.relinquishDefault)) {
+			setupRelinquishDefaultProperty(PropertyIdentifier.relinquishDefault.toString());
+		} else if (propId.equals(PropertyIdentifier.numberOfStates)) {
+			setupNumberOfStatesProperty(PropertyIdentifier.numberOfStates.toString());
 		}
 
 	}
@@ -614,102 +585,10 @@ public class LocalBacnetPoint extends EditablePoint {
 		return a == b || (a != null && b != null && a.toJsonString().equals(b.toJsonString()));
 	}
 
-	private void refreshPriorities() {
-		refreshPriorities(null);
-	}
-
-	private void refreshPriorities(PriorityArray priorities) {
-		Node vnode = node.getChild(PROPERTY_PRESENT_VALUE);
-		if (priorities == null) {
-			try {
-				priorities = getPriorityArray();
-			} catch (BACnetException e) {
-				LOGGER.error("error: ", e);
-				return;
-			}
-		}
-		if (priorities == null)
-			return;
-		for (int i = 1; i <= priorities.getCount(); i++) {
-			Encodable enc = priorities.get(i).getValue();
-			String p = enc.toString();
-			ValueType vt;
-			Value val = null;
-			boolean isnull = (enc instanceof Null);
-			switch (dataType) {
-			case BINARY: {
-				String off = (unitsDescription.size() > 0) ? unitsDescription.get(0) : "0";
-				String on = (unitsDescription.size() > 1) ? unitsDescription.get(1) : "1";
-				vt = ValueType.makeBool(on, off);
-				if (!isnull)
-					val = new Value(Boolean.parseBoolean(p) || p.equals("1") || p.equals("Active"));
-				break;
-			}
-			case NUMERIC: {
-				vt = ValueType.NUMBER;
-				if (!isnull)
-					val = new Value(Double.parseDouble(p));
-				break;
-			}
-			case MULTISTATE: {
-				Set<String> enums = new HashSet<String>(unitsDescription);
-				vt = ValueType.makeEnum(enums);
-				int index = Integer.parseInt(p) - 1;
-				if (!isnull) {
-					if (index >= 0 && index < unitsDescription.size())
-						val = new Value(unitsDescription.get(index));
-					else
-						val = new Value(p);
-				}
-				break;
-			}
-			case ALPHANUMERIC: {
-				vt = ValueType.STRING;
-				if (!isnull)
-					val = new Value(p);
-				break;
-			}
-			default: {
-				vt = ValueType.STRING;
-				if (!isnull)
-					val = new Value(p);
-			}
-			}
-			Node pnode = vnode.getChild("Priority " + i);
-			if (pnode != null) {
-				pnode.setValueType(vt);
-				pnode.setValue(val);
-				if (pnode.getChild(PROPERTY_RELINQUISH) == null) {
-					makeSetAction(pnode, i);
-					makeRelinquishAction(pnode, i);
-				}
-			} else {
-				pnode = vnode.createChild("Priority " + i).setValueType(vt).setValue(val).build();
-				makeSetAction(pnode, i);
-				makeRelinquishAction(pnode, i);
-			}
-
-		}
-	}
-
-	private void makeRelinquishAction(Node valnode, int priority) {
-		Action act = new Action(Permission.READ, new RelinquishHandler(priority));
-		valnode.createChild("relinquish").setAction(act).build().setSerializable(false);
-	}
-
-	private PriorityArray getPriorityArray() throws BACnetException {
-		if (folder.getConnection().getLocalDevice() == null) {
-			folder.conn.stop();
-			return null;
-		}
-		if (folder.getRoot().getLocalDevice() == null)
-			return null;
-		Encodable e = null;
-
-		if (e instanceof BACnetError)
-			return null;
-		return (PriorityArray) e;
-	}
+//	private void makeRelinquishAction(Node valnode, int priority) {
+//		Action act = new Action(Permission.READ, new RelinquishHandler(priority));
+//		valnode.createChild("relinquish").setAction(act).build().setSerializable(false);
+//	}
 
 	public static String getPrettyPresentValue(int objectTypeId, String presentValue, List<String> unitsDescription,
 			String referenceObjectTypeDescription, int referenceInstanceNumber, int referenceDeviceId) {

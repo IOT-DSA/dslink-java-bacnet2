@@ -20,6 +20,7 @@ import com.serotonin.io.serial.SerialPortException;
 import com.serotonin.io.serial.SerialPortProxy;
 import com.serotonin.io.serial.SerialUtils;
 
+import bacnet.properties.LocalBacnetProperty;
 import bacnet.properties.LocalPresentValueProperty;
 
 import org.dsa.iot.dslink.node.Node;
@@ -938,10 +939,8 @@ class BacnetConn {
 			objectPoint.updatePointValue(enc);
 
 			PropertyIdentifier pid = propVal.getPropertyIdentifier();
-			if (pid.equals(PropertyIdentifier.presentValue)) {
-				LocalPresentValueProperty presentProperty = (LocalPresentValueProperty) objectPoint.getProperty(pid);
-				presentProperty.updatePropertyValue(enc);
-			}
+			LocalBacnetProperty property = objectPoint.getProperty(pid);
+			property.updatePropertyValue(enc);
 
 		}
 

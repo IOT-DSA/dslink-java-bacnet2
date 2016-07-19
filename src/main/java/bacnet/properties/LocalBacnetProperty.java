@@ -13,7 +13,7 @@ import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 
 import bacnet.LocalBacnetPoint;
 
-public class LocalBacnetProperty {
+public abstract class LocalBacnetProperty {
 
 	private static final Logger LOGGER;
 
@@ -46,5 +46,7 @@ public class LocalBacnetProperty {
 	public void update(Encodable enc) {
 
 	}
+
+	public abstract void updatePropertyValue(Encodable enc);
 
 }
