@@ -37,6 +37,7 @@ import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 
 import bacnet.properties.LocalBacnetProperty;
 import bacnet.properties.LocalBinaryPVProperty;
+import bacnet.properties.LocalBinaryStateTextProperty;
 import bacnet.properties.LocalBooleanProperty;
 import bacnet.properties.LocalCharacterStringProperty;
 import bacnet.properties.LocalEventStateProperty;
@@ -277,6 +278,21 @@ public class LocalBacnetPoint extends EditablePoint {
 		if (b != null) b.build();
 		propertyIdToLocalProperty.put(PropertyIdentifier.units, unitsProperty);
 	}
+	
+	protected void setupTextProperty(PropertyIdentifier pid) {
+		Node propertyNode = node.getChild(pid.toString());
+		NodeBuilder b = null;
+		if (propertyNode == null) {
+			b = node.createChild(pid.toString());
+			propertyNode = b.getChild();
+		}
+		
+		String defText = (pid.equals(PropertyIdentifier.activeText)) ? "true" : "false";
+		LocalBinaryStateTextProperty textProperty = new LocalBinaryStateTextProperty(objectId, pid, this, node, propertyNode, defText);
+		if (b != null) b.build();
+		propertyIdToLocalProperty.put(pid, textProperty);
+		
+	}
 
 	protected void setupEventStateProperty(String name) {
 		Node propertyNode = node.getChild(name);
@@ -352,9 +368,7 @@ public class LocalBacnetPoint extends EditablePoint {
 			b = node.createChild(name);
 			propertyNode = b.getChild();
 		}
-		LocalUnsignedIntegerProperty nosProperty = new LocalNumberOfStatesProperty(objectId, PropertyIdentifier.numberOfStates, this, node, propertyNode, false);
-		propertyNode.setValue(new Value(3));
-		nosProperty.set(new Value(3));
+		LocalUnsignedIntegerProperty nosProperty = new LocalNumberOfStatesProperty(objectId, PropertyIdentifier.numberOfStates, this, node, propertyNode, 3);
 		if (b != null) b.build();
 		propertyIdToLocalProperty.put(PropertyIdentifier.numberOfStates, nosProperty);
 	}
@@ -395,13 +409,15 @@ public class LocalBacnetPoint extends EditablePoint {
 
 		ObjectType ot = objectId.getObjectType();
 
-		List<PropertyTypeDefinition> defs = ObjectProperties.getRequiredPropertyTypeDefinitions(ot);
+		List<PropertyTypeDefinition> defs = ObjectProperties.getPropertyTypeDefinitions(ot);
 
 		for (PropertyTypeDefinition def : defs) {
 			// System.out.println(def.getClazz() + " : " +
 			// def.getPropertyIdentifier());
 			initializeRequiredProperty(def);
 		}
+		
+		
 		LOGGER.info("all properties are set up");
 	}
 
@@ -444,6 +460,10 @@ public class LocalBacnetPoint extends EditablePoint {
 			setupRelinquishDefaultProperty(PropertyIdentifier.relinquishDefault.toString());
 		} else if (propId.equals(PropertyIdentifier.numberOfStates)) {
 			setupNumberOfStatesProperty(PropertyIdentifier.numberOfStates.toString());
+		} else if (propId.equals(PropertyIdentifier.inactiveText)) {
+			setupTextProperty(PropertyIdentifier.inactiveText);
+		} else if (propId.equals(PropertyIdentifier.activeText)) {
+			setupTextProperty(PropertyIdentifier.activeText);
 		}
 
 	}

@@ -37,12 +37,16 @@ public class LocalCharacterStringProperty extends LocalBacnetProperty {
 		public void handle(ValuePair event) {
 			if (!event.isFromExternalSource()) return;
 			Value newVal = event.getCurrent();
-			String str = newVal.getString();
-			
-			bacnetObj.writeProperty(propertyId, new CharacterString(str));
-			node.setAttribute(propertyId.toString(), newVal);
+			set(newVal);
 			
 		}
+	}
+	
+	public void set(Value newVal) {
+		String str = newVal.getString();
+		
+		bacnetObj.writeProperty(propertyId, new CharacterString(str));
+		node.setAttribute(propertyId.toString(), newVal);
 	}
 
 	@Override
