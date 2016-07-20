@@ -38,7 +38,7 @@ public class LocalNumberOfStatesProperty extends LocalUnsignedIntegerProperty {
 			((LocalUnsignedIntegerProperty) pvalProp).update();
 		}
 		LocalBacnetProperty relinqProp = bacnetPoint.getProperty(PropertyIdentifier.relinquishDefault);
-		if (pvalProp instanceof LocalUnsignedIntegerProperty) {
+		if (relinqProp instanceof LocalUnsignedIntegerProperty) {
 			((LocalUnsignedIntegerProperty) relinqProp).update();
 		}
 		

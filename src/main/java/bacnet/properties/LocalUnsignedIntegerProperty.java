@@ -18,6 +18,7 @@ import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 public class LocalUnsignedIntegerProperty extends LocalBacnetProperty {
 	
 	private boolean isEnum;
+	int value = 0;
 	
 	public LocalUnsignedIntegerProperty(LocalBacnetPoint point, Node parent, Node node) {
 		super(point, parent, node);
@@ -28,13 +29,13 @@ public class LocalUnsignedIntegerProperty extends LocalBacnetProperty {
 		super(oid, pid, point, parent, node);
 		this.isEnum = useDescriptions;
 		
-		bacnetObj.writeProperty(pid, new UnsignedInteger(0));
+		bacnetObj.writeProperty(pid, new UnsignedInteger(value));
 		if (useDescriptions && this.bacnetPoint.getUnitsDescription().size() > 0) {
 			node.setValueType(ValueType.makeEnum(this.bacnetPoint.getUnitsDescription()));
-			node.setValue(new Value(this.bacnetPoint.getUnitsDescription().get(0)));
+			node.setValue(new Value(this.bacnetPoint.getUnitsDescription().get(value)));
 		} else {
 			node.setValueType(ValueType.NUMBER);
-			node.setValue(new Value(0));
+			node.setValue(new Value(value));
 		}
 		;
 		node.setWritable(Writable.WRITE);
@@ -60,7 +61,8 @@ public class LocalUnsignedIntegerProperty extends LocalBacnetProperty {
 		}
 		
 		if (num.intValue() != -1) {
-			bacnetObj.writeProperty(propertyId, new UnsignedInteger(num.intValue()));
+			value = num.intValue();
+			bacnetObj.writeProperty(propertyId, new UnsignedInteger(value));
 			node.setAttribute(propertyId.toString(), newVal);
 		}
 	}
@@ -68,18 +70,19 @@ public class LocalUnsignedIntegerProperty extends LocalBacnetProperty {
 	public void update() {
 		if (isEnum && this.bacnetPoint.getUnitsDescription().size() > 0) {
 			node.setValueType(ValueType.makeEnum(this.bacnetPoint.getUnitsDescription()));
+			node.setValue(new Value(this.bacnetPoint.getUnitsDescription().get(value)));
 		}
 	}
 
 	@Override
 	public void updatePropertyValue(Encodable enc) {
 		if (enc instanceof UnsignedInteger) {
-			int n = ((UnsignedInteger) enc).intValue();
+			value = ((UnsignedInteger) enc).intValue();
 			if (!isEnum) {
-				node.setValue(new Value(n));
+				node.setValue(new Value(value));
 			} else {
-				if (this.bacnetPoint.getUnitsDescription().size() > n) {
-					node.setValue(new Value(this.bacnetPoint.getUnitsDescription().get(n)));
+				if (this.bacnetPoint.getUnitsDescription().size() > value) {
+					node.setValue(new Value(this.bacnetPoint.getUnitsDescription().get(value)));
 				}
 			}
 		}

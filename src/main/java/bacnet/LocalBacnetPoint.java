@@ -46,6 +46,7 @@ import bacnet.properties.LocalOutOfServiceProperty;
 import bacnet.properties.LocalPolarityProperty;
 import bacnet.properties.LocalPresentValueProperty;
 import bacnet.properties.LocalRealProperty;
+import bacnet.properties.LocalStateTextProperty;
 import bacnet.properties.LocalStatusFlagsProperty;
 import bacnet.properties.LocalUnitsProperty;
 import bacnet.properties.LocalUnsignedIntegerProperty;
@@ -293,6 +294,20 @@ public class LocalBacnetPoint extends EditablePoint {
 		propertyIdToLocalProperty.put(pid, textProperty);
 		
 	}
+	
+	protected void setupStateTextProperty(String name) {
+		Node propertyNode = node.getChild(name);
+		NodeBuilder b = null;
+		
+		if (propertyNode == null) {
+			b = node.createChild(name);
+			propertyNode = b.getChild();
+		}
+		
+		LocalStateTextProperty stateTextProperty = new LocalStateTextProperty(objectId, PropertyIdentifier.stateText, this, node, propertyNode);
+		if (b != null) b.build();
+		propertyIdToLocalProperty.put(PropertyIdentifier.stateText, stateTextProperty);
+	}
 
 	protected void setupEventStateProperty(String name) {
 		Node propertyNode = node.getChild(name);
@@ -464,6 +479,8 @@ public class LocalBacnetPoint extends EditablePoint {
 			setupTextProperty(PropertyIdentifier.inactiveText);
 		} else if (propId.equals(PropertyIdentifier.activeText)) {
 			setupTextProperty(PropertyIdentifier.activeText);
+		} else if (propId.equals(PropertyIdentifier.stateText)) {
+			setupStateTextProperty(PropertyIdentifier.stateText.toString());
 		}
 
 	}
