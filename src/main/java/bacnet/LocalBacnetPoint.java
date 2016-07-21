@@ -197,36 +197,31 @@ public class LocalBacnetPoint extends EditablePoint {
 		setupRequiredProperty();
 		setupBacnetObject();
 	}
-
-	private void setupPresentValueProperty() {
-		Node presentValueNode = node.getChild(PROPERTY_PRESENT_VALUE);
-		NodeBuilder b = null;
+	
+	private void setupPresentValueProperty(PropertyIdentifier pid) {
+		Node presentValueNode = buildPropertyNode(pid);	
 		
-		if (null == presentValueNode) {
-			b = node.createChild(PROPERTY_PRESENT_VALUE);
-			presentValueNode = b.getChild();
-		}
 		LocalBacnetProperty presentValueProperty = null;
 		switch (dataType) {
 		case BINARY: {
-			presentValueProperty = new LocalBinaryPVProperty(objectId, PropertyIdentifier.presentValue, this, node, presentValueNode, true);
+			presentValueProperty = new LocalBinaryPVProperty(objectId, pid, this, node, presentValueNode, true);
 			break;
 		}
 		case NUMERIC: {
-			presentValueProperty = new LocalRealProperty(objectId, PropertyIdentifier.presentValue, this, node, presentValueNode);
+			presentValueProperty = new LocalRealProperty(objectId, pid, this, node, presentValueNode);
 			break;
 		}
 		case MULTISTATE: {
-			presentValueProperty = new LocalUnsignedIntegerProperty(objectId, PropertyIdentifier.presentValue, this, node, presentValueNode, true);
+			presentValueProperty = new LocalUnsignedIntegerProperty(objectId, pid, this, node, presentValueNode, true);
 			break;
 		}
 		case ALPHANUMERIC: {
-			presentValueProperty = new LocalCharacterStringProperty(objectId, PropertyIdentifier.presentValue, this, node, presentValueNode);
+			presentValueProperty = new LocalCharacterStringProperty(objectId, pid, this, node, presentValueNode);
 			break;
 		}
 		}
-		if (b != null) b.build();
-		if (presentValueProperty != null) propertyIdToLocalProperty.put(PropertyIdentifier.presentValue, presentValueProperty);
+
+		if (presentValueProperty != null) propertyIdToLocalProperty.put(pid, presentValueProperty);
 	}
 
 	private void setupDataTypeProperty() {
@@ -264,160 +259,86 @@ public class LocalBacnetPoint extends EditablePoint {
 		}
 	}
 
-	protected void setupUnitsProperty(String name) {
-		Node propertyNode = node.getChild(name);
-		NodeBuilder b = null;
-		if (null != propertyNode) {
-
-		} else {
-			b = node.createChild(name);
-			propertyNode = b.getChild();
-		}
-
+	protected void setupUnitsProperty(PropertyIdentifier pid) {
+        Node propertyNode = this.buildPropertyNode(pid);	
 		LocalUnitsProperty unitsProperty = new LocalUnitsProperty(objectId, PropertyIdentifier.units, this, node,
 				propertyNode);
-		if (b != null) b.build();
+
 		propertyIdToLocalProperty.put(PropertyIdentifier.units, unitsProperty);
 	}
 	
 	protected void setupTextProperty(PropertyIdentifier pid) {
-		Node propertyNode = node.getChild(pid.toString());
-		NodeBuilder b = null;
-		if (propertyNode == null) {
-			b = node.createChild(pid.toString());
-			propertyNode = b.getChild();
-		}
-		
+        Node propertyNode = buildPropertyNode(pid);	
 		String defText = (pid.equals(PropertyIdentifier.activeText)) ? "true" : "false";
 		LocalBinaryStateTextProperty textProperty = new LocalBinaryStateTextProperty(objectId, pid, this, node, propertyNode, defText);
-		if (b != null) b.build();
+
 		propertyIdToLocalProperty.put(pid, textProperty);
 		
 	}
 	
-	protected void setupStateTextProperty(String name) {
-		Node propertyNode = node.getChild(name);
-		NodeBuilder b = null;
-		
-		if (propertyNode == null) {
-			b = node.createChild(name);
-			propertyNode = b.getChild();
-		}
-		
+	protected void setupStateTextProperty(PropertyIdentifier pid) {
+        Node propertyNode = buildPropertyNode(pid);	
 		LocalStateTextProperty stateTextProperty = new LocalStateTextProperty(objectId, PropertyIdentifier.stateText, this, node, propertyNode);
-		if (b != null) b.build();
+
 		propertyIdToLocalProperty.put(PropertyIdentifier.stateText, stateTextProperty);
 	}
 
-	protected void setupEventStateProperty(String name) {
-		Node propertyNode = node.getChild(name);
-		NodeBuilder b = null;
-		if (null != propertyNode) {
-
-		} else {
-			b = node.createChild(name);
-			propertyNode = b.getChild();
-		}
-
+	protected void setupEventStateProperty(PropertyIdentifier pid) {
+        Node propertyNode = buildPropertyNode(pid);	
 		LocalEventStateProperty eventStateProperty = new LocalEventStateProperty(objectId,
 				PropertyIdentifier.eventState, this, node, propertyNode);
-		if (b != null) b.build();
+
 		propertyIdToLocalProperty.put(PropertyIdentifier.eventState, eventStateProperty);
 	}
 	
-	protected void setupPolarityProperty(String name) {
-		Node propertyNode = node.getChild(name);
-		NodeBuilder b = null;
-		if (null != propertyNode) {
-			
-		} else {
-			b = node.createChild(name);
-			propertyNode = b.getChild();
-		}
-		
+	protected void setupPolarityProperty(PropertyIdentifier pid) {
+        Node propertyNode = buildPropertyNode(pid);	
 		LocalPolarityProperty polarityProperty = new LocalPolarityProperty(objectId,
 				PropertyIdentifier.polarity, this, node, propertyNode);
-		if (b != null) b.build();
+
 		propertyIdToLocalProperty.put(PropertyIdentifier.polarity, polarityProperty);
 	}
 	
-	protected void setupRelinquishDefaultProperty(String name) {
-		Node propertyNode = node.getChild(name);
-		NodeBuilder b = null;
-		if (null != propertyNode) {
-			
-		} else {
-			b = node.createChild(name);
-			propertyNode = b.getChild();
-		}
-		
-		LocalBacnetProperty relinqProperty = null;
-		switch (dataType) {
-		case BINARY: {
-			relinqProperty = new LocalBinaryPVProperty(objectId, PropertyIdentifier.relinquishDefault, this, node, propertyNode, true);
-			break;
-		}
-		case NUMERIC: {
-			relinqProperty = new LocalRealProperty(objectId, PropertyIdentifier.relinquishDefault, this, node, propertyNode);
-			break;
-		}
-		case MULTISTATE: {
-			relinqProperty = new LocalUnsignedIntegerProperty(objectId, PropertyIdentifier.relinquishDefault, this, node, propertyNode, true);
-			break;
-		}
-		case ALPHANUMERIC: {
-			relinqProperty = new LocalCharacterStringProperty(objectId, PropertyIdentifier.relinquishDefault, this, node, propertyNode);
-			break;
-		}
-		}
-		if (b != null) b.build();
-		if (relinqProperty != null) propertyIdToLocalProperty.put(PropertyIdentifier.relinquishDefault, relinqProperty);
+	protected void setupRelinquishDefaultProperty(PropertyIdentifier pid) {
+		setupPresentValueProperty(pid);
 	}
 	
-	protected void setupNumberOfStatesProperty(String name) {
-		Node propertyNode = node.getChild(name);
-		NodeBuilder b = null;
-		if (null != propertyNode) {
-			
-		} else {
-			b = node.createChild(name);
-			propertyNode = b.getChild();
-		}
+	protected void setupNumberOfStatesProperty(PropertyIdentifier pid) {
+        Node propertyNode = buildPropertyNode(pid);	 
 		LocalUnsignedIntegerProperty nosProperty = new LocalNumberOfStatesProperty(objectId, PropertyIdentifier.numberOfStates, this, node, propertyNode, 3);
-		if (b != null) b.build();
+
 		propertyIdToLocalProperty.put(PropertyIdentifier.numberOfStates, nosProperty);
 	}
 
-	protected void setupStatusFlagsProperty(String name) {
-		Node propertyNode = node.getChild(name);
-		if (null != propertyNode) {
-
-		} else {
-			String status = "inAlarm:false, fault:false, overridden:false, outOfService:false";
-			propertyNode = node.createChild(name).setValueType(ValueType.STRING).setValue(new Value(status)).build();
-		}
-
+	protected void setupStatusFlagsProperty(PropertyIdentifier pid) {
+        Node propertyNode = buildPropertyNode(pid);	      
 		LocalStatusFlagsProperty statusFlagsProperty = new LocalStatusFlagsProperty(objectId,
 				PropertyIdentifier.statusFlags, this, node, propertyNode);
 
 		propertyIdToLocalProperty.put(PropertyIdentifier.statusFlags, statusFlagsProperty);
 	}
 
-	protected void setupOutOfServiceProperty(String name) {
+	protected void setupOutOfServiceProperty(PropertyIdentifier pid) {
+        Node propertyNode = buildPropertyNode(pid);	
+		LocalBooleanProperty outOfServiceProperty = new LocalBooleanProperty(objectId,
+				PropertyIdentifier.outOfService, this, node, propertyNode);
+
+		propertyIdToLocalProperty.put(PropertyIdentifier.outOfService, outOfServiceProperty);
+	}
+	
+	private Node buildPropertyNode(PropertyIdentifier pid){
+		String name = pid.toString();
 		Node propertyNode = node.getChild(name);
 		NodeBuilder b = null;
 		
-		if (null != propertyNode) {
-
-		} else {
+		if (null == propertyNode) {
 			b = node.createChild(name);
 			propertyNode = b.getChild();
 		}
-
-		LocalBooleanProperty outOfServiceProperty = new LocalBooleanProperty(objectId,
-				PropertyIdentifier.outOfService, this, node, propertyNode);
-		if (b != null) b.build();
-		propertyIdToLocalProperty.put(PropertyIdentifier.outOfService, outOfServiceProperty);
+		if (b != null) {
+			b.build();
+		}
+		return propertyNode;
 	}
 
 	private void setupRequiredProperty() {
@@ -459,28 +380,30 @@ public class LocalBacnetPoint extends EditablePoint {
 			// read-only property
 		} else if (propId.equals(PropertyIdentifier.propertyList)) {
 			// read-only property
+		} else if (propId.equals(PropertyIdentifier.priorityArray)) {
+			// read-only property
 		} else if (propId.equals(PropertyIdentifier.presentValue)) {
-			setupPresentValueProperty();
+			setupPresentValueProperty(PropertyIdentifier.presentValue);
 		} else if (propId.equals(PropertyIdentifier.units)) {
-			setupUnitsProperty(PropertyIdentifier.units.toString());
+			setupUnitsProperty(PropertyIdentifier.units);
 		} else if (propId.equals(PropertyIdentifier.statusFlags)) {
-			setupStatusFlagsProperty(PropertyIdentifier.statusFlags.toString());
+			setupStatusFlagsProperty(PropertyIdentifier.statusFlags);
 		} else if (propId.equals(PropertyIdentifier.eventState)) {
-			setupEventStateProperty(PropertyIdentifier.eventState.toString());
+			setupEventStateProperty(PropertyIdentifier.eventState);
 		} else if (propId.equals(PropertyIdentifier.outOfService)) {
-			setupOutOfServiceProperty(PropertyIdentifier.outOfService.toString());
+			setupOutOfServiceProperty(PropertyIdentifier.outOfService);
 		} else if (propId.equals(PropertyIdentifier.polarity)) {
-			setupPolarityProperty(PropertyIdentifier.polarity.toString());
+			setupPolarityProperty(PropertyIdentifier.polarity);
 		} else if (propId.equals(PropertyIdentifier.relinquishDefault)) {
-			setupRelinquishDefaultProperty(PropertyIdentifier.relinquishDefault.toString());
+			setupRelinquishDefaultProperty(PropertyIdentifier.relinquishDefault);
 		} else if (propId.equals(PropertyIdentifier.numberOfStates)) {
-			setupNumberOfStatesProperty(PropertyIdentifier.numberOfStates.toString());
+			setupNumberOfStatesProperty(PropertyIdentifier.numberOfStates);
 		} else if (propId.equals(PropertyIdentifier.inactiveText)) {
 			setupTextProperty(PropertyIdentifier.inactiveText);
 		} else if (propId.equals(PropertyIdentifier.activeText)) {
 			setupTextProperty(PropertyIdentifier.activeText);
 		} else if (propId.equals(PropertyIdentifier.stateText)) {
-			setupStateTextProperty(PropertyIdentifier.stateText.toString());
+			setupStateTextProperty(PropertyIdentifier.stateText);
 		}
 
 	}
@@ -781,4 +704,8 @@ public class LocalBacnetPoint extends EditablePoint {
 			}
 		}
 	}
+
+	public void restoreLastSession() {
+	}
+
 }

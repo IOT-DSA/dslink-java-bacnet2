@@ -34,6 +34,8 @@ import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.PropertyReferences;
 import com.serotonin.bacnet4j.util.PropertyValues;
 
+import bacnet.properties.LocalBacnetProperty;
+
 public class LocalDeviceFolder extends EditableFolder {
 	private static final Logger LOGGER;
 
@@ -48,7 +50,6 @@ public class LocalDeviceFolder extends EditableFolder {
 
 	public LocalDeviceFolder(BacnetConn conn, Node node) {
 		super(conn, node);
-
 	}
 
 	public LocalDeviceFolder(BacnetConn conn, LocalDeviceFolder root, Node node) {
@@ -135,14 +136,16 @@ public class LocalDeviceFolder extends EditableFolder {
 
 		LocalBacnetPoint bacnetPoint = new LocalBacnetPoint(this, node, pointNode);
 		BACnetObject bacnetObj = bacnetPoint.getBacnetObj();
-	    Map<BACnetObject, EditablePoint> ObjectToPoint = conn.getObjectToPoint();
-	    ObjectToPoint.put(bacnetObj, bacnetPoint);
-	    
-//	    // Not production code, for lisener's mockup test only
-//		Value v = new Value(70); 	
-//		Encodable enc = Utils.valueToEncodable(DataType.NUMERIC, v, ObjectType.analogInput,
-//				PropertyIdentifier.presentValue, null);		
-//	    this.getConnection().getListener().propertyWritten(null, bacnetObj, new PropertyValue(PropertyIdentifier.presentValue, enc));
+		Map<BACnetObject, EditablePoint> ObjectToPoint = conn.getObjectToPoint();
+		ObjectToPoint.put(bacnetObj, bacnetPoint);
+
+		// // Not production code, for lisener's mockup test only
+		// Value v = new Value(70);
+		// Encodable enc = Utils.valueToEncodable(DataType.NUMERIC, v,
+		// ObjectType.analogInput,
+		// PropertyIdentifier.presentValue, null);
+		// this.getConnection().getListener().propertyWritten(null, bacnetObj,
+		// new PropertyValue(PropertyIdentifier.presentValue, enc));
 	}
 
 	@Override
@@ -168,6 +171,38 @@ public class LocalDeviceFolder extends EditableFolder {
 			node.createChild(ACTION_EDIT).setAction(act).build().setSerializable(false);
 		else
 			editNode.setAction(act);
+	}
+
+	public void restoreLastSession() {
+		restoreLastSession(this.node);
+	}
+
+	private void restoreLastSession(Node node) {
+		if (node.getChildren() == null)
+			return;
+
+		for (Node child : node.getChildren().values()) {
+			Value restype = child.getAttribute(ATTRIBUTE_RESTORE_TYPE);
+			if (restype != null && restype.getString().equals("editable point")) {
+				Value ot = child.getAttribute(ATTRIBUTE_OBJECT_TYPE);
+				Value inum = child.getAttribute(ATTRIBUTE_OBJECT_INSTANCE_NUMBER);
+				Value defp = child.getAttribute(ATTRIBUTE_DEFAULT_PRIORITY);
+				if (defp == null)
+					child.setAttribute(ATTRIBUTE_DEFAULT_PRIORITY, new Value(8));
+				if (ot != null && inum != null) {
+					LocalBacnetPoint point = new LocalBacnetPoint(this, node, child);
+					point.restoreLastSession();
+				} else {
+					node.removeChild(child);
+				}
+			} else if (child.getAction() == null && child != root.getStatusNode()) {
+				node.removeChild(child);
+			}
+		}
+	}
+
+	public Node getStatusNode() {
+		return null;
 	}
 
 }

@@ -81,6 +81,8 @@ class BacnetConn {
 
 	static final String ACTION_ADD_LOCAL_SLAVE = "set up ip slave";
 	static final String ATTRIBUTE_NAME = "name";
+	static final String ATTRIBUTE_RESTORE_TYPE = "restore type";
+	static final String RESTORE_EDITABLE_FOLDER = "editable folder";
 
 	Node node;
 	private final Node statnode;
@@ -90,6 +92,7 @@ class BacnetConn {
 	boolean isIP;
 	private int unnamedCount;
 	final Set<DeviceNode> deviceNodes = new HashSet<DeviceNode>();
+	LocalDeviceFolder localDeviceNode;
 	Map<BACnetObject, EditablePoint> ObjectToPoint = new HashMap<BACnetObject, EditablePoint>();
 
 	private ScheduledFuture<?> reconnectFuture = null;
@@ -638,7 +641,7 @@ class BacnetConn {
 			Node slaveNode;
 			slaveNode = node.createChild(name).build();
 
-			new LocalDeviceNode(getMe(), slaveNode, localDevice);
+			localDeviceNode = new LocalDeviceNode(getMe(), slaveNode, localDevice);
 		}
 	}
 
@@ -814,6 +817,7 @@ class BacnetConn {
 		final Value refint = child.getAttribute("polling interval");
 		Value covtype = child.getAttribute("cov usage");
 		final Value covlife = child.getAttribute("cov lease time (minutes)");
+		Value restType = child.getAttribute(ATTRIBUTE_RESTORE_TYPE);
 		if (mac != null && instanceNum != null && netNum != null && linkMac != null && refint != null && covtype != null
 				&& covlife != null) {
 			CovType ctype = CovType.NONE;
@@ -841,8 +845,9 @@ class BacnetConn {
 								refint.getNumber().longValue(), ct, covlife.getNumber().intValue());
 						if (dn != null)
 							dn.restoreLastSession();
-						else
+						else {
 							node.removeChild(child);
+						}
 
 					}
 
@@ -854,10 +859,14 @@ class BacnetConn {
 						covlife.getNumber().intValue());
 				if (dn != null)
 					dn.restoreLastSession();
-				else
+				else {
 					node.removeChild(child);
+				}
 			}
 
+		} else if (restType != null && restType.getString().equals(RESTORE_EDITABLE_FOLDER)) {
+			localDeviceNode = new LocalDeviceNode(getMe(), child, localDevice);
+			localDeviceNode.restoreLastSession();
 		} else if (child.getAction() == null && !child.getName().equals("STATUS")) {
 			node.removeChild(child);
 		}
