@@ -47,6 +47,8 @@ public class LocalDeviceNode extends LocalDeviceFolder {
 	static final String ACTION_RESTART = "restart";
 
 	final Node statNode;
+
+
 	final Node eventNode;
 	LocalDevice localDevice;
 	CovType covType;
@@ -118,24 +120,6 @@ public class LocalDeviceNode extends LocalDeviceFolder {
 	private void makeEditAction() {
 		Action act = new Action(Permission.READ, new EditHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
-		// act.addParameter(new Parameter("MAC address", ValueType.STRING,
-		// node.getAttribute("MAC address")));
-		// act.addParameter(new Parameter("instance number", ValueType.NUMBER,
-		// node.getAttribute("instance number")));
-		// act.addParameter(new Parameter("network number", ValueType.NUMBER,
-		// node.getAttribute("network number")));
-		// act.addParameter(new Parameter("link service MAC", ValueType.STRING,
-		// node.getAttribute("link service MAC")));
-		// double defint = node.getAttribute("polling
-		// interval").getNumber().doubleValue() / 1000;
-		// act.addParameter(new Parameter("polling interval", ValueType.NUMBER,
-		// new Value(defint)));
-		// act.addParameter(new Parameter("cov usage",
-		// ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED"),
-		// node.getAttribute("cov usage")));
-		// act.addParameter(new Parameter("cov lease time (minutes)",
-		// ValueType.NUMBER,
-		// node.getAttribute("cov lease time (minutes)")));
 
 		Node editNode = node.getChild(ACTION_EDIT);
 		if (editNode == null)
@@ -147,53 +131,6 @@ public class LocalDeviceNode extends LocalDeviceFolder {
 	private class EditHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			String name = event.getParameter("name", ValueType.STRING).getString();
-			// long interv = (long) (1000
-			// * event.getParameter("polling interval",
-			// ValueType.NUMBER).getNumber().doubleValue());
-			// CovType covtype = CovType.NONE;
-			// try {
-			// covtype = CovType.valueOf(event.getParameter("cov
-			// usage").getString());
-			// } catch (Exception e1) {
-			// }
-			// int covlife = event.getParameter("cov lease time (minutes)",
-			// ValueType.NUMBER).getNumber().intValue();
-			// String mac = event.getParameter("MAC address",
-			// ValueType.STRING).getString();
-			// int instNum = event.getParameter("instance number", new
-			// Value(-1)).getNumber().intValue();
-			// int netNum = event.getParameter("network number",
-			// ValueType.NUMBER).getNumber().intValue();
-			// String linkMac = event.getParameter("link service MAC", new
-			// Value("")).getString();
-			// if (!mac.equals(node.getAttribute("MAC address").getString())
-			// || !linkMac.equals(node.getAttribute("link service
-			// MAC").getString())
-			// || netNum != node.getAttribute("network
-			// number").getNumber().intValue()
-			// || instNum != node.getAttribute("instance
-			// number").getNumber().intValue()) {
-			//
-			// final RemoteDevice d = conn.getDevice(mac, instNum, netNum,
-			// linkMac, interv, covtype, covlife);
-			// conn.getDeviceProps(d);
-			// device = d;
-			// }
-			// interval = interv;
-			// covType = covtype;
-			// try {
-			// mac = d.getAddress().getMacAddress().toIpPortString();
-			// } catch (Exception e) {
-			// mac =
-			// Byte.toString(d.getAddress().getMacAddress().getMstpAddress());
-			// }
-			// node.setAttribute("MAC address", new Value(mac));
-			// node.setAttribute("instance number", new Value(instNum));
-			// node.setAttribute("polling interval", new Value(interval));
-			// node.setAttribute("cov usage", new Value(covtype.toString()));
-			// node.setAttribute("cov lease time (minutes)", new
-			// Value(covlife));
-
 			if (!name.equals(node.getName())) {
 				rename(name);
 			}
@@ -201,5 +138,9 @@ public class LocalDeviceNode extends LocalDeviceFolder {
 			makeEditAction();
 		}
 	}
-
+    
+	@Override
+	public Node getStatusNode() {
+		return statNode;
+	}
 }

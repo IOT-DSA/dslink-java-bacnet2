@@ -38,13 +38,12 @@ public abstract class EditablePoint {
 	static final String ACTION_REMOVE = "remove";
 	static final String ACTION_EDIT = "edit";
 	static final String ACTION_MAKE_COPY = "make copy";
-	
+
+    static final String RESTORE_TYPE = "restore type";
+    static final String RESTORE_EDITABLE_POINT = "editable point";
+    
 	static final String PROPERTY_DATA_TYPE = "dataType";
 	static final String PROPERTY_OBJECT_NAME = "objectName";
-	static final String PROPERTY_PRESENT_VALUE = "present value";
-	static final String PROPERTY_UNITS = "units";
-	static final String PROPERTY_RELINQUISH_ALL = "relinquish all";
-	static final String PROPERTY_RELINQUISH = "relinquish";
 	
 	EditableFolder folder;
     Node parent;
@@ -142,7 +141,7 @@ public abstract class EditablePoint {
 			int newProirity = (priority > -1) ? priority : defaultPriority;
 			handleSet(newVal, newProirity, true);
 			
-			Node presentValueNode = node.getChild(PROPERTY_PRESENT_VALUE);
+			Node presentValueNode = node.getChild(PropertyIdentifier.presentValue.toString());
 			presentValueNode.setValue(newVal);
 		}
 	}
@@ -152,7 +151,7 @@ public abstract class EditablePoint {
 		public void handle(ActionResult event) {
 			String name = event.getParameter("name", ValueType.STRING).getString();
 			Node newnode = parent.createChild(name).build();
-			newnode.setAttribute("restore type", new Value("point"));
+			newnode.setAttribute(RESTORE_TYPE, new Value(RESTORE_EDITABLE_POINT));
 
 			makeCopy();
 		}
@@ -218,6 +217,7 @@ public abstract class EditablePoint {
 	protected abstract void setupNode();
 	protected abstract void makeCopy();
 	protected abstract void handleSet(Value val, int priority, boolean isRaw);
+	public abstract void restoreLastSession();
 	
 	public BACnetObject getBacnetObj() {
 		return bacnetObj;
