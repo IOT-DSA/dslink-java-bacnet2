@@ -27,11 +27,8 @@ import bacnet.properties.LocalBacnetProperty;
 import bacnet.properties.LocalBinaryPVProperty;
 import bacnet.properties.LocalBinaryStateTextProperty;
 import bacnet.properties.LocalBooleanProperty;
-import bacnet.properties.LocalCalendarEntryProperty;
 import bacnet.properties.LocalCharacterStringProperty;
-import bacnet.properties.LocalDateTimeProperty;
 import bacnet.properties.LocalEventStateProperty;
-import bacnet.properties.LocalFileAccessMethodProperty;
 import bacnet.properties.LocalNumberOfStatesProperty;
 import bacnet.properties.LocalPolarityProperty;
 import bacnet.properties.LocalRealProperty;
@@ -110,8 +107,7 @@ public class LocalBacnetPoint extends EditablePoint {
 			setInstanceNumber(instNum);
 			setDataType(Utils.getDataType(objectType));
 
-			if (Utils.isOneOf(objectType, ObjectType.binaryInput, ObjectType.binaryOutput,
-					ObjectType.binaryValue)) {
+			if (Utils.isOneOf(objectType, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
 				getUnitsDescription().add("0");
 				getUnitsDescription().add("1");
 			}
@@ -184,10 +180,10 @@ public class LocalBacnetPoint extends EditablePoint {
 		setupRequiredProperty();
 		setupBacnetObject();
 	}
-	
+
 	private void setupPresentValueProperty(PropertyIdentifier pid) {
-		Node presentValueNode = buildPropertyNode(pid);	
-		
+		Node presentValueNode = buildPropertyNode(pid);
+
 		LocalBacnetProperty presentValueProperty = null;
 		switch (dataType) {
 		case BINARY: {
@@ -206,13 +202,15 @@ public class LocalBacnetPoint extends EditablePoint {
 			presentValueProperty = new LocalCharacterStringProperty(objectId, pid, this, node, presentValueNode);
 			break;
 		}
-		case BOOLEAN:{
+		case BOOLEAN: {
 			presentValueProperty = new LocalBooleanProperty(objectId, pid, this, node, presentValueNode);
-			break;		
+			break;
 		}
 		}
 
-		if (presentValueProperty != null) propertyIdToLocalProperty.put(pid, presentValueProperty);
+		if (presentValueProperty != null) {
+			propertyIdToLocalProperty.put(pid, presentValueProperty);
+		}
 	}
 
 	private void setupDataTypeProperty() {
@@ -251,124 +249,105 @@ public class LocalBacnetPoint extends EditablePoint {
 	}
 
 	protected void setupUnitsProperty(PropertyIdentifier pid) {
-        Node propertyNode = this.buildPropertyNode(pid);	
+		Node propertyNode = this.buildPropertyNode(pid);
 		LocalUnitsProperty unitsProperty = new LocalUnitsProperty(objectId, PropertyIdentifier.units, this, node,
 				propertyNode);
 
 		propertyIdToLocalProperty.put(PropertyIdentifier.units, unitsProperty);
 	}
-	
+
 	protected void setupBinaryStateTextProperty(PropertyIdentifier pid, boolean state) {
-        Node propertyNode = buildPropertyNode(pid);	
+		Node propertyNode = buildPropertyNode(pid);
 		String defText = (state) ? "true" : "false";
-		LocalBinaryStateTextProperty textProperty = new LocalBinaryStateTextProperty(objectId, pid, this, node, propertyNode, defText);
+		LocalBinaryStateTextProperty textProperty = new LocalBinaryStateTextProperty(objectId, pid, this, node,
+				propertyNode, defText);
 
 		propertyIdToLocalProperty.put(pid, textProperty);
-		
+
 	}
-	
+
 	protected void setupStateTextProperty(PropertyIdentifier pid) {
-        Node propertyNode = buildPropertyNode(pid);	
-		LocalStateTextProperty stateTextProperty = new LocalStateTextProperty(objectId, PropertyIdentifier.stateText, this, node, propertyNode);
+		Node propertyNode = buildPropertyNode(pid);
+		LocalStateTextProperty stateTextProperty = new LocalStateTextProperty(objectId, PropertyIdentifier.stateText,
+				this, node, propertyNode);
 
 		propertyIdToLocalProperty.put(PropertyIdentifier.stateText, stateTextProperty);
 	}
 
 	protected void setupEventStateProperty(PropertyIdentifier pid) {
-        Node propertyNode = buildPropertyNode(pid);	
+		Node propertyNode = buildPropertyNode(pid);
 		LocalEventStateProperty eventStateProperty = new LocalEventStateProperty(objectId,
 				PropertyIdentifier.eventState, this, node, propertyNode);
 
 		propertyIdToLocalProperty.put(PropertyIdentifier.eventState, eventStateProperty);
 	}
-	
+
 	protected void setupPolarityProperty(PropertyIdentifier pid) {
-        Node propertyNode = buildPropertyNode(pid);	
-		LocalPolarityProperty polarityProperty = new LocalPolarityProperty(objectId,
-				PropertyIdentifier.polarity, this, node, propertyNode);
+		Node propertyNode = buildPropertyNode(pid);
+		LocalPolarityProperty polarityProperty = new LocalPolarityProperty(objectId, PropertyIdentifier.polarity, this,
+				node, propertyNode);
 
 		propertyIdToLocalProperty.put(PropertyIdentifier.polarity, polarityProperty);
 	}
-	
+
 	protected void setupRelinquishDefaultProperty(PropertyIdentifier pid) {
 		setupPresentValueProperty(pid);
 	}
-	
+
 	/*
-	 *  For any property whose type is UnsignedInteger
-	 * */
-	
+	 * For any property whose type is UnsignedInteger
+	 */
+
 	protected void setupUnsignedIntegerProperty(PropertyIdentifier pid) {
-        Node propertyNode = buildPropertyNode(pid);	 
-        LocalUnsignedIntegerProperty nosProperty = new LocalUnsignedIntegerProperty(objectId, pid, this, node, propertyNode, false);
+		Node propertyNode = buildPropertyNode(pid);
+		LocalUnsignedIntegerProperty nosProperty = new LocalUnsignedIntegerProperty(objectId, pid, this, node,
+				propertyNode, false);
 
 		propertyIdToLocalProperty.put(PropertyIdentifier.numberOfStates, nosProperty);
 	}
-	
+
 	/*
-	 *  For any property whose type is boolean
-	 * */
+	 * For any property whose type is boolean
+	 */
 	protected void setupBooleanProperty(PropertyIdentifier pid) {
-        Node propertyNode = buildPropertyNode(pid);	
-		LocalBooleanProperty booleanProperty = new LocalBooleanProperty(objectId,
-				pid, this, node, propertyNode);
+		Node propertyNode = buildPropertyNode(pid);
+		LocalBooleanProperty booleanProperty = new LocalBooleanProperty(objectId, pid, this, node, propertyNode);
 
 		propertyIdToLocalProperty.put(pid, booleanProperty);
 	}
-	
+
 	/*
-	 *  For any property whose type is characterString
-	 * */
-	protected void setupCharacterStringProperty(PropertyIdentifier pid){
+	 * For any property whose type is characterString
+	 */
+	protected void setupCharacterStringProperty(PropertyIdentifier pid) {
 		Node propertyNode = buildPropertyNode(pid);
-		LocalCharacterStringProperty descriptionProperty = new LocalCharacterStringProperty(objectId,
-				pid, this, node, propertyNode);
-		
+		LocalCharacterStringProperty descriptionProperty = new LocalCharacterStringProperty(objectId, pid, this, node,
+				propertyNode);
+
 		this.propertyIdToLocalProperty.put(pid, descriptionProperty);
 	}
 
 	protected void setupNumberOfStatesProperty(PropertyIdentifier pid) {
-        Node propertyNode = buildPropertyNode(pid);	 
-        LocalNumberOfStatesProperty nosProperty = new LocalNumberOfStatesProperty(objectId, PropertyIdentifier.numberOfStates, this, node, propertyNode, 3);
+		Node propertyNode = buildPropertyNode(pid);
+		LocalNumberOfStatesProperty numberOfStateProperty = new LocalNumberOfStatesProperty(objectId,
+				PropertyIdentifier.numberOfStates, this, node, propertyNode, 3);
 
-		propertyIdToLocalProperty.put(PropertyIdentifier.numberOfStates, nosProperty);
+		propertyIdToLocalProperty.put(PropertyIdentifier.numberOfStates, numberOfStateProperty);
 	}
-	
+
 	protected void setupStatusFlagsProperty(PropertyIdentifier pid) {
-        Node propertyNode = buildPropertyNode(pid);	      
+		Node propertyNode = buildPropertyNode(pid);
 		LocalStatusFlagsProperty statusFlagsProperty = new LocalStatusFlagsProperty(objectId,
 				PropertyIdentifier.statusFlags, this, node, propertyNode);
 
 		propertyIdToLocalProperty.put(PropertyIdentifier.statusFlags, statusFlagsProperty);
 	}
-	
-	protected void setupDateTimeProperty(PropertyIdentifier pid){
-		Node propertyNode = buildPropertyNode(pid);
-		LocalDateTimeProperty descriptionProperty = new LocalDateTimeProperty(objectId,
-				pid, this, node, propertyNode);
-		
-		this.propertyIdToLocalProperty.put(pid, descriptionProperty);	
-	}
-	
-	protected void setupFileAccessMethodProperty(PropertyIdentifier pid) {
-        Node propertyNode = buildPropertyNode(pid);	
-		LocalFileAccessMethodProperty stateTextProperty = new LocalFileAccessMethodProperty(objectId, PropertyIdentifier.stateText, this, node, propertyNode);
 
-		propertyIdToLocalProperty.put(PropertyIdentifier.stateText, stateTextProperty);
-	}
-
-	protected void setupCalendarEntryProperty(PropertyIdentifier pid) {
-        Node propertyNode = buildPropertyNode(pid);	
-		LocalCalendarEntryProperty calendarEntryProperty = new LocalCalendarEntryProperty(objectId, PropertyIdentifier.stateText, this, node, propertyNode);
-
-		propertyIdToLocalProperty.put(pid, calendarEntryProperty);
-	}
-	
-	private Node buildPropertyNode(PropertyIdentifier pid){
+	private Node buildPropertyNode(PropertyIdentifier pid) {
 		String name = pid.toString();
 		Node propertyNode = node.getChild(name);
 		NodeBuilder b = null;
-		
+
 		if (null == propertyNode) {
 			b = node.createChild(name);
 			propertyNode = b.getChild();
@@ -384,14 +363,12 @@ public class LocalBacnetPoint extends EditablePoint {
 		ObjectType ot = objectId.getObjectType();
 
 		List<PropertyTypeDefinition> defs = ObjectProperties.getPropertyTypeDefinitions(ot);
-        System.out.println("Required properties: " + defs.size());
+		// LOGGER.info("Required properties: " + defs.size());
 		for (PropertyTypeDefinition def : defs) {
-			 System.out.println(def.getClazz() + " : " +
-			 def.getPropertyIdentifier());
+			// LOGGER.info(def.getClazz() + " : " +
+			// def.getPropertyIdentifier());
 			initializeRequiredProperty(def);
 		}
-		
-		
 		LOGGER.info("all properties are set up");
 	}
 
@@ -442,36 +419,8 @@ public class LocalBacnetPoint extends EditablePoint {
 			setupBinaryStateTextProperty(PropertyIdentifier.activeText, true);
 		} else if (propId.equals(PropertyIdentifier.stateText)) {
 			setupStateTextProperty(PropertyIdentifier.stateText);
-		} else if (propId.equals(PropertyIdentifier.description)){
+		} else if (propId.equals(PropertyIdentifier.description)) {
 			setupCharacterStringProperty(PropertyIdentifier.description);
-		} else if (propId.equals(PropertyIdentifier.fileType)){
-			setupCharacterStringProperty(PropertyIdentifier.fileType);
-		} else if (propId.equals(PropertyIdentifier.fileSize)){
-			this.setupUnsignedIntegerProperty(PropertyIdentifier.fileSize);
-		} else if (propId.equals(PropertyIdentifier.recordCount)){
-			this.setupUnsignedIntegerProperty(PropertyIdentifier.recordCount);
-		} else if (propId.equals(PropertyIdentifier.modificationDate)){
-			setupDateTimeProperty(PropertyIdentifier.modificationDate);
-		} else if (propId.equals(PropertyIdentifier.profileName)){
-			setupCharacterStringProperty(PropertyIdentifier.profileName);
-		} else if (propId.equals(PropertyIdentifier.readOnly)){
-			setupBooleanProperty(PropertyIdentifier.readOnly);
-		} else if (propId.equals(PropertyIdentifier.archive)){
-			setupBooleanProperty(PropertyIdentifier.archive);
-		} else if (propId.equals(PropertyIdentifier.fileAccessMethod)){
-			setupFileAccessMethodProperty(PropertyIdentifier.fileAccessMethod);
-		} else if (propId.equals(PropertyIdentifier.eventType)){
-//			setupEventTypeProperty(PropertyIdentifier.eventType);
-		} else if (propId.equals(PropertyIdentifier.eventParameters)){
-//			setupEventParametersProperty(PropertyIdentifier.eventParameters);
-		} else if (propId.equals(PropertyIdentifier.eventEnable)){
-//			setupEventEnableProperty(PropertyIdentifier.eventEnable);
-		}else if (propId.equals(PropertyIdentifier.notifyType)){
-//			setupNotifyTypeProperty(PropertyIdentifier.notifyType);
-		} else if (propId.equals(PropertyIdentifier.eventTimeStamps)){
-//			setupEventTimeStampsProperty(PropertyIdentifier.eventTimeStamps);
-		} else if (propId.equals(PropertyIdentifier.dateList)){
-//			setupCalendarEntryProperty(PropertyIdentifier.dateList);
 		}
 
 	}
@@ -636,7 +585,7 @@ public class LocalBacnetPoint extends EditablePoint {
 
 			ValueType vt;
 			Value val;
-			
+
 			switch (dataType) {
 			case BINARY: {
 				String off = (unitsDescription.size() > 0) ? unitsDescription.get(0) : "0";

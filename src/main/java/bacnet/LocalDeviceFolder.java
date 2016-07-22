@@ -139,13 +139,6 @@ public class LocalDeviceFolder extends EditableFolder {
 		Map<BACnetObject, EditablePoint> ObjectToPoint = conn.getObjectToPoint();
 		ObjectToPoint.put(bacnetObj, bacnetPoint);
 
-		// // Not production code, for lisener's mockup test only
-		// Value v = new Value(70);
-		// Encodable enc = Utils.valueToEncodable(DataType.NUMERIC, v,
-		// ObjectType.analogInput,
-		// PropertyIdentifier.presentValue, null);
-		// this.getConnection().getListener().propertyWritten(null, bacnetObj,
-		// new PropertyValue(PropertyIdentifier.presentValue, enc));
 	}
 
 	@Override
@@ -183,7 +176,10 @@ public class LocalDeviceFolder extends EditableFolder {
 
 		for (Node child : node.getChildren().values()) {
 			Value restype = child.getAttribute(ATTRIBUTE_RESTORE_TYPE);
-			if (restype != null && restype.getString().equals("editable point")) {
+			if (restype != null && restype.getString().equals("editable folder")) {
+				LocalDeviceFolder localFolder = new LocalDeviceFolder(conn, this.getRoot(), child);
+				localFolder.restoreLastSession(child);
+			} else if (restype != null && restype.getString().equals("editable point")) {
 				Value ot = child.getAttribute(ATTRIBUTE_OBJECT_TYPE);
 				Value inum = child.getAttribute(ATTRIBUTE_OBJECT_INSTANCE_NUMBER);
 				Value defp = child.getAttribute(ATTRIBUTE_DEFAULT_PRIORITY);
