@@ -17,7 +17,6 @@ import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 
 public class LocalPolarityProperty extends LocalBacnetProperty {
-
 	static final String ATTRIBUTE_POLARITY = "Polarity";
 
 	Polarity polarity;

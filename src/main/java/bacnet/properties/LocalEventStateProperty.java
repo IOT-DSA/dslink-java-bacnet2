@@ -48,11 +48,11 @@ public class LocalEventStateProperty extends LocalBacnetProperty {
 	}
 
 	private List<String> enumeratedNames() {
-		List<String> lst = new ArrayList<String>();
-		for (EventState u : EventState.ALL) {
-			lst.add(u.toString());
+		List<String> stateNames = new ArrayList<String>();
+		for (EventState state : EventState.ALL) {
+			stateNames.add(state.toString());
 		}
-		return lst;
+		return stateNames;
 	}
 
 	private class SetHandler implements Handler<ValuePair> {

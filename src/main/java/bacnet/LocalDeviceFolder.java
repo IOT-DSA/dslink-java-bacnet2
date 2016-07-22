@@ -169,11 +169,11 @@ public class LocalDeviceFolder extends EditableFolder {
 			return;
 
 		for (Node child : node.getChildren().values()) {
-			Value restype = child.getAttribute(ATTRIBUTE_RESTORE_TYPE);
-			if (restype != null && RESTROE_EDITABLE_FOLDER.equals(restype.getString())) {
+			Value resType = child.getAttribute(ATTRIBUTE_RESTORE_TYPE);
+			if (resType != null && RESTORE_EDITABLE_FOLDER.equals(resType.getString())) {
 				LocalDeviceFolder localFolder = new LocalDeviceFolder(conn, this.getRoot(), child);
 				localFolder.restoreLastSession(child);
-			} else if (restype != null && RESTROE_EDITABLE_POINT.equals(restype.getString())) {
+			} else if (resType != null && RESTORE_EDITABLE_POINT.equals(resType.getString())) {
 				Value ot = child.getAttribute(ATTRIBUTE_OBJECT_TYPE);
 				Value inum = child.getAttribute(ATTRIBUTE_OBJECT_INSTANCE_NUMBER);
 				Value defp = child.getAttribute(ATTRIBUTE_DEFAULT_PRIORITY);

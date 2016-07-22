@@ -45,11 +45,11 @@ public class LocalUnitsProperty extends LocalBacnetProperty {
 	}
 
 	private List<String> enumeratedNames() {
-		List<String> lst = new ArrayList<String>();
+		List<String> unitNames = new ArrayList<String>();
 		for (EngineeringUnits u : EngineeringUnits.ALL) {
-			lst.add(u.toString());
+			unitNames.add(u.toString());
 		}
-		return lst;
+		return unitNames;
 	}
 
 	private class SetHandler implements Handler<ValuePair> {

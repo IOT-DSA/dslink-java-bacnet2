@@ -24,10 +24,6 @@ public class LocalPresentValueProperty extends LocalBacnetProperty {
 	}
 
 	public static final int DEFAULT_ROOM_TEMPERATURE = 68;
-	static final String ATTRIBUTE_EVENT_STATE = "event state";
-	static final String ACTION_EDIT = "edit";
-
-	// EventState state;
 
 	public LocalPresentValueProperty(LocalBacnetPoint point, Node parent, Node node) {
 		super(point, parent, node);
@@ -48,7 +44,6 @@ public class LocalPresentValueProperty extends LocalBacnetProperty {
 	}
 
 	public void updatePropertyValue(Encodable enc) {
-
 		if (null != enc) {
 			Value val;
 			if (enc instanceof com.serotonin.bacnet4j.type.primitive.Boolean) {

@@ -15,12 +15,10 @@ import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.Real;
 
 public class LocalRealProperty extends LocalBacnetProperty {
-
 	float value;
 
 	public LocalRealProperty(LocalBacnetPoint point, Node parent, Node node) {
 		super(point, parent, node);
-
 	}
 
 	public LocalRealProperty(ObjectIdentifier oid, PropertyIdentifier pid, LocalBacnetPoint point, Node parent,

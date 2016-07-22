@@ -49,10 +49,10 @@ public class LocalStateTextProperty extends LocalBacnetProperty {
 	}
 
 	public void set(Value newVal) {
-		JsonArray jarr = newVal.getArray();
+		JsonArray jsonArray = newVal.getArray();
 
 		List<CharacterString> states = new ArrayList<CharacterString>();
-		for (Object o : jarr) {
+		for (Object o : jsonArray) {
 			if (o instanceof String) {
 				states.add(new CharacterString((String) o));
 			}
