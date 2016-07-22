@@ -32,10 +32,11 @@ public class LocalUnitsProperty extends LocalBacnetProperty {
 		super(point, parent, node);
 
 	}
-	
-	public LocalUnitsProperty(ObjectIdentifier oid, PropertyIdentifier pid, LocalBacnetPoint point, Node parent, Node node){
+
+	public LocalUnitsProperty(ObjectIdentifier oid, PropertyIdentifier pid, LocalBacnetPoint point, Node parent,
+			Node node) {
 		super(oid, pid, point, parent, node);
-		
+
 		bacnetObj.writeProperty(PropertyIdentifier.units, EngineeringUnits.degreeDaysCelsius);
 		node.setValueType(ValueType.makeEnum(enumeratedNames()));
 		node.setValue(new Value(EngineeringUnits.degreeDaysCelsius.toString()));
@@ -43,33 +44,34 @@ public class LocalUnitsProperty extends LocalBacnetProperty {
 		node.getListener().setValueHandler(new SetHandler());
 	}
 
-	private List<String> enumeratedNames(){
+	private List<String> enumeratedNames() {
 		List<String> lst = new ArrayList<String>();
-		for (EngineeringUnits u: EngineeringUnits.ALL) {
+		for (EngineeringUnits u : EngineeringUnits.ALL) {
 			lst.add(u.toString());
 		}
 		return lst;
 	}
-	
+
 	private class SetHandler implements Handler<ValuePair> {
 
 		@Override
 		public void handle(ValuePair event) {
-			if (!event.isFromExternalSource()) return;
+			if (!event.isFromExternalSource())
+				return;
 			Value newVal = event.getCurrent();
-			units = parseEngineeringUnits(newVal.getString());		
-			bacnetObj.writeProperty(propertyId, units);	
+			units = parseEngineeringUnits(newVal.getString());
+			bacnetObj.writeProperty(propertyId, units);
 			node.setAttribute(propertyId.toString(), newVal);
 		}
 	}
 
 	protected EngineeringUnits parseEngineeringUnits(String unitsString) {
 
-        for (EngineeringUnits unit: EngineeringUnits.ALL){
-        	if (unit.toString().equals(unitsString)){
-        		return unit;
-        	}
-        }	
+		for (EngineeringUnits unit : EngineeringUnits.ALL) {
+			if (unit.toString().equals(unitsString)) {
+				return unit;
+			}
+		}
 
 		return null;
 	}
@@ -80,6 +82,6 @@ public class LocalUnitsProperty extends LocalBacnetProperty {
 			units = (EngineeringUnits) enc;
 			node.setValue(new Value(units.toString()));
 		}
-		
+
 	}
 }

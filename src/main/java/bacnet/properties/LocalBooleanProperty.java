@@ -17,36 +17,38 @@ import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 public class LocalBooleanProperty extends LocalBacnetProperty {
 
 	boolean state;
-	
+
 	public LocalBooleanProperty(LocalBacnetPoint point, Node parent, Node node) {
 		super(point, parent, node);
 
 	}
-	
-	public LocalBooleanProperty(ObjectIdentifier oid, PropertyIdentifier pid, LocalBacnetPoint point, Node parent, Node node){
+
+	public LocalBooleanProperty(ObjectIdentifier oid, PropertyIdentifier pid, LocalBacnetPoint point, Node parent,
+			Node node) {
 		super(oid, pid, point, parent, node);
-		
+
 		bacnetObj.writeProperty(pid, com.serotonin.bacnet4j.type.primitive.Boolean.FALSE);
-		
+
 		node.setValueType(ValueType.BOOL);
 		node.setValue(new Value(false));
 		node.setWritable(Writable.WRITE);
 		node.getListener().setValueHandler(new SetHandler());
 	}
-	
+
 	private class SetHandler implements Handler<ValuePair> {
 
 		@Override
 		public void handle(ValuePair event) {
-			if (!event.isFromExternalSource()) return;
+			if (!event.isFromExternalSource())
+				return;
 			Value newVal = event.getCurrent();
 			state = newVal.getBool();
-			
-			bacnetObj.writeProperty(propertyId, new com.serotonin.bacnet4j.type.primitive.Boolean(state));		
+
+			bacnetObj.writeProperty(propertyId, new com.serotonin.bacnet4j.type.primitive.Boolean(state));
 			node.setAttribute(propertyId.toString(), newVal);
 		}
 	}
-	
+
 	@Override
 	public void updatePropertyValue(Encodable enc) {
 		if (enc instanceof com.serotonin.bacnet4j.type.primitive.Boolean) {

@@ -26,9 +26,9 @@ public class LocalStateTextProperty extends LocalBacnetProperty {
 		super(point, parent, node);
 
 	}
-	
-	
-	public LocalStateTextProperty(ObjectIdentifier oid, PropertyIdentifier pid, LocalBacnetPoint point, Node parent, Node node) {
+
+	public LocalStateTextProperty(ObjectIdentifier oid, PropertyIdentifier pid, LocalBacnetPoint point, Node parent,
+			Node node) {
 		super(oid, pid, point, parent, node);
 
 		node.setValueType(ValueType.ARRAY);
@@ -36,35 +36,36 @@ public class LocalStateTextProperty extends LocalBacnetProperty {
 		node.setWritable(Writable.WRITE);
 		node.getListener().setValueHandler(new SetHandler());
 	}
-	
+
 	private class SetHandler implements Handler<ValuePair> {
 
 		@Override
 		public void handle(ValuePair event) {
-			if (!event.isFromExternalSource()) return;
+			if (!event.isFromExternalSource())
+				return;
 			Value newVal = event.getCurrent();
 			set(newVal);
 		}
 	}
-	
+
 	public void set(Value newVal) {
 		JsonArray jarr = newVal.getArray();
-		
+
 		List<CharacterString> states = new ArrayList<CharacterString>();
-		for (Object o: jarr) {
+		for (Object o : jarr) {
 			if (o instanceof String) {
 				states.add(new CharacterString((String) o));
 			}
 		}
-		
-		if (states.isEmpty()) return;
-		
+
+		if (states.isEmpty())
+			return;
+
 		bacnetObj.writeProperty(propertyId, new SequenceOf<CharacterString>(states));
 		node.setAttribute(propertyId.toString(), newVal);
-		
-		
-		for (int i=0; i<states.size(); i++) {
-			if (bacnetPoint.getUnitsDescription().size() < i+1) {
+
+		for (int i = 0; i < states.size(); i++) {
+			if (bacnetPoint.getUnitsDescription().size() < i + 1) {
 				bacnetPoint.getUnitsDescription().add(states.get(i).getValue());
 			} else {
 				bacnetPoint.getUnitsDescription().set(i, states.get(i).getValue());
@@ -85,15 +86,14 @@ public class LocalStateTextProperty extends LocalBacnetProperty {
 				((LocalNumberOfStatesProperty) nosProp).set(new Value(states.size()));
 			}
 		}
-	
+
 	}
-	
 
 	@Override
 	public void updatePropertyValue(Encodable enc) {
 		if (enc instanceof SequenceOf<?>) {
 			JsonArray jarr = new JsonArray();
-			for (Encodable e: (SequenceOf<?>) enc) {
+			for (Encodable e : (SequenceOf<?>) enc) {
 				if (e instanceof CharacterString) {
 					jarr.add(((CharacterString) e).getValue());
 				}

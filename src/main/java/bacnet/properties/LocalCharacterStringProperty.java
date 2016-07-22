@@ -19,32 +19,34 @@ public class LocalCharacterStringProperty extends LocalBacnetProperty {
 		super(point, parent, node);
 
 	}
-	
-	public LocalCharacterStringProperty(ObjectIdentifier oid, PropertyIdentifier pid, LocalBacnetPoint point, Node parent, Node node){
+
+	public LocalCharacterStringProperty(ObjectIdentifier oid, PropertyIdentifier pid, LocalBacnetPoint point,
+			Node parent, Node node) {
 		super(oid, pid, point, parent, node);
-		
+
 		bacnetObj.writeProperty(pid, new CharacterString(""));
-		
+
 		node.setValueType(ValueType.STRING);
 		node.setValue(new Value(""));
 		node.setWritable(Writable.WRITE);
 		node.getListener().setValueHandler(new SetHandler());
 	}
-	
+
 	private class SetHandler implements Handler<ValuePair> {
 
 		@Override
 		public void handle(ValuePair event) {
-			if (!event.isFromExternalSource()) return;
+			if (!event.isFromExternalSource())
+				return;
 			Value newVal = event.getCurrent();
 			set(newVal);
-			
+
 		}
 	}
-	
+
 	public void set(Value newVal) {
 		String str = newVal.getString();
-		
+
 		bacnetObj.writeProperty(propertyId, new CharacterString(str));
 		node.setAttribute(propertyId.toString(), newVal);
 	}

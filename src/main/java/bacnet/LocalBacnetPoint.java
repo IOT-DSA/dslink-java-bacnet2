@@ -258,7 +258,7 @@ public class LocalBacnetPoint extends EditablePoint {
 
 	protected void setupBinaryStateTextProperty(PropertyIdentifier pid, boolean state) {
 		Node propertyNode = buildPropertyNode(pid);
-		String defText = (state) ? "true" : "false";
+		String defText = state ? "true" : "false";
 		LocalBinaryStateTextProperty textProperty = new LocalBinaryStateTextProperty(objectId, pid, this, node,
 				propertyNode, defText);
 
@@ -293,11 +293,10 @@ public class LocalBacnetPoint extends EditablePoint {
 	protected void setupRelinquishDefaultProperty(PropertyIdentifier pid) {
 		setupPresentValueProperty(pid);
 	}
-
+	
 	/*
 	 * For any property whose type is UnsignedInteger
 	 */
-
 	protected void setupUnsignedIntegerProperty(PropertyIdentifier pid) {
 		Node propertyNode = buildPropertyNode(pid);
 		LocalUnsignedIntegerProperty nosProperty = new LocalUnsignedIntegerProperty(objectId, pid, this, node,
@@ -330,7 +329,7 @@ public class LocalBacnetPoint extends EditablePoint {
 	protected void setupNumberOfStatesProperty(PropertyIdentifier pid) {
 		Node propertyNode = buildPropertyNode(pid);
 		LocalNumberOfStatesProperty numberOfStateProperty = new LocalNumberOfStatesProperty(objectId,
-				PropertyIdentifier.numberOfStates, this, node, propertyNode, 3);
+				PropertyIdentifier.numberOfStates, this, node, propertyNode, LocalNumberOfStatesProperty.DEFAULT_NUMBER_OF_STATE);
 
 		propertyIdToLocalProperty.put(PropertyIdentifier.numberOfStates, numberOfStateProperty);
 	}

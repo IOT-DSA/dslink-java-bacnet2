@@ -19,7 +19,6 @@ import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.type.AmbiguousValue;
 import com.serotonin.bacnet4j.type.Encodable;
-import com.serotonin.bacnet4j.type.constructed.PropertyValue;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
@@ -34,17 +33,12 @@ import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.PropertyReferences;
 import com.serotonin.bacnet4j.util.PropertyValues;
 
-import bacnet.properties.LocalBacnetProperty;
-
 public class LocalDeviceFolder extends EditableFolder {
 	private static final Logger LOGGER;
 
 	static {
 		LOGGER = LoggerFactory.getLogger(LocalDeviceFolder.class);
 	}
-
-	static final String ATTRIBUTE_NAME = "name";
-	static final String ACTION_EDIT = "edit";
 
 	LocalDeviceFolder root;
 
@@ -176,10 +170,10 @@ public class LocalDeviceFolder extends EditableFolder {
 
 		for (Node child : node.getChildren().values()) {
 			Value restype = child.getAttribute(ATTRIBUTE_RESTORE_TYPE);
-			if (restype != null && restype.getString().equals("editable folder")) {
+			if (restype != null && RESTROE_EDITABLE_FOLDER.equals(restype.getString())) {
 				LocalDeviceFolder localFolder = new LocalDeviceFolder(conn, this.getRoot(), child);
 				localFolder.restoreLastSession(child);
-			} else if (restype != null && restype.getString().equals("editable point")) {
+			} else if (restype != null && RESTROE_EDITABLE_POINT.equals(restype.getString())) {
 				Value ot = child.getAttribute(ATTRIBUTE_OBJECT_TYPE);
 				Value inum = child.getAttribute(ATTRIBUTE_OBJECT_INSTANCE_NUMBER);
 				Value defp = child.getAttribute(ATTRIBUTE_DEFAULT_PRIORITY);

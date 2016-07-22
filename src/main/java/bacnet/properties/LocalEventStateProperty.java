@@ -19,8 +19,7 @@ import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 
 import bacnet.LocalBacnetPoint;
 
-
-public class LocalEventStateProperty extends LocalBacnetProperty{
+public class LocalEventStateProperty extends LocalBacnetProperty {
 	private static final Logger LOGGER;
 
 	static {
@@ -36,10 +35,11 @@ public class LocalEventStateProperty extends LocalBacnetProperty{
 		super(point, parent, node);
 
 	}
-	
-	public LocalEventStateProperty(ObjectIdentifier oid, PropertyIdentifier pid, LocalBacnetPoint point, Node parent, Node node){
+
+	public LocalEventStateProperty(ObjectIdentifier oid, PropertyIdentifier pid, LocalBacnetPoint point, Node parent,
+			Node node) {
 		super(oid, pid, point, parent, node);
-		
+
 		bacnetObj.writeProperty(PropertyIdentifier.eventState, EventState.normal);
 		node.setValueType(ValueType.makeEnum(enumeratedNames()));
 		node.setValue(new Value(EventState.normal.toString()));
@@ -47,40 +47,40 @@ public class LocalEventStateProperty extends LocalBacnetProperty{
 		node.getListener().setValueHandler(new SetHandler());
 	}
 
-	private  List<String> enumeratedNames(){
+	private List<String> enumeratedNames() {
 		List<String> lst = new ArrayList<String>();
-		for (EventState u: EventState.ALL) {
+		for (EventState u : EventState.ALL) {
 			lst.add(u.toString());
 		}
 		return lst;
 	}
-	
+
 	private class SetHandler implements Handler<ValuePair> {
 
 		@Override
 		public void handle(ValuePair event) {
-			if (!event.isFromExternalSource()) return;
+			if (!event.isFromExternalSource())
+				return;
 			Value newVal = event.getCurrent();
 			state = parseEventState(newVal.getString());
-			
+
 			bacnetObj.writeProperty(PropertyIdentifier.eventState, state);
-			
+
 			node.setAttribute(ATTRIBUTE_EVENT_STATE, newVal);
 		}
 	}
 
-
 	protected EventState parseEventState(String eventString) {
 
-		for (EventState state : EventState.ALL){
-			if(state.toString().equals(eventString)){
+		for (EventState state : EventState.ALL) {
+			if (state.toString().equals(eventString)) {
 				return state;
 			}
 		}
 
 		return null;
 	}
-	
+
 	public void updatePropertyValue(Encodable enc) {
 		if (enc instanceof EventState) {
 			state = (EventState) enc;

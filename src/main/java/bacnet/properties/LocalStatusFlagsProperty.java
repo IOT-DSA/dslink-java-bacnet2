@@ -106,7 +106,7 @@ public class LocalStatusFlagsProperty extends LocalBacnetProperty {
 					+ " outOfService: " + outOfService;
 			node.setValue(new Value(strFlags));
 		}
-		
+
 	}
 
 }
