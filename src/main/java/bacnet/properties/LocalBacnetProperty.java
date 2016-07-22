@@ -1,8 +1,6 @@
 package bacnet.properties;
 
 import org.dsa.iot.dslink.node.Node;
-import org.dsa.iot.dslink.node.value.Value;
-import org.dsa.iot.dslink.node.value.ValueType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

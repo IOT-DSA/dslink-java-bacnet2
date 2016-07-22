@@ -15,17 +15,18 @@ import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 
 public class LocalBinaryPVProperty extends LocalBacnetProperty {
-	
+
 	boolean state;
 
 	public LocalBinaryPVProperty(LocalBacnetPoint point, Node parent, Node node) {
 		super(point, parent, node);
 
 	}
-	
-	public LocalBinaryPVProperty(ObjectIdentifier oid, PropertyIdentifier pid, LocalBacnetPoint point, Node parent, Node node, boolean useDescriptions){
+
+	public LocalBinaryPVProperty(ObjectIdentifier oid, PropertyIdentifier pid, LocalBacnetPoint point, Node parent,
+			Node node, boolean useDescriptions) {
 		super(oid, pid, point, parent, node);
-		
+
 		bacnetObj.writeProperty(pid, BinaryPV.active);
 		if (useDescriptions && this.bacnetPoint.getUnitsDescription().size() >= 2) {
 			String inact = this.bacnetPoint.getUnitsDescription().get(0);
@@ -38,21 +39,22 @@ public class LocalBinaryPVProperty extends LocalBacnetProperty {
 		node.setWritable(Writable.WRITE);
 		node.getListener().setValueHandler(new SetHandler());
 	}
-	
+
 	private class SetHandler implements Handler<ValuePair> {
 
 		@Override
 		public void handle(ValuePair event) {
-			if (!event.isFromExternalSource()) return;
+			if (!event.isFromExternalSource())
+				return;
 			Value newVal = event.getCurrent();
 			state = newVal.getBool();
-			
+
 			bacnetObj.writeProperty(propertyId, state ? BinaryPV.active : BinaryPV.inactive);
-			
+
 			node.setAttribute(propertyId.toString(), newVal);
 		}
 	}
-	
+
 	public void update() {
 		if (this.bacnetPoint.getUnitsDescription().size() >= 2) {
 			String inact = this.bacnetPoint.getUnitsDescription().get(0);
@@ -60,12 +62,12 @@ public class LocalBinaryPVProperty extends LocalBacnetProperty {
 			node.setValueType(ValueType.makeBool(act, inact));
 		}
 	}
-	
+
 	public void updatePropertyValue(Encodable enc) {
 		if (enc instanceof BinaryPV) {
 			state = enc.equals(BinaryPV.active);
 			node.setValue(new Value(state));
 		}
 	}
-	
+
 }

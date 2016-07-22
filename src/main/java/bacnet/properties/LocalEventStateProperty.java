@@ -1,7 +1,6 @@
 package bacnet.properties;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import org.dsa.iot.dslink.node.Node;
@@ -14,15 +13,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.serotonin.bacnet4j.type.Encodable;
-import com.serotonin.bacnet4j.type.enumerated.EngineeringUnits;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 
 import bacnet.LocalBacnetPoint;
 
-
-public class LocalEventStateProperty extends LocalBacnetProperty{
+public class LocalEventStateProperty extends LocalBacnetProperty {
 	private static final Logger LOGGER;
 
 	static {
@@ -38,10 +35,11 @@ public class LocalEventStateProperty extends LocalBacnetProperty{
 		super(point, parent, node);
 
 	}
-	
-	public LocalEventStateProperty(ObjectIdentifier oid, PropertyIdentifier pid, LocalBacnetPoint point, Node parent, Node node){
+
+	public LocalEventStateProperty(ObjectIdentifier oid, PropertyIdentifier pid, LocalBacnetPoint point, Node parent,
+			Node node) {
 		super(oid, pid, point, parent, node);
-		
+
 		bacnetObj.writeProperty(PropertyIdentifier.eventState, EventState.normal);
 		node.setValueType(ValueType.makeEnum(enumeratedNames()));
 		node.setValue(new Value(EventState.normal.toString()));
@@ -49,40 +47,40 @@ public class LocalEventStateProperty extends LocalBacnetProperty{
 		node.getListener().setValueHandler(new SetHandler());
 	}
 
-	private  List<String> enumeratedNames(){
-		List<String> lst = new ArrayList<String>();
-		for (EventState u: EventState.ALL) {
-			lst.add(u.toString());
+	private List<String> enumeratedNames() {
+		List<String> stateNames = new ArrayList<String>();
+		for (EventState state : EventState.ALL) {
+			stateNames.add(state.toString());
 		}
-		return lst;
+		return stateNames;
 	}
-	
+
 	private class SetHandler implements Handler<ValuePair> {
 
 		@Override
 		public void handle(ValuePair event) {
-			if (!event.isFromExternalSource()) return;
+			if (!event.isFromExternalSource())
+				return;
 			Value newVal = event.getCurrent();
 			state = parseEventState(newVal.getString());
-			
+
 			bacnetObj.writeProperty(PropertyIdentifier.eventState, state);
-			
+
 			node.setAttribute(ATTRIBUTE_EVENT_STATE, newVal);
 		}
 	}
 
-
 	protected EventState parseEventState(String eventString) {
 
-		for (EventState state : EventState.ALL){
-			if(state.toString().equals(eventString)){
+		for (EventState state : EventState.ALL) {
+			if (state.toString().equals(eventString)) {
 				return state;
 			}
 		}
 
 		return null;
 	}
-	
+
 	public void updatePropertyValue(Encodable enc) {
 		if (enc instanceof EventState) {
 			state = (EventState) enc;

@@ -32,7 +32,8 @@ public abstract class EditableFolder {
 	static final String ATTRIBUTE_OBJECT_TYPE = "object type";
 
 	static final String ATTRIBUTE_RESTORE_TYPE = "restore type";
-	static final String RESTROE_EDITABLE_FOLDER = "editable folder";
+	static final String RESTORE_EDITABLE_FOLDER = "editable folder";
+	static final String RESTORE_EDITABLE_POINT = "editable point";
 
 	static final String ATTRIBUTE_OBJECT_INSTANCE_NUMBER = "object instance number";
 	static final String ATTRIBUTE_USE_COV = "use COV";

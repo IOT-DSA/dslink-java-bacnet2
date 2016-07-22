@@ -19,7 +19,6 @@ import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.type.AmbiguousValue;
 import com.serotonin.bacnet4j.type.Encodable;
-import com.serotonin.bacnet4j.type.constructed.PropertyValue;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
@@ -34,17 +33,12 @@ import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.PropertyReferences;
 import com.serotonin.bacnet4j.util.PropertyValues;
 
-import bacnet.properties.LocalBacnetProperty;
-
 public class LocalDeviceFolder extends EditableFolder {
 	private static final Logger LOGGER;
 
 	static {
 		LOGGER = LoggerFactory.getLogger(LocalDeviceFolder.class);
 	}
-
-	static final String ATTRIBUTE_NAME = "name";
-	static final String ACTION_EDIT = "edit";
 
 	LocalDeviceFolder root;
 
@@ -139,13 +133,6 @@ public class LocalDeviceFolder extends EditableFolder {
 		Map<BACnetObject, EditablePoint> ObjectToPoint = conn.getObjectToPoint();
 		ObjectToPoint.put(bacnetObj, bacnetPoint);
 
-		// // Not production code, for lisener's mockup test only
-		// Value v = new Value(70);
-		// Encodable enc = Utils.valueToEncodable(DataType.NUMERIC, v,
-		// ObjectType.analogInput,
-		// PropertyIdentifier.presentValue, null);
-		// this.getConnection().getListener().propertyWritten(null, bacnetObj,
-		// new PropertyValue(PropertyIdentifier.presentValue, enc));
 	}
 
 	@Override
@@ -182,8 +169,11 @@ public class LocalDeviceFolder extends EditableFolder {
 			return;
 
 		for (Node child : node.getChildren().values()) {
-			Value restype = child.getAttribute(ATTRIBUTE_RESTORE_TYPE);
-			if (restype != null && restype.getString().equals("editable point")) {
+			Value resType = child.getAttribute(ATTRIBUTE_RESTORE_TYPE);
+			if (resType != null && RESTORE_EDITABLE_FOLDER.equals(resType.getString())) {
+				LocalDeviceFolder localFolder = new LocalDeviceFolder(conn, this.getRoot(), child);
+				localFolder.restoreLastSession(child);
+			} else if (resType != null && RESTORE_EDITABLE_POINT.equals(resType.getString())) {
 				Value ot = child.getAttribute(ATTRIBUTE_OBJECT_TYPE);
 				Value inum = child.getAttribute(ATTRIBUTE_OBJECT_INSTANCE_NUMBER);
 				Value defp = child.getAttribute(ATTRIBUTE_DEFAULT_PRIORITY);
