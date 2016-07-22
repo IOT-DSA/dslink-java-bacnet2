@@ -5,7 +5,6 @@ import org.dsa.iot.dslink.node.value.Value;
 
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
-import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 
 import bacnet.LocalBacnetPoint;
 
@@ -33,15 +32,17 @@ public class LocalNumberOfStatesProperty extends LocalUnsignedIntegerProperty {
 		while (bacnetPoint.getUnitsDescription().size() > n) {
 			bacnetPoint.getUnitsDescription().remove(n);
 		}
+		
 		LocalBacnetProperty pvalProp = bacnetPoint.getProperty(PropertyIdentifier.presentValue);
 		if (pvalProp instanceof LocalUnsignedIntegerProperty) {
 			((LocalUnsignedIntegerProperty) pvalProp).update();
 		}
+		
 		LocalBacnetProperty relinqProp = bacnetPoint.getProperty(PropertyIdentifier.relinquishDefault);
 		if (relinqProp instanceof LocalUnsignedIntegerProperty) {
 			((LocalUnsignedIntegerProperty) relinqProp).update();
 		}
-		
+		node.setAttribute(propertyId.toString(), newVal);
 	}
 
 }

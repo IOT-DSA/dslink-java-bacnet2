@@ -39,10 +39,8 @@ public class LocalRealProperty extends LocalBacnetProperty {
 		public void handle(ValuePair event) {
 			if (!event.isFromExternalSource()) return;
 			Value newVal = event.getCurrent();
-			value = newVal.getNumber().floatValue();
-			
-			bacnetObj.writeProperty(propertyId, new Real(value));
-			
+			value = newVal.getNumber().floatValue();		
+			bacnetObj.writeProperty(propertyId, new Real(value));		
 			node.setAttribute(propertyId.toString(), newVal);
 		}
 	}

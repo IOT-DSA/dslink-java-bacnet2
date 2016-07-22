@@ -6,45 +6,34 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.commons.lang3.StringUtils;
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.NodeBuilder;
-import org.dsa.iot.dslink.node.Permission;
-import org.dsa.iot.dslink.node.Writable;
-import org.dsa.iot.dslink.node.actions.Action;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.exception.BACnetServiceException;
 import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.obj.BACnetObjectListener;
 import com.serotonin.bacnet4j.obj.ObjectProperties;
 import com.serotonin.bacnet4j.obj.PropertyTypeDefinition;
 import com.serotonin.bacnet4j.type.Encodable;
-import com.serotonin.bacnet4j.type.constructed.BACnetError;
-import com.serotonin.bacnet4j.type.constructed.PriorityArray;
-import com.serotonin.bacnet4j.type.enumerated.EngineeringUnits;
-import com.serotonin.bacnet4j.type.enumerated.EventState;
-import com.serotonin.bacnet4j.type.enumerated.LifeSafetyState;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
-import com.serotonin.bacnet4j.type.enumerated.Polarity;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
-import com.serotonin.bacnet4j.type.primitive.Null;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 
 import bacnet.properties.LocalBacnetProperty;
 import bacnet.properties.LocalBinaryPVProperty;
 import bacnet.properties.LocalBinaryStateTextProperty;
 import bacnet.properties.LocalBooleanProperty;
+import bacnet.properties.LocalCalendarEntryProperty;
 import bacnet.properties.LocalCharacterStringProperty;
+import bacnet.properties.LocalDateTimeProperty;
 import bacnet.properties.LocalEventStateProperty;
+import bacnet.properties.LocalFileAccessMethodProperty;
 import bacnet.properties.LocalNumberOfStatesProperty;
-import bacnet.properties.LocalOutOfServiceProperty;
 import bacnet.properties.LocalPolarityProperty;
-import bacnet.properties.LocalPresentValueProperty;
 import bacnet.properties.LocalRealProperty;
 import bacnet.properties.LocalStateTextProperty;
 import bacnet.properties.LocalStatusFlagsProperty;
@@ -59,8 +48,6 @@ public class LocalBacnetPoint extends EditablePoint {
 	}
 
 	private static PointCounter numPoints = new PointCounter();
-
-//	byte typeId = Null.TYPE_ID;
 
 	private int defaultPriority;
 	private int objectTypeId;
@@ -123,7 +110,7 @@ public class LocalBacnetPoint extends EditablePoint {
 			setInstanceNumber(instNum);
 			setDataType(Utils.getDataType(objectType));
 
-			if (DeviceFolder.isOneOf(objectType, ObjectType.binaryInput, ObjectType.binaryOutput,
+			if (Utils.isOneOf(objectType, ObjectType.binaryInput, ObjectType.binaryOutput,
 					ObjectType.binaryValue)) {
 				getUnitsDescription().add("0");
 				getUnitsDescription().add("1");
@@ -219,6 +206,10 @@ public class LocalBacnetPoint extends EditablePoint {
 			presentValueProperty = new LocalCharacterStringProperty(objectId, pid, this, node, presentValueNode);
 			break;
 		}
+		case BOOLEAN:{
+			presentValueProperty = new LocalBooleanProperty(objectId, pid, this, node, presentValueNode);
+			break;		
+		}
 		}
 
 		if (presentValueProperty != null) propertyIdToLocalProperty.put(pid, presentValueProperty);
@@ -267,9 +258,9 @@ public class LocalBacnetPoint extends EditablePoint {
 		propertyIdToLocalProperty.put(PropertyIdentifier.units, unitsProperty);
 	}
 	
-	protected void setupTextProperty(PropertyIdentifier pid) {
+	protected void setupBinaryStateTextProperty(PropertyIdentifier pid, boolean state) {
         Node propertyNode = buildPropertyNode(pid);	
-		String defText = (pid.equals(PropertyIdentifier.activeText)) ? "true" : "false";
+		String defText = (state) ? "true" : "false";
 		LocalBinaryStateTextProperty textProperty = new LocalBinaryStateTextProperty(objectId, pid, this, node, propertyNode, defText);
 
 		propertyIdToLocalProperty.put(pid, textProperty);
@@ -303,13 +294,46 @@ public class LocalBacnetPoint extends EditablePoint {
 		setupPresentValueProperty(pid);
 	}
 	
-	protected void setupNumberOfStatesProperty(PropertyIdentifier pid) {
+	/*
+	 *  For any property whose type is UnsignedInteger
+	 * */
+	
+	protected void setupUnsignedIntegerProperty(PropertyIdentifier pid) {
         Node propertyNode = buildPropertyNode(pid);	 
-		LocalUnsignedIntegerProperty nosProperty = new LocalNumberOfStatesProperty(objectId, PropertyIdentifier.numberOfStates, this, node, propertyNode, 3);
+        LocalUnsignedIntegerProperty nosProperty = new LocalUnsignedIntegerProperty(objectId, pid, this, node, propertyNode, false);
 
 		propertyIdToLocalProperty.put(PropertyIdentifier.numberOfStates, nosProperty);
 	}
+	
+	/*
+	 *  For any property whose type is boolean
+	 * */
+	protected void setupBooleanProperty(PropertyIdentifier pid) {
+        Node propertyNode = buildPropertyNode(pid);	
+		LocalBooleanProperty booleanProperty = new LocalBooleanProperty(objectId,
+				pid, this, node, propertyNode);
 
+		propertyIdToLocalProperty.put(pid, booleanProperty);
+	}
+	
+	/*
+	 *  For any property whose type is characterString
+	 * */
+	protected void setupCharacterStringProperty(PropertyIdentifier pid){
+		Node propertyNode = buildPropertyNode(pid);
+		LocalCharacterStringProperty descriptionProperty = new LocalCharacterStringProperty(objectId,
+				pid, this, node, propertyNode);
+		
+		this.propertyIdToLocalProperty.put(pid, descriptionProperty);
+	}
+
+	protected void setupNumberOfStatesProperty(PropertyIdentifier pid) {
+        Node propertyNode = buildPropertyNode(pid);	 
+        LocalNumberOfStatesProperty nosProperty = new LocalNumberOfStatesProperty(objectId, PropertyIdentifier.numberOfStates, this, node, propertyNode, 3);
+
+		propertyIdToLocalProperty.put(PropertyIdentifier.numberOfStates, nosProperty);
+	}
+	
 	protected void setupStatusFlagsProperty(PropertyIdentifier pid) {
         Node propertyNode = buildPropertyNode(pid);	      
 		LocalStatusFlagsProperty statusFlagsProperty = new LocalStatusFlagsProperty(objectId,
@@ -317,13 +341,27 @@ public class LocalBacnetPoint extends EditablePoint {
 
 		propertyIdToLocalProperty.put(PropertyIdentifier.statusFlags, statusFlagsProperty);
 	}
-
-	protected void setupOutOfServiceProperty(PropertyIdentifier pid) {
+	
+	protected void setupDateTimeProperty(PropertyIdentifier pid){
+		Node propertyNode = buildPropertyNode(pid);
+		LocalDateTimeProperty descriptionProperty = new LocalDateTimeProperty(objectId,
+				pid, this, node, propertyNode);
+		
+		this.propertyIdToLocalProperty.put(pid, descriptionProperty);	
+	}
+	
+	protected void setupFileAccessMethodProperty(PropertyIdentifier pid) {
         Node propertyNode = buildPropertyNode(pid);	
-		LocalBooleanProperty outOfServiceProperty = new LocalBooleanProperty(objectId,
-				PropertyIdentifier.outOfService, this, node, propertyNode);
+		LocalFileAccessMethodProperty stateTextProperty = new LocalFileAccessMethodProperty(objectId, PropertyIdentifier.stateText, this, node, propertyNode);
 
-		propertyIdToLocalProperty.put(PropertyIdentifier.outOfService, outOfServiceProperty);
+		propertyIdToLocalProperty.put(PropertyIdentifier.stateText, stateTextProperty);
+	}
+
+	protected void setupCalendarEntryProperty(PropertyIdentifier pid) {
+        Node propertyNode = buildPropertyNode(pid);	
+		LocalCalendarEntryProperty calendarEntryProperty = new LocalCalendarEntryProperty(objectId, PropertyIdentifier.stateText, this, node, propertyNode);
+
+		propertyIdToLocalProperty.put(pid, calendarEntryProperty);
 	}
 	
 	private Node buildPropertyNode(PropertyIdentifier pid){
@@ -346,10 +384,10 @@ public class LocalBacnetPoint extends EditablePoint {
 		ObjectType ot = objectId.getObjectType();
 
 		List<PropertyTypeDefinition> defs = ObjectProperties.getPropertyTypeDefinitions(ot);
-
+        System.out.println("Required properties: " + defs.size());
 		for (PropertyTypeDefinition def : defs) {
-			// System.out.println(def.getClazz() + " : " +
-			// def.getPropertyIdentifier());
+			 System.out.println(def.getClazz() + " : " +
+			 def.getPropertyIdentifier());
 			initializeRequiredProperty(def);
 		}
 		
@@ -391,19 +429,49 @@ public class LocalBacnetPoint extends EditablePoint {
 		} else if (propId.equals(PropertyIdentifier.eventState)) {
 			setupEventStateProperty(PropertyIdentifier.eventState);
 		} else if (propId.equals(PropertyIdentifier.outOfService)) {
-			setupOutOfServiceProperty(PropertyIdentifier.outOfService);
+			setupBooleanProperty(PropertyIdentifier.outOfService);
 		} else if (propId.equals(PropertyIdentifier.polarity)) {
 			setupPolarityProperty(PropertyIdentifier.polarity);
 		} else if (propId.equals(PropertyIdentifier.relinquishDefault)) {
 			setupRelinquishDefaultProperty(PropertyIdentifier.relinquishDefault);
 		} else if (propId.equals(PropertyIdentifier.numberOfStates)) {
-			setupNumberOfStatesProperty(PropertyIdentifier.numberOfStates);
+			this.setupUnitsProperty(PropertyIdentifier.numberOfStates);
 		} else if (propId.equals(PropertyIdentifier.inactiveText)) {
-			setupTextProperty(PropertyIdentifier.inactiveText);
+			setupBinaryStateTextProperty(PropertyIdentifier.inactiveText, false);
 		} else if (propId.equals(PropertyIdentifier.activeText)) {
-			setupTextProperty(PropertyIdentifier.activeText);
+			setupBinaryStateTextProperty(PropertyIdentifier.activeText, true);
 		} else if (propId.equals(PropertyIdentifier.stateText)) {
 			setupStateTextProperty(PropertyIdentifier.stateText);
+		} else if (propId.equals(PropertyIdentifier.description)){
+			setupCharacterStringProperty(PropertyIdentifier.description);
+		} else if (propId.equals(PropertyIdentifier.fileType)){
+			setupCharacterStringProperty(PropertyIdentifier.fileType);
+		} else if (propId.equals(PropertyIdentifier.fileSize)){
+			this.setupUnsignedIntegerProperty(PropertyIdentifier.fileSize);
+		} else if (propId.equals(PropertyIdentifier.recordCount)){
+			this.setupUnsignedIntegerProperty(PropertyIdentifier.recordCount);
+		} else if (propId.equals(PropertyIdentifier.modificationDate)){
+			setupDateTimeProperty(PropertyIdentifier.modificationDate);
+		} else if (propId.equals(PropertyIdentifier.profileName)){
+			setupCharacterStringProperty(PropertyIdentifier.profileName);
+		} else if (propId.equals(PropertyIdentifier.readOnly)){
+			setupBooleanProperty(PropertyIdentifier.readOnly);
+		} else if (propId.equals(PropertyIdentifier.archive)){
+			setupBooleanProperty(PropertyIdentifier.archive);
+		} else if (propId.equals(PropertyIdentifier.fileAccessMethod)){
+			setupFileAccessMethodProperty(PropertyIdentifier.fileAccessMethod);
+		} else if (propId.equals(PropertyIdentifier.eventType)){
+//			setupEventTypeProperty(PropertyIdentifier.eventType);
+		} else if (propId.equals(PropertyIdentifier.eventParameters)){
+//			setupEventParametersProperty(PropertyIdentifier.eventParameters);
+		} else if (propId.equals(PropertyIdentifier.eventEnable)){
+//			setupEventEnableProperty(PropertyIdentifier.eventEnable);
+		}else if (propId.equals(PropertyIdentifier.notifyType)){
+//			setupNotifyTypeProperty(PropertyIdentifier.notifyType);
+		} else if (propId.equals(PropertyIdentifier.eventTimeStamps)){
+//			setupEventTimeStampsProperty(PropertyIdentifier.eventTimeStamps);
+		} else if (propId.equals(PropertyIdentifier.dateList)){
+//			setupCalendarEntryProperty(PropertyIdentifier.dateList);
 		}
 
 	}
@@ -501,101 +569,8 @@ public class LocalBacnetPoint extends EditablePoint {
 
 	}
 
-	// public int getDefaultPriority() {
-	// return defaultPriority;
-	// }
-	//
-	// public void setDefaultPriority(int p) {
-	// this.defaultPriority = p;
-	// }
-
-	// public String getEngineeringUnits() {
-	// return engineeringUnits;
-	// }
-	//
-	// public void setEngineeringUnits(String engineeringUnits) {
-	// this.engineeringUnits = engineeringUnits;
-	// }
-
-	// public String getReferenceDevice() {
-	// return referenceDevice;
-	// }
-	//
-	// public void setReferenceDevice(String referenceDevice) {
-	// this.referenceDevice = referenceDevice;
-	// }
-	//
-	// public String getReferenceObject() {
-	// return referenceObject;
-	// }
-	//
-	// public void setReferenceObject(String referenceObject) {
-	// this.referenceObject = referenceObject;
-	// }
-	//
-	// public String getReferenceProperty() {
-	// return referenceProperty;
-	// }
-	//
-	// public void setReferenceProperty(String referenceProperty) {
-	// this.referenceProperty = referenceProperty;
-	// }
-
 	private static boolean areEqual(ValueType a, ValueType b) {
 		return a == b || (a != null && b != null && a.toJsonString().equals(b.toJsonString()));
-	}
-
-//	private void makeRelinquishAction(Node valnode, int priority) {
-//		Action act = new Action(Permission.READ, new RelinquishHandler(priority));
-//		valnode.createChild("relinquish").setAction(act).build().setSerializable(false);
-//	}
-
-	public static String getPrettyPresentValue(int objectTypeId, String presentValue, List<String> unitsDescription,
-			String referenceObjectTypeDescription, int referenceInstanceNumber, int referenceDeviceId) {
-		if (DeviceFolder.isOneOf(objectTypeId, ObjectType.binaryInput, ObjectType.binaryOutput,
-				ObjectType.binaryValue)) {
-			if ("0".equals(presentValue)) {
-				if (unitsDescription.size() > 0)
-					return unitsDescription.get(0);
-				else
-					return "0";
-			}
-			if ("1".equals(presentValue)) {
-				if (unitsDescription.size() > 1)
-					return unitsDescription.get(1);
-				else
-					return "1";
-			}
-		} else if (DeviceFolder.isOneOf(objectTypeId, ObjectType.multiStateInput, ObjectType.multiStateOutput,
-				ObjectType.multiStateValue)) {
-			try {
-				int index = Integer.parseInt(presentValue) - 1;
-				if (index >= 0) {
-					if (index < unitsDescription.size())
-						return unitsDescription.get(index);
-					else
-						return presentValue;
-				}
-
-			} catch (NumberFormatException e) {
-				// no op
-			}
-		} else if (DeviceFolder.isOneOf(objectTypeId, ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone)) {
-			try {
-				int index = Integer.parseInt(presentValue);
-				return new LifeSafetyState(index).toString();
-			} catch (NumberFormatException e) {
-				// no op
-			}
-		} else if (DeviceFolder.isOneOf(objectTypeId, ObjectType.trendLog)) {
-			if (StringUtils.isEmpty(referenceObjectTypeDescription))
-				return "";
-			return referenceObjectTypeDescription + " " + referenceInstanceNumber + " @ " + ObjectType.device.toString()
-					+ " " + referenceDeviceId + ", " + presentValue;
-		} else if (unitsDescription.size() > 0)
-			return presentValue + " " + unitsDescription.get(0);
-
-		return presentValue;
 	}
 
 	@Override

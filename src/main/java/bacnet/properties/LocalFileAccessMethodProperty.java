@@ -13,40 +13,44 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.serotonin.bacnet4j.type.Encodable;
-import com.serotonin.bacnet4j.type.enumerated.EngineeringUnits;
+import com.serotonin.bacnet4j.type.enumerated.FileAccessMethod;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 
 import bacnet.LocalBacnetPoint;
 
-public class LocalUnitsProperty extends LocalBacnetProperty {
+
+public class LocalFileAccessMethodProperty extends LocalBacnetProperty{
 	private static final Logger LOGGER;
 
 	static {
 		LOGGER = LoggerFactory.getLogger(LocalUnitsProperty.class);
 	}
 
-	EngineeringUnits units;
+	static final String ATTRIBUTE_EVENT_STATE = "event state";
+	static final String ACTION_EDIT = "edit";
 
-	public LocalUnitsProperty(LocalBacnetPoint point, Node parent, Node node) {
+	FileAccessMethod method;
+
+	public LocalFileAccessMethodProperty(LocalBacnetPoint point, Node parent, Node node) {
 		super(point, parent, node);
 
 	}
 	
-	public LocalUnitsProperty(ObjectIdentifier oid, PropertyIdentifier pid, LocalBacnetPoint point, Node parent, Node node){
+	public LocalFileAccessMethodProperty(ObjectIdentifier oid, PropertyIdentifier pid, LocalBacnetPoint point, Node parent, Node node){
 		super(oid, pid, point, parent, node);
 		
-		bacnetObj.writeProperty(PropertyIdentifier.units, EngineeringUnits.degreeDaysCelsius);
+		bacnetObj.writeProperty(PropertyIdentifier.fileAccessMethod, FileAccessMethod.streamAccess);
 		node.setValueType(ValueType.makeEnum(enumeratedNames()));
-		node.setValue(new Value(EngineeringUnits.degreeDaysCelsius.toString()));
+		node.setValue(new Value(FileAccessMethod.streamAccess.toString()));
 		node.setWritable(Writable.WRITE);
 		node.getListener().setValueHandler(new SetHandler());
 	}
 
-	private List<String> enumeratedNames(){
+	private  List<String> enumeratedNames(){
 		List<String> lst = new ArrayList<String>();
-		for (EngineeringUnits u: EngineeringUnits.ALL) {
-			lst.add(u.toString());
+		for (FileAccessMethod method: FileAccessMethod.ALL) {
+			lst.add(method.toString());
 		}
 		return lst;
 	}
@@ -57,29 +61,29 @@ public class LocalUnitsProperty extends LocalBacnetProperty {
 		public void handle(ValuePair event) {
 			if (!event.isFromExternalSource()) return;
 			Value newVal = event.getCurrent();
-			units = parseEngineeringUnits(newVal.getString());		
-			bacnetObj.writeProperty(propertyId, units);	
+			method = parseFileAccessMethod(newVal.getString());
+			bacnetObj.writeProperty(PropertyIdentifier.fileAccessMethod, method);	
 			node.setAttribute(propertyId.toString(), newVal);
 		}
 	}
 
-	protected EngineeringUnits parseEngineeringUnits(String unitsString) {
 
-        for (EngineeringUnits unit: EngineeringUnits.ALL){
-        	if (unit.toString().equals(unitsString)){
-        		return unit;
-        	}
-        }	
+	protected FileAccessMethod parseFileAccessMethod(String methodString) {
+
+		for (FileAccessMethod method : FileAccessMethod.ALL){
+			if(method.toString().equals(methodString)){
+				return method;
+			}
+		}
 
 		return null;
 	}
-
-	@Override
+	
 	public void updatePropertyValue(Encodable enc) {
-		if (enc instanceof EngineeringUnits) {
-			units = (EngineeringUnits) enc;
-			node.setValue(new Value(units.toString()));
+		if (enc instanceof FileAccessMethod) {
+			method = (FileAccessMethod) enc;
+			node.setValue(new Value(method.toString()));
 		}
-		
 	}
 }
+

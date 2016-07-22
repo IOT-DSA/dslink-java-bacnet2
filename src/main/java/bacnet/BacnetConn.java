@@ -21,7 +21,6 @@ import com.serotonin.io.serial.SerialPortProxy;
 import com.serotonin.io.serial.SerialUtils;
 
 import bacnet.properties.LocalBacnetProperty;
-import bacnet.properties.LocalPresentValueProperty;
 
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;

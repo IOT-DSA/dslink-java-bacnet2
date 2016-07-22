@@ -772,32 +772,35 @@ public class Utils {
 		String valuesStr = Arrays.toString(enumData.getEnumConstants());
 		return valuesStr.substring(1, valuesStr.length() - 1).replace(" ", "").split(",");
 	}
-	
-	public  static String[] enumeratedObjectTypeNames(){
+
+	public static String[] enumeratedObjectTypeNames() {
 		String valuesStr = Arrays.toString(ObjectType.ALL);
 		return valuesStr.substring(1, valuesStr.length() - 1).replace(" ", "").split(",");
 	}
-	
-	public static  ObjectType parseObjectType(String typeString) {
 
-        for (ObjectType type: ObjectType.ALL){
-        	if (type.toString().replace(" ", "").equals(typeString.replace(" ", ""))){
-        		return type;
-        	}
-        }	
+	public static ObjectType parseObjectType(String typeString) {
+
+		for (ObjectType type : ObjectType.ALL) {
+			if (type.toString().replace(" ", "").equals(typeString.replace(" ", ""))) {
+				return type;
+			}
+		}
 
 		return null;
 
 	}
-	public static DataType getDataType(ObjectType objectType) {
-		if (isOneOf(objectType, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue))
-			return DataType.BINARY;
-		else if (isOneOf(objectType, ObjectType.multiStateInput, ObjectType.multiStateOutput,
-				ObjectType.multiStateValue, ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone))
-			return DataType.MULTISTATE;
 
-		else
+	public static DataType getDataType(ObjectType objectType) {
+		if (isOneOf(objectType, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
+			return DataType.BINARY;
+		} else if (isOneOf(objectType, ObjectType.multiStateInput, ObjectType.multiStateOutput,
+				ObjectType.multiStateValue, ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone)) {
+			return DataType.MULTISTATE;
+		} else if (isOneOf(objectType, ObjectType.calendar)) {
+			return DataType.BOOLEAN;
+		} else {
 			return DataType.NUMERIC;
+		}
 	}
 
 	public static void addPropertyReferences(PropertyReferences refs, ObjectIdentifier oid) {
@@ -866,8 +869,9 @@ public class Utils {
 			return "";
 		return StringUtils.encodeName(s);
 	}
-	
-	public static Encodable valueToEncodable(DataType dataType, Value value, ObjectType objectType, PropertyIdentifier propertyId, List<String> unitsDescription) {
+
+	public static Encodable valueToEncodable(DataType dataType, Value value, ObjectType objectType,
+			PropertyIdentifier propertyId, List<String> unitsDescription) {
 		Class<? extends Encodable> clazz = ObjectProperties.getPropertyTypeDefinition(objectType, propertyId)
 				.getClazz();
 

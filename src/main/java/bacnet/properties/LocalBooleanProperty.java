@@ -42,8 +42,7 @@ public class LocalBooleanProperty extends LocalBacnetProperty {
 			Value newVal = event.getCurrent();
 			state = newVal.getBool();
 			
-			bacnetObj.writeProperty(propertyId, new com.serotonin.bacnet4j.type.primitive.Boolean(state));
-			
+			bacnetObj.writeProperty(propertyId, new com.serotonin.bacnet4j.type.primitive.Boolean(state));		
 			node.setAttribute(propertyId.toString(), newVal);
 		}
 	}

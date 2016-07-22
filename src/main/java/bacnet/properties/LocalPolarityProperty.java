@@ -19,7 +19,6 @@ import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 public class LocalPolarityProperty extends LocalBacnetProperty {
 	
 	static final String ATTRIBUTE_POLARITY = "Polarity";
-	static final String ACTION_EDIT = "edit";
 	
 	Polarity polarity;
 	
@@ -45,10 +44,8 @@ public class LocalPolarityProperty extends LocalBacnetProperty {
 		public void handle(ValuePair event) {
 			if (!event.isFromExternalSource()) return;
 			Value newVal = event.getCurrent();
-			polarity = parsePolarity(newVal.getString());
-			
-			bacnetObj.writeProperty(PropertyIdentifier.polarity, polarity);
-			
+			polarity = parsePolarity(newVal.getString());	
+			bacnetObj.writeProperty(PropertyIdentifier.polarity, polarity);	
 			node.setAttribute(ATTRIBUTE_POLARITY, newVal);
 		}
 	}
