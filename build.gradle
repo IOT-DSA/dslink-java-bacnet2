@@ -18,8 +18,8 @@ repositories {
 }
  
 dependencies {
-    compile 'org.iot-dsa:dslink:0.15.0'
-    compile 'org.iot-dsa:historian:0.15.0'
+    compile 'org.iot-dsa:dslink:0.16.0-SNAPSHOT'
+    compile 'org.iot-dsa:historian:0.16.0-SNAPSHOT'
     compile 'org.apache.commons:commons-lang3:3.0'
     compile 'commons-logging:commons-logging:1.1.1'
     compile 'org.scream3r:jssc:2.8.0'
