@@ -140,8 +140,9 @@ class BacnetConn {
 		int port = node.getAttribute("port").getNumber().intValue();
 		String lba = node.getAttribute("local bind address").getString();
 		boolean isfd = node.getAttribute("register as foreign device in bbmd").getBool();
-		String bbmdip = node.getAttribute("bbmd ip").getString();
-		int bbmdport = node.getAttribute("bbmd port").getNumber().intValue();
+		String bbmdips = node.getAttribute("bbmd ips").getString();
+//		String bbmdip = node.getAttribute("bbmd ip").getString();
+//		int bbmdport = node.getAttribute("bbmd port").getNumber().intValue();
 		String commPort = node.getAttribute("comm port id").getString();
 		int baud = node.getAttribute("baud rate").getNumber().intValue();
 		int station = node.getAttribute("this station id").getNumber().intValue();
@@ -207,13 +208,26 @@ class BacnetConn {
 			try {
 				localDevice.initialize();
 				if (isIP && isfd) {
-					try {
-						((IpNetwork) network).registerAsForeignDevice(
-								new InetSocketAddress(InetAddress.getByName(bbmdip), bbmdport), 100);
-					} catch (UnknownHostException e) {
-						LOGGER.debug("", e);
-					} catch (BACnetException e) {
-						LOGGER.debug("", e);
+					for (String s: bbmdips.split(",")) {
+						s = s.trim();
+						if (!s.isEmpty()) {
+							String[] arr = s.split(":");
+							String bbmdip = arr[0];
+							int bbmdport;
+							try {
+								bbmdport = arr.length < 2 ? 47808 : Integer.parseInt(arr[1]);
+							} catch (Exception e) {
+								bbmdport = 47808;
+							}
+							try {
+								((IpNetwork) network).registerAsForeignDevice(
+										new InetSocketAddress(InetAddress.getByName(bbmdip), bbmdport), 100);
+							} catch (UnknownHostException e) {
+								LOGGER.debug("", e);
+							} catch (BACnetException e) {
+								LOGGER.debug("", e);
+							}
+						}
 					}
 				}
 				localDevice.getEventHandler().addListener(this.listener);
@@ -384,8 +398,9 @@ class BacnetConn {
 					new Parameter("local bind address", ValueType.STRING, node.getAttribute("local bind address")));
 			act.addParameter(new Parameter("register as foreign device in bbmd", ValueType.BOOL,
 					node.getAttribute("register as foreign device in bbmd")));
-			act.addParameter(new Parameter("bbmd ip", ValueType.STRING, node.getAttribute("bbmd ip")));
-			act.addParameter(new Parameter("bbmd port", ValueType.NUMBER, node.getAttribute("bbmd port")));
+			act.addParameter(new Parameter("bbmd ips", ValueType.STRING, node.getAttribute("bbmd ips")));
+//			act.addParameter(new Parameter("bbmd ip", ValueType.STRING, node.getAttribute("bbmd ip")));
+//			act.addParameter(new Parameter("bbmd port", ValueType.NUMBER, node.getAttribute("bbmd port")));
 		} else {
 			Set<String> portids = BacnetLink.listPorts();
 			if (portids.size() > 0) {
@@ -460,15 +475,17 @@ class BacnetConn {
 				int port = event.getParameter("port", ValueType.NUMBER).getNumber().intValue();
 				String lba = event.getParameter("local bind address", ValueType.STRING).getString();
 				boolean isfd = event.getParameter("register as foreign device in bbmd", ValueType.BOOL).getBool();
-				String bbmdip = event.getParameter("bbmd ip", ValueType.STRING).getString();
-				int bbmdport = event.getParameter("bbmd port", ValueType.NUMBER).getNumber().intValue();
+				String bbmdips = event.getParameter("bbmd ips", ValueType.STRING).getString();
+//				String bbmdip = event.getParameter("bbmd ip", ValueType.STRING).getString();
+//				int bbmdport = event.getParameter("bbmd port", ValueType.NUMBER).getNumber().intValue();
 
 				node.setAttribute("broadcast ip", new Value(bip));
 				node.setAttribute("port", new Value(port));
 				node.setAttribute("local bind address", new Value(lba));
 				node.setAttribute("register as foreign device in bbmd", new Value(isfd));
-				node.setAttribute("bbmd ip", new Value(bbmdip));
-				node.setAttribute("bbmd port", new Value(bbmdport));
+				node.setAttribute("bbmd ips", new Value(bbmdips));
+//				node.setAttribute("bbmd ip", new Value(bbmdip));
+//				node.setAttribute("bbmd port", new Value(bbmdport));
 			} else {
 				String commPort = event.getParameter("comm port id", ValueType.STRING).getString();
 				int baud = event.getParameter("baud rate", ValueType.NUMBER).getNumber().intValue();

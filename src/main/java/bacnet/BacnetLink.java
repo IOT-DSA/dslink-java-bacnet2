@@ -22,6 +22,7 @@ import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.serializer.Deserializer;
 import org.dsa.iot.dslink.serializer.Serializer;
 import org.dsa.iot.dslink.util.handler.Handler;
+import org.dsa.iot.dslink.util.json.JsonArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,8 +70,9 @@ public class BacnetLink {
 		act.addParameter(new Parameter("local bind address", ValueType.STRING, new Value("0.0.0.0")));
 		act.addParameter(new Parameter("local network number", ValueType.NUMBER, new Value(0)));
 		act.addParameter(new Parameter("register as foreign device in bbmd", ValueType.BOOL, new Value(false)));
-		act.addParameter(new Parameter("bbmd ip", ValueType.STRING));
-		act.addParameter(new Parameter("bbmd port", ValueType.NUMBER, new Value(47808)));
+		act.addParameter(new Parameter("bbmd ips", ValueType.STRING));
+//		act.addParameter(new Parameter("bbmd ip", ValueType.STRING));
+//		act.addParameter(new Parameter("bbmd port", ValueType.NUMBER, new Value(47808)));
 		act.addParameter(new Parameter("strict device comparisons", ValueType.BOOL, new Value(true)));
 		act.addParameter(new Parameter("Timeout", ValueType.NUMBER, new Value(6000)));
 		act.addParameter(new Parameter("segment timeout", ValueType.NUMBER, new Value(5000)));
@@ -206,12 +208,18 @@ public class BacnetLink {
 			Value isfd = child.getAttribute("register as foreign device in bbmd");
 			if (isfd == null)
 				child.setAttribute("register as foreign device in bbmd", new Value(false));
-			Value bbmdip = child.getAttribute("bbmd ip");
-			if (bbmdip == null)
-				child.setAttribute("bbmd ip", new Value(" "));
-			Value bbmdport = child.getAttribute("bbmd port");
-			if (bbmdport == null)
-				child.setAttribute("bbmd port", new Value(0));
+			Value bbmdips = child.getAttribute("bbmd ips");
+			if (bbmdips == null) {
+				Value bbmdip = child.getAttribute("bbmd ip");
+				Value bbmdport = child.getAttribute("bbmd port");
+				if (bbmdip != null && bbmdport != null) {
+					String iplist = bbmdip.getString() + ":" + bbmdport.getNumber().toString();
+					child.setAttribute("bbmd ips", new Value(iplist));
+				} else {
+					child.setAttribute("bbmd ips", new Value(" "));
+				}
+			}
+			
 			Value commPort = child.getAttribute("comm port id");
 			Value baud = child.getAttribute("baud rate");
 			Value station = child.getAttribute("this station id");
@@ -297,16 +305,18 @@ public class BacnetLink {
 			int station = 0;
 			int ferc = 1;
 			boolean isfd = false;
-			String bbmdip = " ";
-			int bbmdport = 0;
+//			String bbmdip = " ";
+//			int bbmdport = 0;
+			String bbmdips = " ";
 			if (isIP) {
 				bip = event.getParameter("broadcast ip", ValueType.STRING).getString();
 				port = event.getParameter("port", ValueType.NUMBER).getNumber().intValue();
 				lba = event.getParameter("local bind address", ValueType.STRING).getString();
 
 				isfd = event.getParameter("register as foreign device in bbmd", ValueType.BOOL).getBool();
-				bbmdip = event.getParameter("bbmd ip", new Value(" ")).getString();
-				bbmdport = event.getParameter("bbmd port", ValueType.NUMBER).getNumber().intValue();
+				bbmdips = event.getParameter("bbmd ips", ValueType.STRING).getString();
+//				bbmdip = event.getParameter("bbmd ip", new Value(" ")).getString();
+//				bbmdport = event.getParameter("bbmd port", ValueType.NUMBER).getNumber().intValue();
 
 			} else {
 				commPort = event.getParameter("comm port id", ValueType.STRING).getString();
@@ -332,8 +342,9 @@ public class BacnetLink {
 			child.setAttribute("port", new Value(port));
 			child.setAttribute("local bind address", new Value(lba));
 			child.setAttribute("register as foreign device in bbmd", new Value(isfd));
-			child.setAttribute("bbmd ip", new Value(bbmdip));
-			child.setAttribute("bbmd port", new Value(bbmdport));
+			child.setAttribute("bbmd ips", new Value(bbmdips));
+//			child.setAttribute("bbmd ip", new Value(bbmdip));
+//			child.setAttribute("bbmd port", new Value(bbmdport));
 			child.setAttribute("comm port id", new Value(commPort));
 			child.setAttribute("baud rate", new Value(baud));
 			child.setAttribute("this station id", new Value(station));
