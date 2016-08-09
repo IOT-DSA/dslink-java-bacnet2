@@ -314,7 +314,7 @@ public class BacnetLink {
 				lba = event.getParameter("local bind address", ValueType.STRING).getString();
 
 				isfd = event.getParameter("register as foreign device in bbmd", ValueType.BOOL).getBool();
-				bbmdips = event.getParameter("bbmd ips", ValueType.STRING).getString();
+				bbmdips = event.getParameter("bbmd ips", new Value(" ")).getString();
 //				bbmdip = event.getParameter("bbmd ip", new Value(" ")).getString();
 //				bbmdport = event.getParameter("bbmd port", ValueType.NUMBER).getNumber().intValue();
 
