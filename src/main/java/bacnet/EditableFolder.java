@@ -32,12 +32,12 @@ public abstract class EditableFolder {
 	static final String ATTRIBUTE_OBJECT_TYPE = "object type";
 
 	static final String ATTRIBUTE_RESTORE_TYPE = "restore type";
-	static final String RESTORE_EDITABLE_FOLDER = "editable folder";
-	static final String RESTORE_EDITABLE_POINT = "editable point";
+	static final String ATTRIBUTE_EDITABLE_FOLDER = "editable folder";
+	static final String ATTRIBUTE_EDITABLE_POINT = "editable point";
 
 	static final String ATTRIBUTE_OBJECT_INSTANCE_NUMBER = "object instance number";
 	static final String ATTRIBUTE_USE_COV = "use COV";
-	static final String ATTRIBUTE_SETTANLE = "settable";
+	static final String ATTRIBUTE_SETTABLE = "settable";
 	static final String ATTRIBUTE_DEFAULT_PRIORITY = "default priority";
 
 	protected BacnetConn conn;
@@ -121,7 +121,7 @@ public abstract class EditableFolder {
 		act.addParameter(new Parameter(ATTRIBUTE_OBJECT_TYPE, ValueType.makeEnum(Utils.enumeratedObjectTypeNames())));
 		act.addParameter(new Parameter(ATTRIBUTE_OBJECT_INSTANCE_NUMBER, ValueType.NUMBER, new Value(0)));
 		act.addParameter(new Parameter(ATTRIBUTE_USE_COV, ValueType.BOOL, new Value(false)));
-		act.addParameter(new Parameter(ATTRIBUTE_SETTANLE, ValueType.BOOL, new Value(false)));
+		act.addParameter(new Parameter(ATTRIBUTE_SETTABLE, ValueType.BOOL, new Value(false)));
 		node.createChild(ACTION_ADD_OBJECT).setAction(act).build().setSerializable(false);
 	}
 
