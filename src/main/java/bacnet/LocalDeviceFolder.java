@@ -100,33 +100,19 @@ public class LocalDeviceFolder extends EditableFolder {
 			pt.setDataType(DataType.MULTISTATE);
 	}
 
-	void addObjectPoint(ObjectIdentifier oid, PropertyReferences refs, Map<ObjectIdentifier, LocalBacnetPoint> points) {
-		Utils.addPropertyReferences(refs, oid);
-
-		LocalBacnetPoint pt = new LocalBacnetPoint(this, node, oid);
-
-		boolean defaultSettable = Utils.isOneOf(oid.getObjectType(), ObjectType.analogOutput, ObjectType.analogValue,
-				ObjectType.binaryOutput, ObjectType.binaryValue, ObjectType.multiStateOutput,
-				ObjectType.multiStateValue);
-
-		pt.setSettable(defaultSettable);
-
-		points.put(oid, pt);
-	}
-
 	@Override
 	protected void addObject(String name, ObjectType objectType, ActionResult event) {
 
-		int instNum = event.getParameter("object instance number", ValueType.NUMBER).getNumber().intValue();
-		boolean cov = event.getParameter("use COV", ValueType.BOOL).getBool();
-		boolean settable = event.getParameter("settable", ValueType.BOOL).getBool();
+		int instNum = event.getParameter(ATTRIBUTE_OBJECT_INSTANCE_NUMBER, ValueType.NUMBER).getNumber().intValue();
+		boolean cov = event.getParameter(ATTRIBUTE_USE_COV, ValueType.BOOL).getBool();
+		boolean settable = event.getParameter(ATTRIBUTE_SETTABLE, ValueType.BOOL).getBool();
 
 		Node pointNode = node.createChild(name).build();
-		pointNode.setAttribute("object type", new Value(objectType.toString()));
-		pointNode.setAttribute("object instance number", new Value(instNum));
-		pointNode.setAttribute("use COV", new Value(cov));
-		pointNode.setAttribute("settable", new Value(settable));
-		pointNode.setAttribute("restore type", new Value("loal point"));
+		pointNode.setAttribute(ATTRIBUTE_OBJECT_TYPE, new Value(objectType.toString()));
+		pointNode.setAttribute(ATTRIBUTE_OBJECT_INSTANCE_NUMBER, new Value(instNum));
+		pointNode.setAttribute(ATTRIBUTE_USE_COV, new Value(cov));
+		pointNode.setAttribute(ATTRIBUTE_SETTABLE, new Value(settable));
+		pointNode.setAttribute(ATTRIBUTE_RESTORE_TYPE, new Value(ATTRIBUTE_EDITABLE_POINT));
 
 		LocalBacnetPoint bacnetPoint = new LocalBacnetPoint(this, node, pointNode);
 		BACnetObject bacnetObj = bacnetPoint.getBacnetObj();
@@ -170,10 +156,10 @@ public class LocalDeviceFolder extends EditableFolder {
 
 		for (Node child : node.getChildren().values()) {
 			Value resType = child.getAttribute(ATTRIBUTE_RESTORE_TYPE);
-			if (resType != null && RESTORE_EDITABLE_FOLDER.equals(resType.getString())) {
+			if (resType != null && ATTRIBUTE_EDITABLE_FOLDER.equals(resType.getString())) {
 				LocalDeviceFolder localFolder = new LocalDeviceFolder(conn, this.getRoot(), child);
 				localFolder.restoreLastSession(child);
-			} else if (resType != null && RESTORE_EDITABLE_POINT.equals(resType.getString())) {
+			} else if (resType != null && ATTRIBUTE_EDITABLE_POINT.equals(resType.getString())) {
 				Value ot = child.getAttribute(ATTRIBUTE_OBJECT_TYPE);
 				Value inum = child.getAttribute(ATTRIBUTE_OBJECT_INSTANCE_NUMBER);
 				Value defp = child.getAttribute(ATTRIBUTE_DEFAULT_PRIORITY);
