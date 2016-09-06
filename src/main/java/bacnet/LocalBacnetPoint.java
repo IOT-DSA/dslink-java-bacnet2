@@ -46,14 +46,7 @@ public class LocalBacnetPoint extends EditablePoint {
 
 	private static PointCounter numPoints = new PointCounter();
 
-	private int defaultPriority;
-	private int objectTypeId;
-	private int instanceNumber;
-	private String objectTypeDescription;
-	private String objectName;
 	private String presentValue;
-	private boolean cov;
-	private boolean settable;
 
 	private DataType dataType;
 	private List<String> unitsDescription = new ArrayList<String>();
@@ -293,7 +286,7 @@ public class LocalBacnetPoint extends EditablePoint {
 	protected void setupRelinquishDefaultProperty(PropertyIdentifier pid) {
 		setupPresentValueProperty(pid);
 	}
-	
+
 	/*
 	 * For any property whose type is UnsignedInteger
 	 */
@@ -329,7 +322,8 @@ public class LocalBacnetPoint extends EditablePoint {
 	protected void setupNumberOfStatesProperty(PropertyIdentifier pid) {
 		Node propertyNode = buildPropertyNode(pid);
 		LocalNumberOfStatesProperty numberOfStateProperty = new LocalNumberOfStatesProperty(objectId,
-				PropertyIdentifier.numberOfStates, this, node, propertyNode, LocalNumberOfStatesProperty.DEFAULT_NUMBER_OF_STATE);
+				PropertyIdentifier.numberOfStates, this, node, propertyNode,
+				LocalNumberOfStatesProperty.DEFAULT_NUMBER_OF_STATE);
 
 		propertyIdToLocalProperty.put(PropertyIdentifier.numberOfStates, numberOfStateProperty);
 	}
@@ -368,7 +362,6 @@ public class LocalBacnetPoint extends EditablePoint {
 			// def.getPropertyIdentifier());
 			initializeRequiredProperty(def);
 		}
-		LOGGER.info("all properties are set up");
 	}
 
 	/*

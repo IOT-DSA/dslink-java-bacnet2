@@ -68,16 +68,16 @@ public abstract class EditableFolder {
 
 	protected class AddFolderHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
-			String name = event.getParameter("name", ValueType.STRING).getString();
+			String name = event.getParameter(ATTRIBUTE_NAME, ValueType.STRING).getString();
 			node.createChild(name).build();
 			addFolder(name);
 		}
 	}
 
-	private class AddObjectHandler implements Handler<ActionResult> {
+	protected class AddObjectHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
-			String name = event.getParameter("name", ValueType.STRING).getString();
-			ObjectType objectType = Utils.parseObjectType(event.getParameter("object type").getString());
+			String name = event.getParameter(ATTRIBUTE_NAME, ValueType.STRING).getString();
+			ObjectType objectType = Utils.parseObjectType(event.getParameter(ATTRIBUTE_OBJECT_TYPE).getString());
 
 			addObject(name, objectType, event);
 		}
@@ -89,12 +89,19 @@ public abstract class EditableFolder {
 		}
 	}
 
-	protected static class CopyHandler implements Handler<ActionResult> {
+	protected class CopyHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
-			// String newname = event.getParameter("name",
-			// ValueType.STRING).getString();
-			// if (newname.length() > 0 && !newname.equals(node.getName()))
-			// duplicate(newname);
+			String newname = event.getParameter(ATTRIBUTE_NAME, ValueType.STRING).getString();
+			if (newname.length() > 0 && !newname.equals(node.getName()))
+				duplicate(newname);
+		}
+	}
+
+	private void duplicate(String newname) {
+		if (newname != null && newname.length() > 0 && !newname.equals(node.getName())) {
+			Node parent = node.getParent();
+			parent.removeChild(node);
+			node = parent.createChild(newname).build();
 		}
 	}
 

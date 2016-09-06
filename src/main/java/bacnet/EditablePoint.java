@@ -57,9 +57,15 @@ public abstract class EditablePoint {
 	Node node;
 
 	BACnetObject bacnetObj;
-
-	private int defaultPriority;
 	ObjectIdentifier objectId;
+	String objectTypeDescription;
+	int objectTypeId;
+	ObjectType objectType;
+	int instanceNumber;
+	String objectName;
+	boolean cov;
+	boolean settable;
+	int defaultPriority;
 	// PropertyIdentifier propertyId;
 	int id;
 	Map<PropertyIdentifier, LocalBacnetProperty> propertyIdToLocalProperty;
@@ -173,14 +179,26 @@ public abstract class EditablePoint {
 
 	protected class EditHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
-			String newname = event.getParameter(ATTRIBUTE_NAME, ValueType.STRING).getString();
-			if (newname != null && newname.length() > 0 && !newname.equals(node.getName())) {
-				parent.removeChild(node);
-				node = parent.createChild(newname).build();
+			String name = event.getParameter(ATTRIBUTE_NAME, ValueType.STRING).getString();
+			if (name != null && name.length() > 0 && !name.equals(node.getName())) {
+				duplicate(name);
 			}
+			objectTypeDescription = Utils.parseObjectType(event.getParameter(ATTRIBUTE_OBJECT_TYPE).getString())
+					.toString();
+			instanceNumber = event.getParameter(ATTRIBUTE_OBJECT_INSTANCE_NUMBER, ValueType.NUMBER).getNumber()
+					.intValue();
+			cov = event.getParameter(ATTRIBUTE_USE_COV, ValueType.BOOL).getBool();
+			settable = event.getParameter(ATTRIBUTE_SETTABLE, ValueType.BOOL).getBool();
 
 			setupNode();
+		}
+	}
 
+	private void duplicate(String newname) {
+		if (newname != null && newname.length() > 0 && !newname.equals(node.getName())) {
+			Node parent = node.getParent();
+			parent.removeChild(node);
+			node = parent.createChild(newname).build();
 		}
 	}
 
