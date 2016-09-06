@@ -44,6 +44,14 @@ public abstract class EditablePoint {
     
 	static final String PROPERTY_DATA_TYPE = "dataType";
 	static final String PROPERTY_OBJECT_NAME = "objectName";
+	static final int    PRIORITY_NON_WRITABLE = -1;
+	
+	static final String ATTRIBUTE_NAME = "name";
+	static final String ATTRIBUTE_OBJECT_TYPE = "object type";
+	static final String ATTRIBUTE_OBJECT_INSTANCE_NUMBER = "object instance number";
+	static final String ATTRIBUTE_USE_COV = "use COV";
+	static final String ATTRIBUTE_SETTABLE = "settable";
+	static final String ATTRIBUTE_DEFAULT_PRIORITY = "default priority";
 	
 	EditableFolder folder;
     Node parent;
@@ -70,42 +78,49 @@ public abstract class EditablePoint {
 		this.makePointActions();
 	}
 	
-	protected void makePointActions() {
+	protected void makeRemoveAction(){
 		Action act = new Action(Permission.READ, new RemoveHandler());
-		Node anode = node.getChild(ACTION_REMOVE);
-		if (anode == null)
+		Node actionNode = node.getChild(ACTION_REMOVE);
+		if (actionNode == null)
 			node.createChild(ACTION_REMOVE).setAction(act).build().setSerializable(false);
 		else
-			anode.setAction(act);
-
-		act = new Action(Permission.READ, new EditHandler());
-		act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
-		act.addParameter(new Parameter("object type",
-				ValueType.makeEnum(Utils.enumNames(ObjectType.class)),
-				node.getAttribute("object type")));
+			actionNode.setAction(act);
+	}
+	
+	protected void makeEditAction(){
+		Action act = new Action(Permission.READ, new EditHandler());
+		act.addParameter(new Parameter(ATTRIBUTE_NAME, ValueType.STRING, new Value(node.getName())));
+		act.addParameter(new Parameter(ATTRIBUTE_OBJECT_TYPE,
+				ValueType.makeEnum(Utils.enumeratedObjectTypeNames())));
 		act.addParameter(
-				new Parameter("object instance number", ValueType.NUMBER, node.getAttribute("object instance number")));
-		act.addParameter(new Parameter("use COV", ValueType.BOOL, node.getAttribute("use COV")));
-		act.addParameter(new Parameter("settable", ValueType.BOOL, node.getAttribute("settable")));
-		act.addParameter(new Parameter("default priority", ValueType.NUMBER, node.getAttribute("default priority")));
-		anode = node.getChild(ACTION_EDIT);
-		if (anode == null)
+				new Parameter(ATTRIBUTE_OBJECT_INSTANCE_NUMBER, ValueType.NUMBER, node.getAttribute(ATTRIBUTE_OBJECT_INSTANCE_NUMBER)));
+		act.addParameter(new Parameter(ATTRIBUTE_USE_COV, ValueType.BOOL, node.getAttribute(ATTRIBUTE_USE_COV)));
+		act.addParameter(new Parameter(ATTRIBUTE_SETTABLE, ValueType.BOOL, node.getAttribute(ATTRIBUTE_SETTABLE)));
+		act.addParameter(new Parameter(ATTRIBUTE_DEFAULT_PRIORITY, ValueType.NUMBER, node.getAttribute(ATTRIBUTE_DEFAULT_PRIORITY)));
+		Node actionNode = node.getChild(ACTION_EDIT);
+		if (actionNode == null)
 			node.createChild(ACTION_EDIT).setAction(act).build().setSerializable(false);
 		else
-			anode.setAction(act);
-
-		act = new Action(Permission.READ, new CopyHandler());
-		act.addParameter(new Parameter("name", ValueType.STRING));
-		anode = node.getChild(ACTION_MAKE_COPY);
-		if (anode == null) {
+			actionNode.setAction(act);
+		
+	}
+	
+	protected void makeCopyAction(){
+		Action act = new Action(Permission.READ, new CopyHandler());
+		act.addParameter(new Parameter(ATTRIBUTE_NAME, ValueType.STRING));
+		Node actionNode = node.getChild(ACTION_MAKE_COPY);
+		if (actionNode == null) {
 			node.createChild(ACTION_MAKE_COPY).setAction(act).build().setSerializable(false);
 		} else {
-			anode.setAction(act);
-		}
-
-		makeSetAction(node, -1);			
-
-
+			actionNode.setAction(act);
+		}	
+	}
+	
+	protected void makePointActions() {
+        makeRemoveAction();
+        makeEditAction();
+        makeCopyAction();
+		makeSetAction(node, PRIORITY_NON_WRITABLE);			
 	}
 	
 	protected void makeSetAction(Node node, int priority) {
@@ -159,7 +174,7 @@ public abstract class EditablePoint {
 	
 	protected class EditHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
-			String newname = event.getParameter("name", ValueType.STRING).getString();
+			String newname = event.getParameter(ATTRIBUTE_NAME, ValueType.STRING).getString();
 			if (newname != null && newname.length() > 0 && !newname.equals(node.getName())) {
 				parent.removeChild(node);
 				node = parent.createChild(newname).build();

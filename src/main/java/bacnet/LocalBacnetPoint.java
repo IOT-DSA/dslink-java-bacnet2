@@ -173,7 +173,7 @@ public class LocalBacnetPoint extends EditablePoint {
 		node.setAttribute("restore type", new Value("editable point"));
 
 		makePointActions();
-		makeSetAction(node, -1);
+		makeSetAction(node, PRIORITY_NON_WRITABLE);
 
 		setupDataTypeProperty();
 		setupObjectNameProperty();
