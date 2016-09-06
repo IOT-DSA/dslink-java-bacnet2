@@ -16,7 +16,6 @@ import org.dsa.iot.dslink.util.handler.Handler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 import com.serotonin.bacnet4j.exception.BACnetServiceException;
 import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.obj.ObjectProperties;
@@ -28,57 +27,57 @@ import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 
 import bacnet.properties.LocalBacnetProperty;
 
-
 public abstract class EditablePoint {
 	private static final Logger LOGGER;
+
 	static {
 		LOGGER = LoggerFactory.getLogger(EditablePoint.class);
 	}
-	
+
 	static final String ACTION_REMOVE = "remove";
 	static final String ACTION_EDIT = "edit";
 	static final String ACTION_MAKE_COPY = "make copy";
 
-    static final String RESTORE_TYPE = "restore type";
-    static final String RESTORE_EDITABLE_POINT = "editable point";
-    
+	static final String RESTORE_TYPE = "restore type";
+	static final String RESTORE_EDITABLE_POINT = "editable point";
+
 	static final String PROPERTY_DATA_TYPE = "dataType";
 	static final String PROPERTY_OBJECT_NAME = "objectName";
-	static final int    PRIORITY_NON_WRITABLE = -1;
-	
+	static final int PRIORITY_NON_WRITABLE = -1;
+
 	static final String ATTRIBUTE_NAME = "name";
 	static final String ATTRIBUTE_OBJECT_TYPE = "object type";
 	static final String ATTRIBUTE_OBJECT_INSTANCE_NUMBER = "object instance number";
 	static final String ATTRIBUTE_USE_COV = "use COV";
 	static final String ATTRIBUTE_SETTABLE = "settable";
 	static final String ATTRIBUTE_DEFAULT_PRIORITY = "default priority";
-	
+
 	EditableFolder folder;
-    Node parent;
+	Node parent;
 	Node node;
 
 	BACnetObject bacnetObj;
-	
+
 	private int defaultPriority;
 	ObjectIdentifier objectId;
-//	PropertyIdentifier propertyId;
+	// PropertyIdentifier propertyId;
 	int id;
-	Map<PropertyIdentifier, LocalBacnetProperty> propertyIdToLocalProperty; 
-	
-	public EditablePoint(EditableFolder folder, Node parent){
+	Map<PropertyIdentifier, LocalBacnetProperty> propertyIdToLocalProperty;
+
+	public EditablePoint(EditableFolder folder, Node parent) {
 		this.folder = folder;
 		this.parent = parent;
 	}
-	
-	public EditablePoint(EditableFolder folder, Node parent, Node node){
-        this(folder, parent);
-        
+
+	public EditablePoint(EditableFolder folder, Node parent, Node node) {
+		this(folder, parent);
+
 		this.node = node;
-		
+
 		this.makePointActions();
 	}
-	
-	protected void makeRemoveAction(){
+
+	protected void makeRemoveAction() {
 		Action act = new Action(Permission.READ, new RemoveHandler());
 		Node actionNode = node.getChild(ACTION_REMOVE);
 		if (actionNode == null)
@@ -86,26 +85,26 @@ public abstract class EditablePoint {
 		else
 			actionNode.setAction(act);
 	}
-	
-	protected void makeEditAction(){
+
+	protected void makeEditAction() {
 		Action act = new Action(Permission.READ, new EditHandler());
 		act.addParameter(new Parameter(ATTRIBUTE_NAME, ValueType.STRING, new Value(node.getName())));
-		act.addParameter(new Parameter(ATTRIBUTE_OBJECT_TYPE,
-				ValueType.makeEnum(Utils.enumeratedObjectTypeNames())));
-		act.addParameter(
-				new Parameter(ATTRIBUTE_OBJECT_INSTANCE_NUMBER, ValueType.NUMBER, node.getAttribute(ATTRIBUTE_OBJECT_INSTANCE_NUMBER)));
+		act.addParameter(new Parameter(ATTRIBUTE_OBJECT_TYPE, ValueType.makeEnum(Utils.enumeratedObjectTypeNames())));
+		act.addParameter(new Parameter(ATTRIBUTE_OBJECT_INSTANCE_NUMBER, ValueType.NUMBER,
+				node.getAttribute(ATTRIBUTE_OBJECT_INSTANCE_NUMBER)));
 		act.addParameter(new Parameter(ATTRIBUTE_USE_COV, ValueType.BOOL, node.getAttribute(ATTRIBUTE_USE_COV)));
 		act.addParameter(new Parameter(ATTRIBUTE_SETTABLE, ValueType.BOOL, node.getAttribute(ATTRIBUTE_SETTABLE)));
-		act.addParameter(new Parameter(ATTRIBUTE_DEFAULT_PRIORITY, ValueType.NUMBER, node.getAttribute(ATTRIBUTE_DEFAULT_PRIORITY)));
+		act.addParameter(new Parameter(ATTRIBUTE_DEFAULT_PRIORITY, ValueType.NUMBER,
+				node.getAttribute(ATTRIBUTE_DEFAULT_PRIORITY)));
 		Node actionNode = node.getChild(ACTION_EDIT);
 		if (actionNode == null)
 			node.createChild(ACTION_EDIT).setAction(act).build().setSerializable(false);
 		else
 			actionNode.setAction(act);
-		
+
 	}
-	
-	protected void makeCopyAction(){
+
+	protected void makeCopyAction() {
 		Action act = new Action(Permission.READ, new CopyHandler());
 		act.addParameter(new Parameter(ATTRIBUTE_NAME, ValueType.STRING));
 		Node actionNode = node.getChild(ACTION_MAKE_COPY);
@@ -113,34 +112,35 @@ public abstract class EditablePoint {
 			node.createChild(ACTION_MAKE_COPY).setAction(act).build().setSerializable(false);
 		} else {
 			actionNode.setAction(act);
-		}	
+		}
 	}
-	
+
 	protected void makePointActions() {
-        makeRemoveAction();
-        makeEditAction();
-        makeCopyAction();
-		makeSetAction(node, PRIORITY_NON_WRITABLE);			
+		makeRemoveAction();
+		makeEditAction();
+		makeCopyAction();
+		makeSetAction(node, PRIORITY_NON_WRITABLE);
 	}
-	
+
 	protected void makeSetAction(Node node, int priority) {
 		node.setWritable(Writable.WRITE);
 		node.getListener().setValueHandler(new RawSetHandler(priority));
 	}
-	
-	public boolean isPresentValueRequired(){
+
+	public boolean isPresentValueRequired() {
 		ObjectType ot = objectId.getObjectType();
 		// only initialize the required properties
 		List<PropertyTypeDefinition> defs = ObjectProperties.getRequiredPropertyTypeDefinitions(ot);
-		for (PropertyTypeDefinition def: defs){
+		for (PropertyTypeDefinition def : defs) {
 			PropertyIdentifier pid = def.getPropertyIdentifier();
-			if (pid.equals(PropertyIdentifier.presentValue)){
+			if (pid.equals(PropertyIdentifier.presentValue)) {
 				return true;
 			}
 		}
-		
+
 		return false;
 	}
+
 	private class RawSetHandler implements Handler<ValuePair> {
 		private int priority;
 
@@ -155,12 +155,11 @@ public abstract class EditablePoint {
 			Value newVal = event.getCurrent();
 			int newProirity = (priority > -1) ? priority : defaultPriority;
 			handleSet(newVal, newProirity, true);
-			
+
 			Node presentValueNode = node.getChild(PropertyIdentifier.presentValue.toString());
 			presentValueNode.setValue(newVal);
 		}
 	}
-
 
 	protected class CopyHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
@@ -171,7 +170,7 @@ public abstract class EditablePoint {
 			makeCopy();
 		}
 	}
-	
+
 	protected class EditHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			String newname = event.getParameter(ATTRIBUTE_NAME, ValueType.STRING).getString();
@@ -179,17 +178,17 @@ public abstract class EditablePoint {
 				parent.removeChild(node);
 				node = parent.createChild(newname).build();
 			}
-			
+
 			setupNode();
 
 		}
 	}
-	
-	protected ObjectIdentifier getObjectIdentifier(){
+
+	protected ObjectIdentifier getObjectIdentifier() {
 		ObjectType objectType = Utils.parseObjectType(node.getAttribute("object type").getString());
 		int instNum = node.getAttribute("object instance number").getNumber().intValue();
-		 ObjectIdentifier oid = new ObjectIdentifier(objectType, instNum);
-		 return oid;
+		ObjectIdentifier oid = new ObjectIdentifier(objectType, instNum);
+		return oid;
 	}
 
 	protected class RemoveHandler implements Handler<ActionResult> {
@@ -201,17 +200,16 @@ public abstract class EditablePoint {
 			try {
 				folder.getLocalDevice().removeObject(oid);
 			} catch (BACnetServiceException e) {
-                LOGGER.debug("error :", e);
+				LOGGER.debug("error :", e);
 			}
 		}
 	}
 
-
 	protected static class RelinquishHandler implements Handler<ActionResult> {
-		//private int priority;
+		// private int priority;
 
 		RelinquishHandler(int p) {
-			//priority = p;
+			// priority = p;
 		}
 
 		public void handle(ActionResult event) {
@@ -221,19 +219,22 @@ public abstract class EditablePoint {
 
 	protected static class RelinquishAllHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
-			
+
 		}
 	}
-	
+
 	protected void relinquish(int priority) {
 
 	}
-	
+
 	protected abstract void setupNode();
+
 	protected abstract void makeCopy();
+
 	protected abstract void handleSet(Value val, int priority, boolean isRaw);
+
 	public abstract void restoreLastSession();
-	
+
 	public BACnetObject getBacnetObj() {
 		return bacnetObj;
 	}
@@ -241,11 +242,11 @@ public abstract class EditablePoint {
 	public void setBacnetObj(BACnetObject bacnetObj) {
 		this.bacnetObj = bacnetObj;
 	}
-	
+
 	public Node getNode() {
 		return node;
 	}
-	
+
 	public LocalBacnetProperty getProperty(PropertyIdentifier pid) {
 
 		return propertyIdToLocalProperty.get(pid);
