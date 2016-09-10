@@ -80,6 +80,14 @@ class BacnetConn {
 
 	static final String ACTION_ADD_LOCAL_SLAVE = "set up ip slave";
 	static final String ATTRIBUTE_NAME = "name";
+	static final String ATTRIBUTE_MAC_ADDRESS = "MAC address";
+	static final String ATTRIBUTE_INSTANCE_NUMBER = "instance number";
+	static final String ATTRIBUTE_NETWOR_NUMBER = "network number";
+	static final String ATTRIBUTE_LINK_SERVICE_MAC = "link service MAC";
+	static final String ATTRIBUTE_POLLING_INTERVAL = "polling interval";
+	static final String ATTRIBUTE_COV_USAGE = "cov usage";
+	static final String ATTRIBUTE_COV_LEASE_TIME = "cov lease time (minutes)";
+
 	static final String ATTRIBUTE_RESTORE_TYPE = "restore type";
 	static final String RESTORE_EDITABLE_FOLDER = "editable folder";
 
@@ -89,7 +97,7 @@ class BacnetConn {
 	private long defaultInterval;
 	BacnetLink link;
 	boolean isIP;
-	private int unnamedCount;
+
 	final Set<DeviceNode> deviceNodes = new HashSet<DeviceNode>();
 	LocalDeviceFolder localDeviceNode;
 	Map<BACnetObject, EditablePoint> ObjectToPoint = new HashMap<BACnetObject, EditablePoint>();
@@ -120,7 +128,6 @@ class BacnetConn {
 		this.statnode = node.createChild("STATUS").setValueType(ValueType.STRING).setValue(new Value("")).build();
 		this.statnode.setSerializable(false);
 
-		unnamedCount = 0;
 		this.listener = new EventListenerImpl();
 	}
 
@@ -141,8 +148,8 @@ class BacnetConn {
 		String lba = node.getAttribute("local bind address").getString();
 		boolean isfd = node.getAttribute("register as foreign device in bbmd").getBool();
 		String bbmdips = node.getAttribute("bbmd ips").getString();
-//		String bbmdip = node.getAttribute("bbmd ip").getString();
-//		int bbmdport = node.getAttribute("bbmd port").getNumber().intValue();
+		// String bbmdip = node.getAttribute("bbmd ip").getString();
+		// int bbmdport = node.getAttribute("bbmd port").getNumber().intValue();
 		String commPort = node.getAttribute("comm port id").getString();
 		int baud = node.getAttribute("baud rate").getNumber().intValue();
 		int station = node.getAttribute("this station id").getNumber().intValue();
@@ -208,7 +215,7 @@ class BacnetConn {
 			try {
 				localDevice.initialize();
 				if (isIP && isfd) {
-					for (String s: bbmdips.split(",")) {
+					for (String s : bbmdips.split(",")) {
 						s = s.trim();
 						if (!s.isEmpty()) {
 							String[] arr = s.split(":");
@@ -280,14 +287,15 @@ class BacnetConn {
 			String defMac = "10";
 			if (isIP)
 				defMac = "10.0.1.248:47808";
-			act.addParameter(new Parameter("MAC address", ValueType.STRING, new Value(defMac)));
-			act.addParameter(new Parameter("instance number", ValueType.NUMBER));
-			act.addParameter(new Parameter("network number", ValueType.NUMBER, new Value(0)));
-			act.addParameter(new Parameter("link service MAC", ValueType.STRING));
+			act.addParameter(new Parameter(ATTRIBUTE_MAC_ADDRESS, ValueType.STRING, new Value(defMac)));
+			act.addParameter(new Parameter(ATTRIBUTE_INSTANCE_NUMBER, ValueType.NUMBER));
+			act.addParameter(new Parameter(ATTRIBUTE_NETWOR_NUMBER, ValueType.NUMBER, new Value(0)));
+			act.addParameter(new Parameter(ATTRIBUTE_LINK_SERVICE_MAC, ValueType.STRING));
+			act.addParameter(new Parameter(ATTRIBUTE_POLLING_INTERVAL, ValueType.NUMBER,
+					new Value(((double) defaultInterval) / 1000)));
 			act.addParameter(
-					new Parameter("polling interval", ValueType.NUMBER, new Value(((double) defaultInterval) / 1000)));
-			act.addParameter(new Parameter("cov usage", ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED")));
-			act.addParameter(new Parameter("cov lease time (minutes)", ValueType.NUMBER, new Value(60)));
+					new Parameter(ATTRIBUTE_COV_USAGE, ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED")));
+			act.addParameter(new Parameter(ATTRIBUTE_COV_LEASE_TIME, ValueType.NUMBER, new Value(60)));
 			anode = node.getChild("add device");
 			if (anode == null)
 				node.createChild("add device").setAction(act).build().setSerializable(false);
@@ -399,8 +407,10 @@ class BacnetConn {
 			act.addParameter(new Parameter("register as foreign device in bbmd", ValueType.BOOL,
 					node.getAttribute("register as foreign device in bbmd")));
 			act.addParameter(new Parameter("bbmd ips", ValueType.STRING, node.getAttribute("bbmd ips")));
-//			act.addParameter(new Parameter("bbmd ip", ValueType.STRING, node.getAttribute("bbmd ip")));
-//			act.addParameter(new Parameter("bbmd port", ValueType.NUMBER, node.getAttribute("bbmd port")));
+			// act.addParameter(new Parameter("bbmd ip", ValueType.STRING,
+			// node.getAttribute("bbmd ip")));
+			// act.addParameter(new Parameter("bbmd port", ValueType.NUMBER,
+			// node.getAttribute("bbmd port")));
 		} else {
 			Set<String> portids = BacnetLink.listPorts();
 			if (portids.size() > 0) {
@@ -476,16 +486,18 @@ class BacnetConn {
 				String lba = event.getParameter("local bind address", ValueType.STRING).getString();
 				boolean isfd = event.getParameter("register as foreign device in bbmd", ValueType.BOOL).getBool();
 				String bbmdips = event.getParameter("bbmd ips", ValueType.STRING).getString();
-//				String bbmdip = event.getParameter("bbmd ip", ValueType.STRING).getString();
-//				int bbmdport = event.getParameter("bbmd port", ValueType.NUMBER).getNumber().intValue();
+				// String bbmdip = event.getParameter("bbmd ip",
+				// ValueType.STRING).getString();
+				// int bbmdport = event.getParameter("bbmd port",
+				// ValueType.NUMBER).getNumber().intValue();
 
 				node.setAttribute("broadcast ip", new Value(bip));
 				node.setAttribute("port", new Value(port));
 				node.setAttribute("local bind address", new Value(lba));
 				node.setAttribute("register as foreign device in bbmd", new Value(isfd));
 				node.setAttribute("bbmd ips", new Value(bbmdips));
-//				node.setAttribute("bbmd ip", new Value(bbmdip));
-//				node.setAttribute("bbmd port", new Value(bbmdport));
+				// node.setAttribute("bbmd ip", new Value(bbmdip));
+				// node.setAttribute("bbmd port", new Value(bbmdport));
 			} else {
 				String commPort = event.getParameter("comm port id", ValueType.STRING).getString();
 				int baud = event.getParameter("baud rate", ValueType.NUMBER).getNumber().intValue();
@@ -579,21 +591,21 @@ class BacnetConn {
 	private class AddDeviceHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			String name = null;
-			Value namev = event.getParameter("name", ValueType.STRING);
+			Value namev = event.getParameter(ATTRIBUTE_NAME, ValueType.STRING);
 			if (namev != null)
 				name = namev.getString();
 			long interval = (long) (1000
-					* event.getParameter("polling interval", ValueType.NUMBER).getNumber().doubleValue());
+					* event.getParameter(ATTRIBUTE_POLLING_INTERVAL, ValueType.NUMBER).getNumber().doubleValue());
 			CovType covtype = CovType.NONE;
 			try {
-				covtype = CovType.valueOf(event.getParameter("cov usage").getString());
+				covtype = CovType.valueOf(event.getParameter(ATTRIBUTE_COV_USAGE).getString());
 			} catch (Exception e1) {
 			}
-			int covlife = event.getParameter("cov lease time (minutes)", ValueType.NUMBER).getNumber().intValue();
-			String mac = event.getParameter("MAC address", new Value("")).getString();
-			int instanceNum = event.getParameter("instance number", new Value(-1)).getNumber().intValue();
-			int netNum = event.getParameter("network number", ValueType.NUMBER).getNumber().intValue();
-			String linkMac = event.getParameter("link service MAC", new Value("")).getString();
+			int covlife = event.getParameter(ATTRIBUTE_COV_LEASE_TIME, ValueType.NUMBER).getNumber().intValue();
+			String mac = event.getParameter(ATTRIBUTE_MAC_ADDRESS, new Value("")).getString();
+			int instanceNum = event.getParameter(ATTRIBUTE_INSTANCE_NUMBER, new Value(-1)).getNumber().intValue();
+			int netNum = event.getParameter(ATTRIBUTE_NETWOR_NUMBER, ValueType.NUMBER).getNumber().intValue();
+			String linkMac = event.getParameter(ATTRIBUTE_LINK_SERVICE_MAC, new Value("")).getString();
 
 			RemoteDevice dev = getDevice(mac, instanceNum, netNum, linkMac, interval, covtype, covlife);
 
@@ -693,12 +705,16 @@ class BacnetConn {
 	private boolean devInTree(RemoteDevice d) {
 		if (node.getChildren() == null)
 			return false;
-		String mac = Utils.getMac(d);
+		String deviceMacAddress = Utils.getMac(d);
+		int deviceInstanceNumber = d.getInstanceNumber();
+		int deviceNetworkNumber = d.getAddress().getNetworkNumber().intValue();
 		for (Node child : node.getChildren().values()) {
-			Value addr = child.getAttribute("MAC address");
-			Value inst = child.getAttribute("instance number");
-			if ((addr != null && mac.equals(addr.getString()))
-					|| (inst != null && inst.getNumber().intValue() == d.getInstanceNumber())) {
+			Value macAddress = child.getAttribute(ATTRIBUTE_MAC_ADDRESS);
+			Value instanceNumber = child.getAttribute(ATTRIBUTE_INSTANCE_NUMBER);
+			Value networkNumber = child.getAttribute(ATTRIBUTE_NETWOR_NUMBER);
+			if ((macAddress != null && deviceMacAddress.equals(macAddress.getString()))
+					&& (instanceNumber != null && instanceNumber.getNumber().intValue() == deviceInstanceNumber)
+					&& (networkNumber != null && networkNumber.getNumber().intValue() == deviceNetworkNumber)) {
 				return true;
 			}
 		}
@@ -723,8 +739,9 @@ class BacnetConn {
 					if (pid.equals(PropertyIdentifier.objectName)) {
 						String name = toLegalName(value.toString());
 						if (value instanceof BACnetError || name.length() < 1) {
-							d.setName("unnamed device " + unnamedCount);
-							unnamedCount += 1;
+							int instanceNumber = d.getInstanceNumber();
+							String macAddress = Utils.getMac(d);
+							d.setName("Device " + instanceNumber + " - " + macAddress);
 						} else {
 							d.setName(name);
 						}
@@ -777,13 +794,14 @@ class BacnetConn {
 				instanceNum = d.getInstanceNumber();
 				netNum = d.getAddress().getNetworkNumber().intValue();
 			}
-			child.setAttribute("MAC address", new Value(mac));
-			child.setAttribute("instance number", new Value(instanceNum));
-			child.setAttribute("network number", new Value(netNum));
-			child.setAttribute("link service MAC", new Value(linkMac));
-			child.setAttribute("polling interval", new Value(interval));
-			child.setAttribute("cov usage", new Value(covtype.toString()));
-			child.setAttribute("cov lease time (minutes)", new Value(covlife));
+
+			child.setAttribute(ATTRIBUTE_MAC_ADDRESS, new Value(mac));
+			child.setAttribute(ATTRIBUTE_INSTANCE_NUMBER, new Value(instanceNum));
+			child.setAttribute(ATTRIBUTE_NETWOR_NUMBER, new Value(netNum));
+			child.setAttribute(ATTRIBUTE_LINK_SERVICE_MAC, new Value(linkMac));
+			child.setAttribute(ATTRIBUTE_POLLING_INTERVAL, new Value(interval));
+			child.setAttribute(ATTRIBUTE_COV_USAGE, new Value(covtype.toString()));
+			child.setAttribute(ATTRIBUTE_COV_LEASE_TIME, new Value(covlife));
 			return new DeviceNode(getMe(), child, d);
 		}
 		return null;
@@ -826,13 +844,14 @@ class BacnetConn {
 				}
 			}
 		}
-		final Value mac = child.getAttribute("MAC address");
-		final Value instanceNum = child.getAttribute("instance number");
-		final Value netNum = child.getAttribute("network number");
-		final Value linkMac = child.getAttribute("link service MAC");
-		final Value refint = child.getAttribute("polling interval");
-		Value covtype = child.getAttribute("cov usage");
-		final Value covlife = child.getAttribute("cov lease time (minutes)");
+
+		final Value mac = child.getAttribute(ATTRIBUTE_MAC_ADDRESS);
+		final Value instanceNum = child.getAttribute(ATTRIBUTE_INSTANCE_NUMBER);
+		final Value netNum = child.getAttribute(ATTRIBUTE_NETWOR_NUMBER);
+		final Value linkMac = child.getAttribute(ATTRIBUTE_LINK_SERVICE_MAC);
+		final Value refint = child.getAttribute(ATTRIBUTE_POLLING_INTERVAL);
+		Value covtype = child.getAttribute(ATTRIBUTE_COV_USAGE);
+		final Value covlife = child.getAttribute(ATTRIBUTE_COV_LEASE_TIME);
 		Value restType = child.getAttribute(ATTRIBUTE_RESTORE_TYPE);
 		if (mac != null && instanceNum != null && netNum != null && linkMac != null && refint != null && covtype != null
 				&& covlife != null) {
