@@ -69,6 +69,7 @@ import com.serotonin.bacnet4j.type.notificationParameters.NotificationParameters
 import com.serotonin.bacnet4j.type.primitive.Boolean;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
+import com.serotonin.bacnet4j.type.primitive.OctetString;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.RequestListener;
 import com.serotonin.bacnet4j.util.RequestUtils;
@@ -94,6 +95,8 @@ class BacnetConn {
 	Node node;
 	private final Node statnode;
 	LocalDevice localDevice;
+	Transport transport;
+
 	private long defaultInterval;
 	BacnetLink link;
 	boolean isIP;
@@ -197,7 +200,7 @@ class BacnetConn {
 			}
 		}
 		if (network != null) {
-			Transport transport = new DefaultTransport(network);
+			transport = new DefaultTransport(network);
 			transport.setTimeout(timeout);
 			transport.setSegTimeout(segtimeout);
 			transport.setSegWindow(segwin);
@@ -691,6 +694,13 @@ class BacnetConn {
 					totaltime += waittime;
 					RemoteDevice d = devs.poll();
 					if (d != null && !devInTree(d)) {
+						// map network to link service for bacnet routers
+						OctetString deviceMacAddress = d.getAddress().getMacAddress();
+						int deviceInstanceNumber = d.getInstanceNumber();
+						int deviceNetworkNumber = d.getAddress().getNetworkNumber().intValue();
+						if (deviceNetworkNumber == 0) {
+							transport.addNetworkRouter(deviceInstanceNumber, deviceMacAddress);
+						}
 						setupDeviceNode(d, null, null, null, null, null, null, defaultInterval, CovType.NONE, 60);
 					}
 				}
