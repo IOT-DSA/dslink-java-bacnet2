@@ -104,7 +104,7 @@ class BacnetConn {
 	final Set<DeviceNode> deviceNodes = new HashSet<DeviceNode>();
 	LocalDeviceFolder localDeviceNode;
 	Map<BACnetObject, EditablePoint> ObjectToPoint = new HashMap<BACnetObject, EditablePoint>();
-
+	final Map<Integer, OctetString> networkRouters = new HashMap<Integer, OctetString>();
 	private ScheduledFuture<?> reconnectFuture = null;
 	private int retryDelay = 1;
 
@@ -205,6 +205,13 @@ class BacnetConn {
 			transport.setSegTimeout(segtimeout);
 			transport.setSegWindow(segwin);
 			transport.setRetries(retries);
+			if (!networkRouters.isEmpty()){
+				for(Map.Entry<Integer, OctetString> entry: networkRouters.entrySet()){
+					Integer networkNumber = entry.getKey();
+					OctetString linkService = entry.getValue();
+					transport.addNetworkRouter(networkNumber, linkService);
+				}
+			}
 			localDevice = new LocalDevice(locdevId, transport);
 			try {
 				localDevice.getConfiguration().writeProperty(PropertyIdentifier.objectName,
@@ -700,6 +707,7 @@ class BacnetConn {
 						int deviceNetworkNumber = d.getAddress().getNetworkNumber().intValue();
 						if (deviceNetworkNumber == 0) {
 							transport.addNetworkRouter(deviceInstanceNumber, deviceMacAddress);
+							networkRouters.put(deviceInstanceNumber, deviceMacAddress);
 						}
 						setupDeviceNode(d, null, null, null, null, null, null, defaultInterval, CovType.NONE, 60);
 					}
@@ -871,7 +879,7 @@ class BacnetConn {
 			} catch (Exception e) {
 			}
 			final CovType ct = ctype;
-
+            
 			boolean disabled = child.getChild("STATUS") != null
 					&& (new Value("disabled").equals(child.getChild("STATUS").getValue())
 							|| new Value("not connected").equals(child.getChild("STATUS").getValue()));
