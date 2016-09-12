@@ -34,17 +34,19 @@ import com.serotonin.io.serial.CommPortProxy;
 
 public class BacnetLink {
 	private static final Logger LOGGER;
-
+	
 	private Node node;
 	final Map<BacnetPoint, ScheduledFuture<?>> futures;
 	final Set<BacnetConn> serialConns;
 	Serializer copySerializer;
 	Deserializer copyDeserializer;
 
+	static final String ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER = "bbmd ips with network number";
+
 	static {
 		LOGGER = LoggerFactory.getLogger(BacnetLink.class);
 	}
-
+	
 	private BacnetLink(Node node, Serializer ser, Deserializer deser) {
 		this.node = node;
 		this.futures = new ConcurrentHashMap<BacnetPoint, ScheduledFuture<?>>();
@@ -70,9 +72,7 @@ public class BacnetLink {
 		act.addParameter(new Parameter("local bind address", ValueType.STRING, new Value("0.0.0.0")));
 		act.addParameter(new Parameter("local network number", ValueType.NUMBER, new Value(0)));
 		act.addParameter(new Parameter("register as foreign device in bbmd", ValueType.BOOL, new Value(false)));
-		act.addParameter(new Parameter("bbmd ips", ValueType.STRING));
-//		act.addParameter(new Parameter("bbmd ip", ValueType.STRING));
-//		act.addParameter(new Parameter("bbmd port", ValueType.NUMBER, new Value(47808)));
+		act.addParameter(new Parameter(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, ValueType.STRING));
 		act.addParameter(new Parameter("strict device comparisons", ValueType.BOOL, new Value(true)));
 		act.addParameter(new Parameter("Timeout", ValueType.NUMBER, new Value(6000)));
 		act.addParameter(new Parameter("segment timeout", ValueType.NUMBER, new Value(5000)));
@@ -208,15 +208,15 @@ public class BacnetLink {
 			Value isfd = child.getAttribute("register as foreign device in bbmd");
 			if (isfd == null)
 				child.setAttribute("register as foreign device in bbmd", new Value(false));
-			Value bbmdips = child.getAttribute("bbmd ips");
+			Value bbmdips = child.getAttribute(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER);
 			if (bbmdips == null) {
 				Value bbmdip = child.getAttribute("bbmd ip");
 				Value bbmdport = child.getAttribute("bbmd port");
 				if (bbmdip != null && bbmdport != null) {
 					String iplist = bbmdip.getString() + ":" + bbmdport.getNumber().toString();
-					child.setAttribute("bbmd ips", new Value(iplist));
+					child.setAttribute(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, new Value(iplist));
 				} else {
-					child.setAttribute("bbmd ips", new Value(" "));
+					child.setAttribute(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, new Value(" "));
 				}
 			}
 			
@@ -305,8 +305,7 @@ public class BacnetLink {
 			int station = 0;
 			int ferc = 1;
 			boolean isfd = false;
-//			String bbmdip = " ";
-//			int bbmdport = 0;
+
 			String bbmdips = " ";
 			if (isIP) {
 				bip = event.getParameter("broadcast ip", ValueType.STRING).getString();
@@ -314,9 +313,7 @@ public class BacnetLink {
 				lba = event.getParameter("local bind address", ValueType.STRING).getString();
 
 				isfd = event.getParameter("register as foreign device in bbmd", ValueType.BOOL).getBool();
-				bbmdips = event.getParameter("bbmd ips", new Value(" ")).getString();
-//				bbmdip = event.getParameter("bbmd ip", new Value(" ")).getString();
-//				bbmdport = event.getParameter("bbmd port", ValueType.NUMBER).getNumber().intValue();
+				bbmdips = event.getParameter(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, new Value(" ")).getString();
 
 			} else {
 				commPort = event.getParameter("comm port id", ValueType.STRING).getString();
@@ -342,9 +339,7 @@ public class BacnetLink {
 			child.setAttribute("port", new Value(port));
 			child.setAttribute("local bind address", new Value(lba));
 			child.setAttribute("register as foreign device in bbmd", new Value(isfd));
-			child.setAttribute("bbmd ips", new Value(bbmdips));
-//			child.setAttribute("bbmd ip", new Value(bbmdip));
-//			child.setAttribute("bbmd port", new Value(bbmdport));
+			child.setAttribute(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, new Value(bbmdips));
 			child.setAttribute("comm port id", new Value(commPort));
 			child.setAttribute("baud rate", new Value(baud));
 			child.setAttribute("this station id", new Value(station));
