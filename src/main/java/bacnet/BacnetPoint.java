@@ -36,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.serotonin.bacnet4j.enums.Month;
+import com.serotonin.bacnet4j.exception.BACnetErrorException;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.obj.ObjectProperties;
 import com.serotonin.bacnet4j.service.acknowledgement.ReadRangeAck;
@@ -1221,11 +1222,16 @@ public class BacnetPoint {
 		}
 		if (folder.root.device == null)
 			return null;
-		Encodable e = RequestUtils.getProperty(folder.conn.localDevice, folder.root.device, oid,
-				PropertyIdentifier.priorityArray);
-		if (e instanceof BACnetError)
+		Encodable encodable = null;
+		try {
+			encodable = RequestUtils.getProperty(folder.conn.localDevice, folder.root.device, oid,
+					PropertyIdentifier.priorityArray);
+		} catch (BACnetErrorException ex) {
+			LOGGER.debug(ex.getMessage());
+		}
+		if (encodable instanceof BACnetError)
 			return null;
-		return (PriorityArray) e;
+		return (PriorityArray) encodable;
 	}
 
 	private class RelinquishAllHandler implements Handler<ActionResult> {
@@ -1494,11 +1500,12 @@ public class BacnetPoint {
 				SequenceOf<PropertyValue> listOfValues = covEv.poll();
 				if (listOfValues != null) {
 					for (PropertyValue pv : listOfValues) {
-						if (node != null) LOGGER.debug("got cov for " + node.getName());
-						try{
+						if (node != null)
+							LOGGER.debug("got cov for " + node.getName());
+						try {
 							folder.updatePointValue(getMe(), pv.getPropertyIdentifier(), pv.getValue());
 						} catch (Exception e) {
-							LOGGER.debug("" ,e);
+							LOGGER.debug("", e);
 						}
 					}
 				}
