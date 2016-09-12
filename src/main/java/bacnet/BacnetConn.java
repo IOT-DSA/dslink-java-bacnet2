@@ -201,9 +201,15 @@ class BacnetConn {
 						bbmdPort = 47808;
 					}
 					bbmdIpToPort.put(bbmdIp, bbmdPort);
-					String networkNumber = arr[2];
+					int networkNumber = 0;
+					try {
+						networkNumber = arr.length < 3 ? 0 : Integer.parseInt(arr[2]);
+					} catch (Exception e) {
+						LOGGER.debug(e.getMessage());
+					}					
+					
 					OctetString os = IpNetworkUtils.toOctetString(bbmdIp, bbmdPort);
-					networkRouters.put(Integer.parseInt(networkNumber), os);
+					networkRouters.put(networkNumber, os);
 				}
 			}
 		}
