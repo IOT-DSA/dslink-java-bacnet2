@@ -40,11 +40,13 @@ import org.slf4j.LoggerFactory;
 import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.RemoteObject;
+import com.serotonin.bacnet4j.base.BACnetUtils;
 import com.serotonin.bacnet4j.event.DeviceEventAdapter;
 import com.serotonin.bacnet4j.event.DeviceEventListener;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.npdu.Network;
 import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
+import com.serotonin.bacnet4j.npdu.ip.IpNetworkUtils;
 import com.serotonin.bacnet4j.npdu.mstp.MasterNode;
 import com.serotonin.bacnet4j.npdu.mstp.MstpNetwork;
 import com.serotonin.bacnet4j.obj.BACnetObject;
@@ -105,6 +107,7 @@ class BacnetConn {
 	LocalDeviceFolder localDeviceNode;
 	Map<BACnetObject, EditablePoint> ObjectToPoint = new HashMap<BACnetObject, EditablePoint>();
 	final Map<Integer, OctetString> networkRouters = new HashMap<Integer, OctetString>();
+	final Map<String, Integer> bbmdIpToPort = new HashMap<String, Integer>();
 	private ScheduledFuture<?> reconnectFuture = null;
 	private int retryDelay = 1;
 
@@ -185,6 +188,26 @@ class BacnetConn {
 			anode.setAction(act);
 		}
 
+		if (isIP && isfd) {
+			for (String s : bbmdips.split(",")) {
+				s = s.trim();
+				if (!s.isEmpty()) {
+					String[] arr = s.split(":");
+					String bbmdIp = arr[0];
+					int bbmdPort;
+					try {
+						bbmdPort = arr.length < 2 ? 47808 : Integer.parseInt(arr[1]);
+					} catch (Exception e) {
+						bbmdPort = 47808;
+					}
+					bbmdIpToPort.put(bbmdIp, bbmdPort);
+					String networkNumber = arr[2];
+					OctetString os = IpNetworkUtils.toOctetString(bbmdIp, bbmdPort);
+					networkRouters.put(Integer.parseInt(networkNumber), os);
+				}
+			}
+		}
+		
 		Network network;
 		if (isIP) {
 			network = new IpNetwork(bip, port, lba, lnn);
@@ -225,26 +248,18 @@ class BacnetConn {
 			try {
 				localDevice.initialize();
 				if (isIP && isfd) {
-					for (String s : bbmdips.split(",")) {
-						s = s.trim();
-						if (!s.isEmpty()) {
-							String[] arr = s.split(":");
-							String bbmdip = arr[0];
-							int bbmdport;
-							try {
-								bbmdport = arr.length < 2 ? 47808 : Integer.parseInt(arr[1]);
-							} catch (Exception e) {
-								bbmdport = 47808;
-							}
+					for (Map.Entry<String, Integer> entry : bbmdIpToPort.entrySet()) {
+                            String bbmdIp = entry.getKey();
+						    Integer bbmdPort = entry.getValue();
 							try {
 								((IpNetwork) network).registerAsForeignDevice(
-										new InetSocketAddress(InetAddress.getByName(bbmdip), bbmdport), 100);
+										new InetSocketAddress(InetAddress.getByName(bbmdIp), bbmdPort), 100);
 							} catch (UnknownHostException e) {
 								LOGGER.debug("", e);
 							} catch (BACnetException e) {
 								LOGGER.debug("", e);
 							}
-						}
+	
 					}
 				}
 				localDevice.getEventHandler().addListener(this.listener);
