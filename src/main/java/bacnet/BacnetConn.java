@@ -90,7 +90,8 @@ class BacnetConn {
 	static final String ATTRIBUTE_POLLING_INTERVAL = "polling interval";
 	static final String ATTRIBUTE_COV_USAGE = "cov usage";
 	static final String ATTRIBUTE_COV_LEASE_TIME = "cov lease time (minutes)";
-
+	static final String ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER = "bbmd ips with network number";
+	
 	static final String ATTRIBUTE_RESTORE_TYPE = "restore type";
 	static final String RESTORE_EDITABLE_FOLDER = "editable folder";
 
@@ -117,7 +118,7 @@ class BacnetConn {
 	static {
 		LOGGER = LoggerFactory.getLogger(BacnetConn.class);
 	}
-
+	
 	BacnetConn(BacnetLink link, Node node) {
 		this.node = node;
 		this.link = link;
@@ -153,7 +154,7 @@ class BacnetConn {
 		int port = node.getAttribute("port").getNumber().intValue();
 		String lba = node.getAttribute("local bind address").getString();
 		boolean isfd = node.getAttribute("register as foreign device in bbmd").getBool();
-		String bbmdips = node.getAttribute("bbmd ips").getString();
+		String bbmdips = node.getAttribute(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER).getString();
 		// String bbmdip = node.getAttribute("bbmd ip").getString();
 		// int bbmdport = node.getAttribute("bbmd port").getNumber().intValue();
 		String commPort = node.getAttribute("comm port id").getString();
@@ -207,9 +208,11 @@ class BacnetConn {
 					} catch (Exception e) {
 						LOGGER.debug(e.getMessage());
 					}					
-					
-					OctetString os = IpNetworkUtils.toOctetString(bbmdIp, bbmdPort);
-					networkRouters.put(networkNumber, os);
+					if (!bbmdIp.isEmpty()){
+						OctetString os = IpNetworkUtils.toOctetString(bbmdIp, bbmdPort);
+						networkRouters.put(networkNumber, os);						
+					}
+
 				}
 			}
 		}
@@ -437,7 +440,7 @@ class BacnetConn {
 					new Parameter("local bind address", ValueType.STRING, node.getAttribute("local bind address")));
 			act.addParameter(new Parameter("register as foreign device in bbmd", ValueType.BOOL,
 					node.getAttribute("register as foreign device in bbmd")));
-			act.addParameter(new Parameter("bbmd ips", ValueType.STRING, node.getAttribute("bbmd ips")));
+			act.addParameter(new Parameter(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, ValueType.STRING, node.getAttribute(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER)));
 			// act.addParameter(new Parameter("bbmd ip", ValueType.STRING,
 			// node.getAttribute("bbmd ip")));
 			// act.addParameter(new Parameter("bbmd port", ValueType.NUMBER,
@@ -516,7 +519,7 @@ class BacnetConn {
 				int port = event.getParameter("port", ValueType.NUMBER).getNumber().intValue();
 				String lba = event.getParameter("local bind address", ValueType.STRING).getString();
 				boolean isfd = event.getParameter("register as foreign device in bbmd", ValueType.BOOL).getBool();
-				String bbmdips = event.getParameter("bbmd ips", ValueType.STRING).getString();
+				String bbmdips = event.getParameter(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, ValueType.STRING).getString();
 				// String bbmdip = event.getParameter("bbmd ip",
 				// ValueType.STRING).getString();
 				// int bbmdport = event.getParameter("bbmd port",
@@ -526,7 +529,7 @@ class BacnetConn {
 				node.setAttribute("port", new Value(port));
 				node.setAttribute("local bind address", new Value(lba));
 				node.setAttribute("register as foreign device in bbmd", new Value(isfd));
-				node.setAttribute("bbmd ips", new Value(bbmdips));
+				node.setAttribute(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, new Value(bbmdips));
 				// node.setAttribute("bbmd ip", new Value(bbmdip));
 				// node.setAttribute("bbmd port", new Value(bbmdport));
 			} else {
