@@ -1,7 +1,9 @@
 package bacnet;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -63,7 +65,7 @@ public class DeviceFolder {
 	protected BacnetConn conn;
 	protected DeviceNode root;
 	private int unnamedCount;
-	// private HashMap<ObjectIdentifier, BacnetPoint> points;
+	final Set<ObjectIdentifier> pointSet = new HashSet<ObjectIdentifier>();
 
 	static {
 		LOGGER = LoggerFactory.getLogger(DeviceFolder.class);
@@ -181,12 +183,18 @@ public class DeviceFolder {
 									for (Object o : (SequenceOf<?>) value) {
 										ObjectIdentifier oid = (ObjectIdentifier) o;
 										// LOGGER.info(oid.getObjectType().toString());
-										addObjectPoint(oid, refs, points);
+										if(!pointSet.contains(oid)){
+											pointSet.add(oid);
+										    addObjectPoint(oid, refs, points);
+										}
 									}
 								} else {
 									ObjectIdentifier oid = (ObjectIdentifier) value;
 									// LOGGER.info(oid.getObjectType().toString());
-									addObjectPoint(oid, refs, points);
+									if (!pointSet.contains(oid)){
+										addObjectPoint(oid, refs, points);										
+									}
+
 								}
 								return false;
 							}
