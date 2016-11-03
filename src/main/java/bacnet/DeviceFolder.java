@@ -74,7 +74,7 @@ public class DeviceFolder {
 	DeviceFolder(BacnetConn conn, Node node) {
 		this.conn = conn;
 		this.node = node;
-		// this.points = new HashMap<ObjectIdentifier, BacnetPoint>();
+
 		node.setAttribute("restore type", new Value("folder"));
 
 		Action act = new Action(Permission.READ, new RemoveHandler());
@@ -183,16 +183,16 @@ public class DeviceFolder {
 									for (Object o : (SequenceOf<?>) value) {
 										ObjectIdentifier oid = (ObjectIdentifier) o;
 										// LOGGER.info(oid.getObjectType().toString());
-										if(!pointSet.contains(oid)){
+										if (!pointSet.contains(oid)) {
 											pointSet.add(oid);
-										    addObjectPoint(oid, refs, points);
+											addObjectPoint(oid, refs, points);
 										}
 									}
 								} else {
 									ObjectIdentifier oid = (ObjectIdentifier) value;
 									// LOGGER.info(oid.getObjectType().toString());
-									if (!pointSet.contains(oid)){
-										addObjectPoint(oid, refs, points);										
+									if (!pointSet.contains(oid)) {
+										addObjectPoint(oid, refs, points);
 									}
 
 								}
@@ -202,13 +202,10 @@ public class DeviceFolder {
 			} catch (BACnetException e) {
 				// TODO Auto-generated catch block
 				// e.printStackTrace();
-				LOGGER.debug("error: ", e);
+				LOGGER.debug("error: ", e.getMessage());
 			}
 
 			getProperties(refs, points);
-			// for (BacnetPoint pt: points.values()) {
-			// conn.link.setupPoint(pt, getMe());
-			// }
 		}
 	}
 
@@ -295,7 +292,7 @@ public class DeviceFolder {
 				public boolean requestProgress(double prog, ObjectIdentifier oid, PropertyIdentifier pid,
 						UnsignedInteger unsignedinteger, Encodable encodable) {
 					BacnetPoint pt = points.get(oid);
-					
+
 					try {
 						updatePointValue(pt, pid, encodable);
 					} catch (Exception e) {
