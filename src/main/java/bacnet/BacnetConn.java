@@ -91,12 +91,12 @@ class BacnetConn {
 	static final String ATTRIBUTE_COV_USAGE = "cov usage";
 	static final String ATTRIBUTE_COV_LEASE_TIME = "cov lease time (minutes)";
 	static final String ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER = "bbmd ips with network number";
-	
+
 	static final String ATTRIBUTE_RESTORE_TYPE = "restore type";
 	static final String RESTORE_EDITABLE_FOLDER = "editable folder";
 
 	Node node;
-	private final Node statnode;
+	final Node statnode;
 	LocalDevice localDevice;
 	Transport transport;
 
@@ -112,13 +112,13 @@ class BacnetConn {
 	private ScheduledFuture<?> reconnectFuture = null;
 	private int retryDelay = 1;
 
-	private final ScheduledThreadPoolExecutor stpe;
+	ScheduledThreadPoolExecutor serialStpe;
 	DeviceEventListener listener;
 
 	static {
 		LOGGER = LoggerFactory.getLogger(BacnetConn.class);
 	}
-	
+
 	BacnetConn(BacnetLink link, Node node) {
 		this.node = node;
 		this.link = link;
@@ -128,9 +128,9 @@ class BacnetConn {
 
 		if (!isIP) {
 			link.serialConns.add(this);
-			stpe = Objects.createDaemonThreadPool();
+			serialStpe = Objects.createDaemonThreadPool();
 		} else {
-			stpe = null;
+			serialStpe = null;
 		}
 		this.statnode = node.createChild("STATUS").setValueType(ValueType.STRING).setValue(new Value("")).build();
 		this.statnode.setSerializable(false);
@@ -139,7 +139,7 @@ class BacnetConn {
 	}
 
 	ScheduledThreadPoolExecutor getDaemonThreadPool() {
-		return stpe;
+		return serialStpe;
 	}
 
 	void init() {
@@ -155,8 +155,6 @@ class BacnetConn {
 		String lba = node.getAttribute("local bind address").getString();
 		boolean isfd = node.getAttribute("register as foreign device in bbmd").getBool();
 		String bbmdips = node.getAttribute(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER).getString();
-		// String bbmdip = node.getAttribute("bbmd ip").getString();
-		// int bbmdport = node.getAttribute("bbmd port").getNumber().intValue();
 		String commPort = node.getAttribute("comm port id").getString();
 		int baud = node.getAttribute("baud rate").getNumber().intValue();
 		int station = node.getAttribute("this station id").getNumber().intValue();
@@ -207,16 +205,16 @@ class BacnetConn {
 						networkNumber = arr.length < 3 ? 0 : Integer.parseInt(arr[2]);
 					} catch (Exception e) {
 						LOGGER.debug(e.getMessage());
-					}					
-					if (!bbmdIp.isEmpty()){
+					}
+					if (!bbmdIp.isEmpty()) {
 						OctetString os = IpNetworkUtils.toOctetString(bbmdIp, bbmdPort);
-						networkRouters.put(networkNumber, os);						
+						networkRouters.put(networkNumber, os);
 					}
 
 				}
 			}
 		}
-		
+
 		Network network;
 		if (isIP) {
 			network = new IpNetwork(bip, port, lba, lnn);
@@ -237,8 +235,8 @@ class BacnetConn {
 			transport.setSegTimeout(segtimeout);
 			transport.setSegWindow(segwin);
 			transport.setRetries(retries);
-			if (!networkRouters.isEmpty()){
-				for(Map.Entry<Integer, OctetString> entry: networkRouters.entrySet()){
+			if (!networkRouters.isEmpty()) {
+				for (Map.Entry<Integer, OctetString> entry : networkRouters.entrySet()) {
 					Integer networkNumber = entry.getKey();
 					OctetString linkService = entry.getValue();
 					transport.addNetworkRouter(networkNumber, linkService);
@@ -258,17 +256,17 @@ class BacnetConn {
 				localDevice.initialize();
 				if (isIP && isfd) {
 					for (Map.Entry<String, Integer> entry : bbmdIpToPort.entrySet()) {
-                            String bbmdIp = entry.getKey();
-						    Integer bbmdPort = entry.getValue();
-							try {
-								((IpNetwork) network).registerAsForeignDevice(
-										new InetSocketAddress(InetAddress.getByName(bbmdIp), bbmdPort), 100);
-							} catch (UnknownHostException e) {
-								LOGGER.debug("", e);
-							} catch (BACnetException e) {
-								LOGGER.debug("", e);
-							}
-	
+						String bbmdIp = entry.getKey();
+						Integer bbmdPort = entry.getValue();
+						try {
+							((IpNetwork) network).registerAsForeignDevice(
+									new InetSocketAddress(InetAddress.getByName(bbmdIp), bbmdPort), 100);
+						} catch (UnknownHostException e) {
+							LOGGER.debug("", e);
+						} catch (BACnetException e) {
+							LOGGER.debug("", e);
+						}
+
 					}
 				}
 				localDevice.getEventHandler().addListener(this.listener);
@@ -338,8 +336,8 @@ class BacnetConn {
 			statnode.setValue(new Value("Connected"));
 
 		} else if (!"Stopped".equals(statnode.getValue().getString())) {
-			ScheduledThreadPoolExecutor gstpe = Objects.getDaemonThreadPool();
-			reconnectFuture = gstpe.schedule(new Runnable() {
+			ScheduledThreadPoolExecutor reconnectStpe = Objects.getDaemonThreadPool();
+			reconnectFuture = reconnectStpe.schedule(new Runnable() {
 
 				@Override
 				public void run() {
@@ -356,7 +354,7 @@ class BacnetConn {
 		}
 	}
 
-	private static class SerialPortWrapperImpl extends SerialPortWrapper {
+	static class SerialPortWrapperImpl extends SerialPortWrapper {
 
 		private SerialParameters params;
 		private SerialPortProxy spp = null;
@@ -440,11 +438,10 @@ class BacnetConn {
 					new Parameter("local bind address", ValueType.STRING, node.getAttribute("local bind address")));
 			act.addParameter(new Parameter("register as foreign device in bbmd", ValueType.BOOL,
 					node.getAttribute("register as foreign device in bbmd")));
-			act.addParameter(new Parameter(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, ValueType.STRING, node.getAttribute(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER)));
+			act.addParameter(new Parameter(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, ValueType.STRING,
+					node.getAttribute(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER)));
 			// act.addParameter(new Parameter("bbmd ip", ValueType.STRING,
 			// node.getAttribute("bbmd ip")));
-			// act.addParameter(new Parameter("bbmd port", ValueType.NUMBER,
-			// node.getAttribute("bbmd port")));
 		} else {
 			Set<String> portids = BacnetLink.listPorts();
 			if (portids.size() > 0) {
@@ -519,11 +516,10 @@ class BacnetConn {
 				int port = event.getParameter("port", ValueType.NUMBER).getNumber().intValue();
 				String lba = event.getParameter("local bind address", ValueType.STRING).getString();
 				boolean isfd = event.getParameter("register as foreign device in bbmd", ValueType.BOOL).getBool();
-				String bbmdips = event.getParameter(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, ValueType.STRING).getString();
+				String bbmdips = event.getParameter(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, ValueType.STRING)
+						.getString();
 				// String bbmdip = event.getParameter("bbmd ip",
 				// ValueType.STRING).getString();
-				// int bbmdport = event.getParameter("bbmd port",
-				// ValueType.NUMBER).getNumber().intValue();
 
 				node.setAttribute("broadcast ip", new Value(bip));
 				node.setAttribute("port", new Value(port));
@@ -531,7 +527,6 @@ class BacnetConn {
 				node.setAttribute("register as foreign device in bbmd", new Value(isfd));
 				node.setAttribute(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, new Value(bbmdips));
 				// node.setAttribute("bbmd ip", new Value(bbmdip));
-				// node.setAttribute("bbmd port", new Value(bbmdport));
 			} else {
 				String commPort = event.getParameter("comm port id", ValueType.STRING).getString();
 				int baud = event.getParameter("baud rate", ValueType.NUMBER).getNumber().intValue();
@@ -571,11 +566,6 @@ class BacnetConn {
 				rename(name);
 			}
 
-			// if (node.getChildren()!=null) {
-			// for (Node child: node.getChildren().values()) {
-			// if (child.getAction()!=null) node.removeChild(child);
-			// }
-			// }
 			restoreLastSession();
 		}
 	}
@@ -600,7 +590,7 @@ class BacnetConn {
 		link.serialConns.remove(getMe());
 		node.getParent().removeChild(node);
 		if (!isIP)
-			stpe.shutdown();
+			serialStpe.shutdown();
 	}
 
 	protected void rename(String name) {
@@ -763,12 +753,6 @@ class BacnetConn {
 		return false;
 	}
 
-	// private void setupDeviceNodes(List<RemoteDevice> devices) {
-	// for (RemoteDevice d: devices) {
-	// setupDeviceNode(d, null, defaultInterval, CovType.NONE, 60);
-	// }
-	// }
-
 	void getDeviceProps(final RemoteDevice d) {
 		LocalDevice ld = localDevice;
 		if (d == null || ld == null)
@@ -903,7 +887,7 @@ class BacnetConn {
 			} catch (Exception e) {
 			}
 			final CovType ct = ctype;
-            
+
 			boolean disabled = child.getChild("STATUS") != null
 					&& (new Value("disabled").equals(child.getChild("STATUS").getValue())
 							|| new Value("not connected").equals(child.getChild("STATUS").getValue()));

@@ -62,9 +62,9 @@ public class DeviceNode extends DeviceFolder {
 	long interval;
 	CovType covType;
 
-	private final ScheduledThreadPoolExecutor stpe;
+	private final ScheduledThreadPoolExecutor deviceStpe;
 	private final ConcurrentMap<ObjectIdentifier, BacnetPoint> subscribedPoints = new ConcurrentHashMap<ObjectIdentifier, BacnetPoint>();
-	private ScheduledFuture<?> future = null;
+	private ScheduledFuture<?> pollingFuture = null;
 	private ScheduledFuture<?> reconnectFuture = null;
 	private int retryDelay = 1;
 
@@ -122,9 +122,9 @@ public class DeviceNode extends DeviceFolder {
 		}
 
 		if (conn.isIP)
-			this.stpe = Objects.createDaemonThreadPool();
+			this.deviceStpe = Objects.createDaemonThreadPool();
 		else
-			this.stpe = conn.getDaemonThreadPool();
+			this.deviceStpe = conn.getDaemonThreadPool();
 
 		makeEditAction();
 
@@ -135,7 +135,7 @@ public class DeviceNode extends DeviceFolder {
 	}
 
 	ScheduledThreadPoolExecutor getDaemonThreadPool() {
-		return stpe;
+		return deviceStpe;
 	}
 
 	void enable(boolean userDriven) {
@@ -151,8 +151,9 @@ public class DeviceNode extends DeviceFolder {
 			}
 		}
 		enabled = true;
-		if (future == null)
+		if (pollingFuture == null)
 			startPolling();
+
 		if (device == null) {
 			String mac = node.getAttribute("MAC address").getString();
 			int instNum = node.getAttribute("instance number").getNumber().intValue();
@@ -217,8 +218,8 @@ public class DeviceNode extends DeviceFolder {
 	}
 
 	private void scheduleRetry() {
-		ScheduledThreadPoolExecutor gstpe = Objects.getDaemonThreadPool();
-		reconnectFuture = gstpe.schedule(new Runnable() {
+		ScheduledThreadPoolExecutor reconnectStpe = Objects.getDaemonThreadPool();
+		reconnectFuture = reconnectStpe.schedule(new Runnable() {
 
 			@Override
 			public void run() {
@@ -237,7 +238,7 @@ public class DeviceNode extends DeviceFolder {
 	protected void remove() {
 		super.remove();
 		if (conn.isIP)
-			stpe.shutdown();
+			deviceStpe.shutdown();
 		conn.deviceNodes.remove(this);
 	}
 
@@ -457,7 +458,7 @@ public class DeviceNode extends DeviceFolder {
 		if (subscribedPoints.containsKey(point.oid))
 			return;
 		subscribedPoints.put(point.oid, point);
-		if (future == null)
+		if (pollingFuture == null)
 			startPolling();
 	}
 
@@ -468,10 +469,10 @@ public class DeviceNode extends DeviceFolder {
 	}
 
 	private void stopPolling() {
-		if (future != null) {
+		if (pollingFuture != null) {
 			LOGGER.debug("stopping polling for device " + node.getName());
-			future.cancel(false);
-			future = null;
+			pollingFuture.cancel(false);
+			pollingFuture = null;
 		}
 	}
 
@@ -480,7 +481,7 @@ public class DeviceNode extends DeviceFolder {
 			return;
 
 		LOGGER.debug("starting polling for device " + node.getName());
-		future = stpe.scheduleWithFixedDelay(new Runnable() {
+		pollingFuture = deviceStpe.scheduleWithFixedDelay(new Runnable() {
 			public void run() {
 				if (conn.localDevice == null) {
 					conn.stop();

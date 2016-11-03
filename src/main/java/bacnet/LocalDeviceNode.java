@@ -1,7 +1,5 @@
 package bacnet;
 
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
@@ -47,7 +45,6 @@ public class LocalDeviceNode extends LocalDeviceFolder {
 	static final String ACTION_RESTART = "restart";
 
 	final Node statNode;
-
 
 	final Node eventNode;
 	LocalDevice localDevice;
@@ -138,7 +135,7 @@ public class LocalDeviceNode extends LocalDeviceFolder {
 			makeEditAction();
 		}
 	}
-    
+
 	@Override
 	public Node getStatusNode() {
 		return statNode;
