@@ -854,8 +854,10 @@ class BacnetConn {
 
 	public void restoreLastSession() {
 		init();
-		if (node.getChildren() == null)
+
+		if (null == localDevice || node.getChildren() == null)
 			return;
+		
 		for (Node child : node.getChildren().values()) {
 			restoreDevice(child);
 		}
