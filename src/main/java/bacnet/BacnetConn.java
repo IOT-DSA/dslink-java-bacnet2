@@ -78,7 +78,7 @@ import com.serotonin.bacnet4j.util.RequestUtils;
 import com.serotonin.bacnet4j.util.sero.SerialPortWrapper;
 import com.serotonin.io.serial.SerialParameters;
 
-class BacnetConn {
+abstract class BacnetConn {
 	private static final Logger LOGGER;
 
 	static final String ACTION_ADD_LOCAL_SLAVE = "set up ip slave";
@@ -90,7 +90,6 @@ class BacnetConn {
 	static final String ATTRIBUTE_POLLING_INTERVAL = "polling interval";
 	static final String ATTRIBUTE_COV_USAGE = "cov usage";
 	static final String ATTRIBUTE_COV_LEASE_TIME = "cov lease time (minutes)";
-	static final String ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER = "bbmd ips with network number";
 
 	static final String ATTRIBUTE_RESTORE_TYPE = "restore type";
 	static final String RESTORE_EDITABLE_FOLDER = "editable folder";
@@ -100,7 +99,15 @@ class BacnetConn {
 	LocalDevice localDevice;
 	Transport transport;
 
-	private long defaultInterval;
+	int localNetworkNumber;
+	int timeout;
+	int segmentTimeout;
+	int segmentWindow;
+	int retries;
+	int localDeviceId;
+	String localDeviceName;
+	String localDeviceVendor;
+	long defaultInterval;
 	BacnetLink link;
 	boolean isIP;
 
@@ -125,17 +132,26 @@ class BacnetConn {
 
 		isIP = node.getAttribute("isIP").getBool();
 		defaultInterval = node.getAttribute("default polling interval").getNumber().longValue();
+		localNetworkNumber = node.getAttribute("local network number").getNumber().intValue();
+		timeout = node.getAttribute("Timeout").getNumber().intValue();
+		segmentTimeout = node.getAttribute("segment timeout").getNumber().intValue();
+		segmentWindow = node.getAttribute("segment window").getNumber().intValue();
+		retries = node.getAttribute("retries").getNumber().intValue();
+		localDeviceId = node.getAttribute("local device id").getNumber().intValue();
+		localDeviceName = node.getAttribute("local device name").getString();
+		localDeviceVendor = node.getAttribute("local device vendor").getString();
+		defaultInterval = node.getAttribute("default polling interval").getNumber().longValue();
 
-		if (!isIP) {
-			link.serialConns.add(this);
-			serialStpe = Objects.createDaemonThreadPool();
-		} else {
-			serialStpe = null;
-		}
+		initializeScheduledThreadPoolExecutor();
+
 		this.statnode = node.createChild("STATUS").setValueType(ValueType.STRING).setValue(new Value("")).build();
 		this.statnode.setSerializable(false);
 
 		this.listener = new EventListenerImpl();
+	}
+
+	void initializeScheduledThreadPoolExecutor() {
+		serialStpe = null;
 	}
 
 	ScheduledThreadPoolExecutor getDaemonThreadPool() {
@@ -148,28 +164,6 @@ class BacnetConn {
 			reconnectFuture = null;
 		}
 		statnode.setValue(new Value("Setting up connection"));
-
-		isIP = node.getAttribute("isIP").getBool();
-		String bip = node.getAttribute("broadcast ip").getString();
-		int port = node.getAttribute("port").getNumber().intValue();
-		String lba = node.getAttribute("local bind address").getString();
-		boolean isfd = node.getAttribute("register as foreign device in bbmd").getBool();
-		String bbmdips = node.getAttribute(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER).getString();
-		String commPort = node.getAttribute("comm port id").getString();
-		int baud = node.getAttribute("baud rate").getNumber().intValue();
-		int station = node.getAttribute("this station id").getNumber().intValue();
-		int ferc = node.getAttribute("frame error retry count").getNumber().intValue();
-		int lnn = node.getAttribute("local network number").getNumber().intValue();
-		// boolean strict = node.getAttribute("strict device
-		// comparisons").getBool();
-		int timeout = node.getAttribute("Timeout").getNumber().intValue();
-		int segtimeout = node.getAttribute("segment timeout").getNumber().intValue();
-		int segwin = node.getAttribute("segment window").getNumber().intValue();
-		int retries = node.getAttribute("retries").getNumber().intValue();
-		int locdevId = node.getAttribute("local device id").getNumber().intValue();
-		String locdevName = node.getAttribute("local device name").getString();
-		String locdevVend = node.getAttribute("local device vendor").getString();
-		defaultInterval = node.getAttribute("default polling interval").getNumber().longValue();
 
 		Action act = new Action(Permission.READ, new RemoveHandler());
 		Node anode = node.getChild("remove");
@@ -187,53 +181,13 @@ class BacnetConn {
 			anode.setAction(act);
 		}
 
-		if (isIP && isfd) {
-			for (String s : bbmdips.split(",")) {
-				s = s.trim();
-				if (!s.isEmpty()) {
-					String[] arr = s.split(":");
-					String bbmdIp = arr[0];
-					int bbmdPort;
-					try {
-						bbmdPort = arr.length < 2 ? 47808 : Integer.parseInt(arr[1]);
-					} catch (Exception e) {
-						bbmdPort = 47808;
-					}
-					bbmdIpToPort.put(bbmdIp, bbmdPort);
-					int networkNumber = 0;
-					try {
-						networkNumber = arr.length < 3 ? 0 : Integer.parseInt(arr[2]);
-					} catch (Exception e) {
-						LOGGER.debug(e.getMessage());
-					}
-					if (!bbmdIp.isEmpty()) {
-						OctetString os = IpNetworkUtils.toOctetString(bbmdIp, bbmdPort);
-						networkRouters.put(networkNumber, os);
-					}
-
-				}
-			}
-		}
-
 		Network network;
-		if (isIP) {
-			network = new IpNetwork(bip, port, lba, lnn);
-		} else {
-			try {
-				SerialPortWrapper wrapper = new SerialPortWrapperImpl(commPort, baud, "DSLink");
-				MasterNode mastnode = new MasterNode(wrapper, (byte) station, ferc);
-				network = new MstpNetwork(mastnode, lnn);
-			} catch (SerialPortException e) {
-				LOGGER.debug("", e);
-				statnode.setValue(new Value("COM Port not found"));
-				network = null;
-			}
-		}
+		network = createNetwork(localNetworkNumber);
 		if (network != null) {
 			transport = new DefaultTransport(network);
 			transport.setTimeout(timeout);
-			transport.setSegTimeout(segtimeout);
-			transport.setSegWindow(segwin);
+			transport.setSegTimeout(segmentTimeout);
+			transport.setSegWindow(segmentWindow);
 			transport.setRetries(retries);
 			if (!networkRouters.isEmpty()) {
 				for (Map.Entry<Integer, OctetString> entry : networkRouters.entrySet()) {
@@ -242,33 +196,19 @@ class BacnetConn {
 					transport.addNetworkRouter(networkNumber, linkService);
 				}
 			}
-			localDevice = new LocalDevice(locdevId, transport);
+			localDevice = new LocalDevice(localDeviceId, transport);
 			try {
 				localDevice.getConfiguration().writeProperty(PropertyIdentifier.objectName,
-						new CharacterString(locdevName));
+						new CharacterString(localDeviceName));
 				localDevice.getConfiguration().writeProperty(PropertyIdentifier.vendorName,
-						new CharacterString(locdevVend));
+						new CharacterString(localDeviceVendor));
 			} catch (Exception e1) {
 				LOGGER.debug("error: ", e1);
 			}
 			// localDevice.setStrict(strict);
 			try {
 				localDevice.initialize();
-				if (isIP && isfd) {
-					for (Map.Entry<String, Integer> entry : bbmdIpToPort.entrySet()) {
-						String bbmdIp = entry.getKey();
-						Integer bbmdPort = entry.getValue();
-						try {
-							((IpNetwork) network).registerAsForeignDevice(
-									new InetSocketAddress(InetAddress.getByName(bbmdIp), bbmdPort), 100);
-						} catch (UnknownHostException e) {
-							LOGGER.debug("", e);
-						} catch (BACnetException e) {
-							LOGGER.debug("", e);
-						}
-
-					}
-				}
+				registerAsFeignDevice(network);
 				localDevice.getEventHandler().addListener(this.listener);
 				localDevice.sendGlobalBroadcast(localDevice.getIAm());
 				// Thread.sleep(200000);
@@ -316,9 +256,9 @@ class BacnetConn {
 
 			act = new Action(Permission.READ, new AddDeviceHandler());
 			act.addParameter(new Parameter("name", ValueType.STRING));
-			String defMac = "10";
-			if (isIP)
-				defMac = "10.0.1.248:47808";
+
+			String defMac = getDefaultMac();
+
 			act.addParameter(new Parameter(ATTRIBUTE_MAC_ADDRESS, ValueType.STRING, new Value(defMac)));
 			act.addParameter(new Parameter(ATTRIBUTE_INSTANCE_NUMBER, ValueType.NUMBER));
 			act.addParameter(new Parameter(ATTRIBUTE_NETWOR_NUMBER, ValueType.NUMBER, new Value(0)));
@@ -352,6 +292,22 @@ class BacnetConn {
 			if (retryDelay < 60)
 				retryDelay += 2;
 		}
+	}
+
+	String getDefaultMac() {
+		return "10";
+	}
+
+	abstract Network createNetwork(int localNetworkNumber);
+
+	abstract void addTransportParameters(Action act);
+
+	abstract void setTransportAtrributions(ActionResult event);
+
+	abstract BacnetConn getBacnetConnection(BacnetLink link, Node newnode);
+
+	void registerAsFeignDevice(Network network) {
+
 	}
 
 	static class SerialPortWrapperImpl extends SerialPortWrapper {
@@ -431,37 +387,10 @@ class BacnetConn {
 	Action getEditAction() {
 		Action act = new Action(Permission.READ, new EditHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
-		if (isIP) {
-			act.addParameter(new Parameter("broadcast ip", ValueType.STRING, node.getAttribute("broadcast ip")));
-			act.addParameter(new Parameter("port", ValueType.NUMBER, node.getAttribute("port")));
-			act.addParameter(
-					new Parameter("local bind address", ValueType.STRING, node.getAttribute("local bind address")));
-			act.addParameter(new Parameter("register as foreign device in bbmd", ValueType.BOOL,
-					node.getAttribute("register as foreign device in bbmd")));
-			act.addParameter(new Parameter(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, ValueType.STRING,
-					node.getAttribute(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER)));
-			// act.addParameter(new Parameter("bbmd ip", ValueType.STRING,
-			// node.getAttribute("bbmd ip")));
-		} else {
-			Set<String> portids = BacnetLink.listPorts();
-			if (portids.size() > 0) {
-				if (portids.contains(node.getAttribute("comm port id").getString())) {
-					act.addParameter(new Parameter("comm port id", ValueType.makeEnum(portids),
-							node.getAttribute("comm port id")));
-					act.addParameter(new Parameter("comm port id (manual entry)", ValueType.STRING));
-				} else {
-					act.addParameter(new Parameter("comm port id", ValueType.makeEnum(portids)));
-					act.addParameter(new Parameter("comm port id (manual entry)", ValueType.STRING,
-							node.getAttribute("comm port id")));
-				}
-			} else {
-				act.addParameter(new Parameter("comm port id", ValueType.STRING, node.getAttribute("comm port id")));
-			}
-			act.addParameter(new Parameter("baud rate", ValueType.NUMBER, node.getAttribute("baud rate")));
-			act.addParameter(new Parameter("this station id", ValueType.NUMBER, node.getAttribute("this station id")));
-			act.addParameter(new Parameter("frame error retry count", ValueType.NUMBER,
-					node.getAttribute("frame error retry count")));
-		}
+
+		addTransportParameters(act);
+
+		// common parameters
 		act.addParameter(
 				new Parameter("local network number", ValueType.NUMBER, node.getAttribute("local network number")));
 		act.addParameter(new Parameter("strict device comparisons", ValueType.BOOL,
@@ -511,54 +440,33 @@ class BacnetConn {
 	private class EditHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			String name = event.getParameter("name", ValueType.STRING).getString();
-			if (isIP) {
-				String bip = event.getParameter("broadcast ip", ValueType.STRING).getString();
-				int port = event.getParameter("port", ValueType.NUMBER).getNumber().intValue();
-				String lba = event.getParameter("local bind address", ValueType.STRING).getString();
-				boolean isfd = event.getParameter("register as foreign device in bbmd", ValueType.BOOL).getBool();
-				String bbmdips = event.getParameter(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, ValueType.STRING)
-						.getString();
-				// String bbmdip = event.getParameter("bbmd ip",
-				// ValueType.STRING).getString();
 
-				node.setAttribute("broadcast ip", new Value(bip));
-				node.setAttribute("port", new Value(port));
-				node.setAttribute("local bind address", new Value(lba));
-				node.setAttribute("register as foreign device in bbmd", new Value(isfd));
-				node.setAttribute(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, new Value(bbmdips));
-				// node.setAttribute("bbmd ip", new Value(bbmdip));
-			} else {
-				String commPort = event.getParameter("comm port id", ValueType.STRING).getString();
-				int baud = event.getParameter("baud rate", ValueType.NUMBER).getNumber().intValue();
-				int station = event.getParameter("this station id", ValueType.NUMBER).getNumber().intValue();
-				int ferc = event.getParameter("frame error retry count", ValueType.NUMBER).getNumber().intValue();
-				node.setAttribute("comm port id", new Value(commPort));
-				node.setAttribute("baud rate", new Value(baud));
-				node.setAttribute("this station id", new Value(station));
-				node.setAttribute("frame error retry count", new Value(ferc));
-			}
-			int lnn = event.getParameter("local network number", ValueType.NUMBER).getNumber().intValue();
+			setTransportAtrributions(event);
+
+			// common attribution
+			int localNetworkNumber = event.getParameter("local network number", ValueType.NUMBER).getNumber()
+					.intValue();
 			boolean strict = event.getParameter("strict device comparisons", ValueType.BOOL).getBool();
 			int timeout = event.getParameter("Timeout", ValueType.NUMBER).getNumber().intValue();
 			int segtimeout = event.getParameter("segment timeout", ValueType.NUMBER).getNumber().intValue();
-			int segwin = event.getParameter("segment window", ValueType.NUMBER).getNumber().intValue();
+			int segmentWindow = event.getParameter("segment window", ValueType.NUMBER).getNumber().intValue();
 			int retries = event.getParameter("retries", ValueType.NUMBER).getNumber().intValue();
-			int locdevId = event.getParameter("local device id", ValueType.NUMBER).getNumber().intValue();
-			String locdevName = event.getParameter("local device name", ValueType.STRING).getString();
-			String locdevVend = event.getParameter("local device vendor", ValueType.STRING).getString();
-			long interval = (long) (1000
+			int localDeviceId = event.getParameter("local device id", ValueType.NUMBER).getNumber().intValue();
+			String localDeviceName = event.getParameter("local device name", ValueType.STRING).getString();
+			String localDeviceVendor = event.getParameter("local device vendor", ValueType.STRING).getString();
+			long intervalInMilliseconds = (long) (1000
 					* event.getParameter("default polling interval", ValueType.NUMBER).getNumber().doubleValue());
 
-			node.setAttribute("local network number", new Value(lnn));
+			node.setAttribute("local network number", new Value(localNetworkNumber));
 			node.setAttribute("strict device comparisons", new Value(strict));
 			node.setAttribute("Timeout", new Value(timeout));
 			node.setAttribute("segment timeout", new Value(segtimeout));
-			node.setAttribute("segment window", new Value(segwin));
+			node.setAttribute("segment window", new Value(segmentWindow));
 			node.setAttribute("retries", new Value(retries));
-			node.setAttribute("local device id", new Value(locdevId));
-			node.setAttribute("local device name", new Value(locdevName));
-			node.setAttribute("local device vendor", new Value(locdevVend));
-			node.setAttribute("default polling interval", new Value(interval));
+			node.setAttribute("local device id", new Value(localDeviceId));
+			node.setAttribute("local device name", new Value(localDeviceName));
+			node.setAttribute("local device vendor", new Value(localDeviceVendor));
+			node.setAttribute("default polling interval", new Value(intervalInMilliseconds));
 
 			stop();
 
@@ -589,8 +497,12 @@ class BacnetConn {
 		node.clearChildren();
 		link.serialConns.remove(getMe());
 		node.getParent().removeChild(node);
-		if (!isIP)
-			serialStpe.shutdown();
+
+		shutdown();
+	}
+
+	void shutdown() {
+
 	}
 
 	protected void rename(String name) {
@@ -604,7 +516,7 @@ class BacnetConn {
 		jobj.put(name, nodeobj);
 		link.copyDeserializer.deserialize(jobj);
 		Node newnode = node.getParent().getChild(name);
-		BacnetConn bc = new BacnetConn(link, newnode);
+		BacnetConn bc = getBacnetConnection(link, newnode);
 		bc.restoreLastSession();
 	}
 
@@ -639,12 +551,13 @@ class BacnetConn {
 
 	RemoteDevice getDevice(String mac, int instanceNum, int netNum, String linkMac, long interval, CovType covtype,
 			int covlife) {
-		ConcurrentLinkedQueue<RemoteDevice> devs = new ConcurrentLinkedQueue<RemoteDevice>();
-		DiscoveryListener dl = new DiscoveryListener(devs);
 		if (localDevice == null) {
 			stop();
 			return null;
 		}
+
+		ConcurrentLinkedQueue<RemoteDevice> devs = new ConcurrentLinkedQueue<RemoteDevice>();
+		DiscoveryListener dl = new DiscoveryListener(devs);
 		if (!mac.isEmpty() && instanceNum >= 0) {
 			Address address = Utils.toAddress(netNum, mac);
 			try {
@@ -699,12 +612,13 @@ class BacnetConn {
 
 	private class DeviceDiscoveryHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
-			ConcurrentLinkedQueue<RemoteDevice> devs = new ConcurrentLinkedQueue<RemoteDevice>();
-			DiscoveryListener dl = new DiscoveryListener(devs);
 			if (localDevice == null) {
 				stop();
 				return;
 			}
+
+			ConcurrentLinkedQueue<RemoteDevice> devs = new ConcurrentLinkedQueue<RemoteDevice>();
+			DiscoveryListener dl = new DiscoveryListener(devs);
 			localDevice.getEventHandler().addListener(dl);
 			try {
 				localDevice.sendGlobalBroadcast(new WhoIsRequest());
@@ -857,7 +771,7 @@ class BacnetConn {
 
 		if (null == localDevice || node.getChildren() == null)
 			return;
-		
+
 		for (Node child : node.getChildren().values()) {
 			restoreDevice(child);
 		}
@@ -1043,9 +957,4 @@ class BacnetConn {
 	public Map<BACnetObject, EditablePoint> getObjectToPoint() {
 		return ObjectToPoint;
 	}
-
-	// // Not production code, for lisener's mockup test only
-	// public DeviceEventListener getListener() {
-	// return this.listener;
-	// }
 }
