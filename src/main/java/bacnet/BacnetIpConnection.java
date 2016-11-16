@@ -4,6 +4,8 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.actions.Action;
@@ -33,6 +35,7 @@ public class BacnetIpConnection extends BacnetConn {
 	static final String ATTR_LOCAL_BIND_ADDRESS = "local bind address";
 	static final String ATTR_REGISTER_AS_FOREIGN_DEVICE = "register as foreign device in bbmd";
 	static final String ATTR_BBMD_IP_WITH_NETWORK_NUMBER = "bbmd ips with network number";
+	static final int DEFAULT_TIME_TO_LIVE = 100;
 
 	String broadcastIp;
 	int port;
@@ -49,7 +52,7 @@ public class BacnetIpConnection extends BacnetConn {
 		isRegisteredAsForegnDevice = node.getAttribute(ATTR_REGISTER_AS_FOREIGN_DEVICE).getBool();
 		bbmdIpList = node.getAttribute(ATTR_BBMD_IP_WITH_NETWORK_NUMBER).getString();
 		if (null != bbmdIpList && isRegisteredAsForegnDevice) {
-			this.parseBBMD(bbmdIpList);
+			this.parseBroadcastManagementDevice(bbmdIpList);
 		}
 	}
 
@@ -60,25 +63,22 @@ public class BacnetIpConnection extends BacnetConn {
 		return network;
 	}
 
-	private void parseBBMD(String bbmdIpList) {
+	private void parseBroadcastManagementDevice(String bbmdIpList) {
+		String bbmdIp = null;
+		int bbmdPort = IpNetwork.DEFAULT_PORT;
+		int networkNumber = 0;
 		for (String entry : bbmdIpList.split(",")) {
 			entry = entry.trim();
 			if (!entry.isEmpty()) {
-				String[] arr = entry.split(":");
-				String bbmdIp = arr[0];
-				int bbmdPort;
-				try {
-					bbmdPort = arr.length < 2 ? IpNetwork.DEFAULT_PORT : Integer.parseInt(arr[1]);
-				} catch (Exception e) {
-					bbmdPort = IpNetwork.DEFAULT_PORT;
+				Pattern p = Pattern.compile("^\\s*(.*?):(\\d+):(\\d+)$");
+				Matcher m = p.matcher(entry);
+				if (m.matches()) {
+					bbmdIp = m.group(1);
+					bbmdPort = Integer.parseInt(m.group(2));
+					networkNumber = Integer.parseInt(m.group(3));
 				}
 				bbmdIpToPort.put(bbmdIp, bbmdPort);
-				int networkNumber = 0;
-				try {
-					networkNumber = arr.length < 3 ? 0 : Integer.parseInt(arr[2]);
-				} catch (Exception e) {
-					LOGGER.debug(e.getMessage());
-				}
+
 				if (!bbmdIp.isEmpty()) {
 					OctetString os = IpNetworkUtils.toOctetString(bbmdIp, bbmdPort);
 					networkRouters.put(networkNumber, os);
@@ -124,8 +124,8 @@ public class BacnetIpConnection extends BacnetConn {
 			String bbmdIp = entry.getKey();
 			Integer bbmdPort = entry.getValue();
 			try {
-				((IpNetwork) network)
-						.registerAsForeignDevice(new InetSocketAddress(InetAddress.getByName(bbmdIp), bbmdPort), 100);
+				((IpNetwork) network).registerAsForeignDevice(
+						new InetSocketAddress(InetAddress.getByName(bbmdIp), bbmdPort), DEFAULT_TIME_TO_LIVE);
 			} catch (UnknownHostException e) {
 				LOGGER.debug("", e);
 			} catch (BACnetException e) {

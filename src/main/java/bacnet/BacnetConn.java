@@ -304,7 +304,11 @@ abstract class BacnetConn {
 
 	abstract void setTransportAtrributions(ActionResult event);
 
-	abstract BacnetConn getBacnetConnection(BacnetLink link2, Node newnode);
+	abstract BacnetConn getBacnetConnection(BacnetLink link, Node newnode);
+
+	void registerAsFeignDevice(Network network) {
+
+	}
 
 	static class SerialPortWrapperImpl extends SerialPortWrapper {
 
@@ -450,7 +454,7 @@ abstract class BacnetConn {
 			int localDeviceId = event.getParameter("local device id", ValueType.NUMBER).getNumber().intValue();
 			String localDeviceName = event.getParameter("local device name", ValueType.STRING).getString();
 			String localDeviceVendor = event.getParameter("local device vendor", ValueType.STRING).getString();
-			long interval = (long) (1000
+			long intervalInMilliseconds = (long) (1000
 					* event.getParameter("default polling interval", ValueType.NUMBER).getNumber().doubleValue());
 
 			node.setAttribute("local network number", new Value(localNetworkNumber));
@@ -462,7 +466,7 @@ abstract class BacnetConn {
 			node.setAttribute("local device id", new Value(localDeviceId));
 			node.setAttribute("local device name", new Value(localDeviceName));
 			node.setAttribute("local device vendor", new Value(localDeviceVendor));
-			node.setAttribute("default polling interval", new Value(interval));
+			node.setAttribute("default polling interval", new Value(intervalInMilliseconds));
 
 			stop();
 
@@ -953,13 +957,4 @@ abstract class BacnetConn {
 	public Map<BACnetObject, EditablePoint> getObjectToPoint() {
 		return ObjectToPoint;
 	}
-
-	void registerAsFeignDevice(Network newwork) {
-
-	}
-
-	// // Not production code, for lisener's mockup test only
-	// public DeviceEventListener getListener() {
-	// return this.listener;
-	// }
 }
