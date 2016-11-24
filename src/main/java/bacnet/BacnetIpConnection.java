@@ -1,12 +1,17 @@
 package bacnet;
 
+import com.serotonin.bacnet4j.exception.BACnetException;
+import com.serotonin.bacnet4j.npdu.Network;
+import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
+import com.serotonin.bacnet4j.npdu.ip.IpNetworkBuilder;
+import com.serotonin.bacnet4j.npdu.ip.IpNetworkUtils;
+import com.serotonin.bacnet4j.type.primitive.OctetString;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.actions.Action;
 import org.dsa.iot.dslink.node.actions.ActionResult;
@@ -15,13 +20,6 @@ import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.serotonin.bacnet4j.exception.BACnetException;
-import com.serotonin.bacnet4j.npdu.Network;
-import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
-import com.serotonin.bacnet4j.npdu.ip.IpNetworkBuilder;
-import com.serotonin.bacnet4j.npdu.ip.IpNetworkUtils;
-import com.serotonin.bacnet4j.type.primitive.OctetString;
 
 public class BacnetIpConnection extends BacnetConn {
 	private static final Logger LOGGER;
@@ -71,21 +69,19 @@ public class BacnetIpConnection extends BacnetConn {
 			entry = entry.trim();
 			if (!entry.isEmpty()) {
 				Pattern p = Pattern.compile("^\\s*(.*?):(\\d+):(\\d+)$");
-				Matcher m = p.matcher(entry);
-				if (m.matches()) {
-					bbmdIp = m.group(1);
-					bbmdPort = Integer.parseInt(m.group(2));
-					networkNumber = Integer.parseInt(m.group(3));
-				}
-				bbmdIpToPort.put(bbmdIp, bbmdPort);
-
-				if (!bbmdIp.isEmpty()) {
-					OctetString os = IpNetworkUtils.toOctetString(bbmdIp, bbmdPort);
-					networkRouters.put(networkNumber, os);
-				}
-
-			}
-		}
+                Matcher m = p.matcher(entry);
+                if (m.matches()) {
+                    bbmdIp = m.group(1);
+                    bbmdPort = Integer.parseInt(m.group(2));
+                    networkNumber = Integer.parseInt(m.group(3));
+                    if (!bbmdIp.isEmpty()) {
+                        bbmdIpToPort.put(bbmdIp, bbmdPort);
+                        OctetString os = IpNetworkUtils.toOctetString(bbmdIp, bbmdPort);
+                        networkRouters.put(networkNumber, os);
+                    }
+                }
+            }
+        }
 	}
 
 	@Override
