@@ -25,8 +25,6 @@ import org.dsa.iot.dslink.util.json.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import bacnet.BacnetConn.CovType;
-
 import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.ServiceFuture;
 import com.serotonin.bacnet4j.exception.BACnetException;
@@ -121,10 +119,7 @@ public class DeviceNode extends DeviceFolder {
 		} catch (Exception e) {
 		}
 
-		if (conn.isIP)
-			this.deviceStpe = Objects.createDaemonThreadPool();
-		else
-			this.deviceStpe = conn.getDaemonThreadPool();
+		this.deviceStpe = conn.getDaemonThreadPool();
 
 		makeEditAction();
 
@@ -237,8 +232,7 @@ public class DeviceNode extends DeviceFolder {
 	@Override
 	protected void remove() {
 		super.remove();
-		if (conn.isIP)
-			deviceStpe.shutdown();
+
 		conn.deviceNodes.remove(this);
 	}
 
@@ -487,6 +481,7 @@ public class DeviceNode extends DeviceFolder {
 					conn.stop();
 					return;
 				}
+
 				PropertyReferences refs = new PropertyReferences();
 				for (ObjectIdentifier oid : subscribedPoints.keySet()) {
 					DeviceFolder.addPropertyReferences(refs, oid);
