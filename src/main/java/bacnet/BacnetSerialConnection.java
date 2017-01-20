@@ -24,7 +24,7 @@ public class BacnetSerialConnection extends BacnetConn {
 	private static final Logger LOGGER;
 
 	static {
-		LOGGER = LoggerFactory.getLogger(BacnetConn.class);
+		LOGGER = LoggerFactory.getLogger(BacnetSerialConnection.class);
 	}
 
 	static final String ATTR_COMM_PORT_ID = "comm port id";

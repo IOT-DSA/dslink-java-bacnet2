@@ -81,7 +81,18 @@ import com.serotonin.io.serial.SerialParameters;
 abstract class BacnetConn {
 	private static final Logger LOGGER;
 
+	static {
+		LOGGER = LoggerFactory.getLogger(BacnetConn.class);
+	}
+
 	static final String ACTION_ADD_LOCAL_SLAVE = "set up ip slave";
+	static final String ACTION_REMOVE = "remove";
+	static final String ACTION_EDIT = "edit";
+	static final String ACTION_STOP = "stop";
+	static final String ACTION_RESTART = "restart";
+	static final String ACTION_DISCOVER_DEVICES = "discover devices";
+	static final String ACTION_ADD_DEVICE = "add device";
+
 	static final String ATTRIBUTE_NAME = "name";
 	static final String ATTRIBUTE_MAC_ADDRESS = "MAC address";
 	static final String ATTRIBUTE_INSTANCE_NUMBER = "instance number";
@@ -93,6 +104,11 @@ abstract class BacnetConn {
 
 	static final String ATTRIBUTE_RESTORE_TYPE = "restore type";
 	static final String RESTORE_EDITABLE_FOLDER = "editable folder";
+
+	static final String NODE_STATUS = "STATUS";
+	static final String NODE_STATUS_SETTING_UP_CONNECTION = "Setting up connection";
+	static final String NODE_STATUS_CONNECTED = "Connected";
+	static final String NODE_STATUS_STOPPED = "Stopped";
 
 	Node node;
 	final Node statnode;
@@ -109,7 +125,6 @@ abstract class BacnetConn {
 	String localDeviceVendor;
 	long defaultInterval;
 	BacnetLink link;
-	boolean isIP;
 
 	final Set<DeviceNode> deviceNodes = new HashSet<DeviceNode>();
 	LocalDeviceFolder localDeviceNode;
@@ -122,15 +137,10 @@ abstract class BacnetConn {
 	ScheduledThreadPoolExecutor serialStpe;
 	DeviceEventListener listener;
 
-	static {
-		LOGGER = LoggerFactory.getLogger(BacnetConn.class);
-	}
-
 	BacnetConn(BacnetLink link, Node node) {
 		this.node = node;
 		this.link = link;
 
-		isIP = node.getAttribute("isIP").getBool();
 		defaultInterval = node.getAttribute("default polling interval").getNumber().longValue();
 		localNetworkNumber = node.getAttribute("local network number").getNumber().intValue();
 		timeout = node.getAttribute("Timeout").getNumber().intValue();
@@ -144,7 +154,7 @@ abstract class BacnetConn {
 
 		initializeScheduledThreadPoolExecutor();
 
-		this.statnode = node.createChild("STATUS").setValueType(ValueType.STRING).setValue(new Value("")).build();
+		this.statnode = node.createChild(NODE_STATUS).setValueType(ValueType.STRING).setValue(new Value("")).build();
 		this.statnode.setSerializable(false);
 
 		this.listener = new EventListenerImpl();
@@ -163,19 +173,19 @@ abstract class BacnetConn {
 			reconnectFuture.cancel(false);
 			reconnectFuture = null;
 		}
-		statnode.setValue(new Value("Setting up connection"));
+		statnode.setValue(new Value(NODE_STATUS_SETTING_UP_CONNECTION));
 
 		Action act = new Action(Permission.READ, new RemoveHandler());
-		Node anode = node.getChild("remove");
+		Node anode = node.getChild(ACTION_REMOVE);
 		if (anode == null)
-			node.createChild("remove").setAction(act).build().setSerializable(false);
+			node.createChild(ACTION_REMOVE).setAction(act).build().setSerializable(false);
 		else
 			anode.setAction(act);
 
 		act = getEditAction();
-		anode = node.getChild("edit");
+		anode = node.getChild(ACTION_EDIT);
 		if (anode == null) {
-			anode = node.createChild("edit").setAction(act).build();
+			anode = node.createChild(ACTION_EDIT).setAction(act).build();
 			anode.setSerializable(false);
 		} else {
 			anode.setAction(act);
@@ -226,28 +236,28 @@ abstract class BacnetConn {
 			localDevice = null;
 		}
 
-		if (!"Stopped".equals(statnode.getValue().getString())) {
+		if (!NODE_STATUS_STOPPED.equals(statnode.getValue().getString())) {
 			act = new Action(Permission.READ, new StopHandler());
-			anode = node.getChild("stop");
+			anode = node.getChild(ACTION_STOP);
 			if (anode == null)
-				node.createChild("stop").setAction(act).build().setSerializable(false);
+				node.createChild(ACTION_STOP).setAction(act).build().setSerializable(false);
 			else
 				anode.setAction(act);
 		}
 
 		act = new Action(Permission.READ, new RestartHandler());
-		anode = node.getChild("restart");
+		anode = node.getChild(ACTION_RESTART);
 		if (anode == null)
-			node.createChild("restart").setAction(act).build().setSerializable(false);
+			node.createChild(ACTION_RESTART).setAction(act).build().setSerializable(false);
 		else
 			anode.setAction(act);
 
 		if (localDevice != null) {
 			retryDelay = 1;
 			act = new Action(Permission.READ, new DeviceDiscoveryHandler());
-			anode = node.getChild("discover devices");
+			anode = node.getChild(ACTION_DISCOVER_DEVICES);
 			if (anode == null)
-				node.createChild("discover devices").setAction(act).build().setSerializable(false);
+				node.createChild(ACTION_DISCOVER_DEVICES).setAction(act).build().setSerializable(false);
 			else
 				anode.setAction(act);
 
@@ -268,22 +278,22 @@ abstract class BacnetConn {
 			act.addParameter(
 					new Parameter(ATTRIBUTE_COV_USAGE, ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED")));
 			act.addParameter(new Parameter(ATTRIBUTE_COV_LEASE_TIME, ValueType.NUMBER, new Value(60)));
-			anode = node.getChild("add device");
+			anode = node.getChild(ACTION_ADD_DEVICE);
 			if (anode == null)
-				node.createChild("add device").setAction(act).build().setSerializable(false);
+				node.createChild(ACTION_ADD_DEVICE).setAction(act).build().setSerializable(false);
 			else
 				anode.setAction(act);
-			statnode.setValue(new Value("Connected"));
+			statnode.setValue(new Value(NODE_STATUS_CONNECTED));
 
-		} else if (!"Stopped".equals(statnode.getValue().getString())) {
+		} else if (!NODE_STATUS_STOPPED.equals(statnode.getValue().getString())) {
 			ScheduledThreadPoolExecutor reconnectStpe = Objects.getDaemonThreadPool();
 			reconnectFuture = reconnectStpe.schedule(new Runnable() {
 
 				@Override
 				public void run() {
 					Value stat = statnode.getValue();
-					if (stat == null || !("Connected".equals(stat.getString())
-							|| "Setting up connection".equals(stat.getString()))) {
+					if (stat == null || !(NODE_STATUS_CONNECTED.equals(stat.getString())
+							|| NODE_STATUS_SETTING_UP_CONNECTION.equals(stat.getString()))) {
 						restoreLastSession();
 					}
 				}
@@ -430,10 +440,10 @@ abstract class BacnetConn {
 		if (localDevice != null) {
 			localDevice.terminate();
 			localDevice = null;
-			node.removeChild("stop");
-			node.removeChild("discover devices");
-			node.removeChild("add device");
-			statnode.setValue(new Value("Stopped"));
+			node.removeChild(ACTION_STOP);
+			node.removeChild(ACTION_DISCOVER_DEVICES);
+			node.removeChild(ACTION_ADD_DEVICE);
+			statnode.setValue(new Value(NODE_STATUS_STOPPED));
 		}
 	}
 
@@ -518,10 +528,6 @@ abstract class BacnetConn {
 		Node newnode = node.getParent().getChild(name);
 		BacnetConn bc = getBacnetConnection(link, newnode);
 		bc.restoreLastSession();
-	}
-
-	public enum CovType {
-		NONE, UNCONFIRMED, CONFIRMED
 	}
 
 	private class AddDeviceHandler implements Handler<ActionResult> {
