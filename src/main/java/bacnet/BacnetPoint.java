@@ -157,7 +157,7 @@ public class BacnetPoint {
 		this.listener = folder.new CovListener(this);
 		this.parent = parent;
 		this.node = node;
-		ObjectType ot = DeviceFolder.parseObjectType(node.getAttribute("object type").getString());
+		ObjectType ot = Utils.parseObjectType(node.getAttribute("object type").getString());
 		int instNum = node.getAttribute("object instance number").getNumber().intValue();
 		boolean usecov = node.getAttribute("use COV").getBool();
 		boolean canset = node.getAttribute("settable").getBool();
@@ -367,13 +367,7 @@ public class BacnetPoint {
 
 		act = new Action(Permission.READ, new EditHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
-		act.addParameter(new Parameter("object type",
-				ValueType.makeEnum("Analog Input", "Analog Output", "Analog Value", "Binary Input", "Binary Output",
-						"Binary Value", "Calendar", "Command", "Device", "Event Enrollment", "File", "Group", "Loop",
-						"Multi-state Input", "Multi-state Output", "Notification Class", "Program", "Schedule",
-						"Averaging", "Multi-state Value", "Trend Log", "Life Safety Point", "Life Safety Zone",
-						"Accumulator", "Pulse Converter", "Event Log", "Trend Log Multiple", "Load Control",
-						"Structured View", "Access Door"),
+		act.addParameter(new Parameter("object type", ValueType.makeEnum(Utils.enumeratedObjectTypeNames()),
 				node.getAttribute("object type")));
 		act.addParameter(
 				new Parameter("object instance number", ValueType.NUMBER, node.getAttribute("object instance number")));
@@ -552,8 +546,7 @@ public class BacnetPoint {
 			settable = event.getParameter("settable", ValueType.BOOL).getBool();
 			cov = event.getParameter("use COV", ValueType.BOOL).getBool();
 			defaultPriority = event.getParameter("default priority", ValueType.NUMBER).getNumber().intValue();
-			ObjectType ot = DeviceFolder
-					.parseObjectType(event.getParameter("object type", ValueType.STRING).getString());
+			ObjectType ot = Utils.parseObjectType(event.getParameter("object type", ValueType.STRING).getString());
 			instanceNumber = event.getParameter("object instance number", ValueType.NUMBER).getNumber().intValue();
 			oid = new ObjectIdentifier(ot, instanceNumber);
 			setObjectTypeId(ot.intValue());
