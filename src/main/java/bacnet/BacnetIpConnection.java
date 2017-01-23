@@ -25,7 +25,7 @@ public class BacnetIpConnection extends BacnetConn {
 	private static final Logger LOGGER;
 
 	static {
-		LOGGER = LoggerFactory.getLogger(BacnetConn.class);
+		LOGGER = LoggerFactory.getLogger(BacnetIpConnection.class);
 	}
 
 	static final String ATTR_BROADCAST_IP = "broadcast ip";

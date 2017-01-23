@@ -21,8 +21,6 @@ import org.dsa.iot.dslink.util.json.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import bacnet.BacnetConn.CovType;
-
 import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.event.DeviceEventAdapter;
 import com.serotonin.bacnet4j.exception.BACnetException;
@@ -89,13 +87,7 @@ public class DeviceFolder {
 
 		act = new Action(Permission.READ, new AddObjectHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING));
-		act.addParameter(new Parameter("object type",
-				ValueType.makeEnum("Analog Input", "Analog Output", "Analog Value", "Binary Input", "Binary Output",
-						"Binary Value", "Calendar", "Command", "Device", "Event Enrollment", "File", "Group", "Loop",
-						"Multi-state Input", "Multi-state Output", "Notification Class", "Program", "Schedule",
-						"Averaging", "Multi-state Value", "Trend Log", "Life Safety Point", "Life Safety Zone",
-						"Accumulator", "Pulse Converter", "Event Log", "Trend Log Multiple", "Load Control",
-						"Structured View", "Access Door")));
+		act.addParameter(new Parameter("object type", ValueType.makeEnum(Utils.enumeratedObjectTypeNames())));
 		act.addParameter(new Parameter("object instance number", ValueType.NUMBER, new Value(0)));
 		act.addParameter(new Parameter("use COV", ValueType.BOOL, new Value(false)));
 		act.addParameter(new Parameter("settable", ValueType.BOOL, new Value(false)));
@@ -149,7 +141,7 @@ public class DeviceFolder {
 	private class AddObjectHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			String name = event.getParameter("name", ValueType.STRING).getString();
-			ObjectType ot = parseObjectType(event.getParameter("object type").getString());
+			ObjectType ot = Utils.parseObjectType(event.getParameter("object type").getString());
 			int instNum = event.getParameter("object instance number", ValueType.NUMBER).getNumber().intValue();
 			boolean cov = event.getParameter("use COV", ValueType.BOOL).getBool();
 			boolean sett = event.getParameter("settable", ValueType.BOOL).getBool();
@@ -600,73 +592,6 @@ public class DeviceFolder {
 			String name = event.getParameter("name", ValueType.STRING).getString();
 			Node child = node.createChild(name).build();
 			new DeviceFolder(conn, child, root);
-		}
-	}
-
-	static ObjectType parseObjectType(String otStr) {
-		switch (otStr) {
-		case "Analog Input":
-			return ObjectType.analogInput;
-		case "Analog Output":
-			return ObjectType.analogOutput;
-		case "Analog Value":
-			return ObjectType.analogValue;
-		case "Binary Input":
-			return ObjectType.binaryInput;
-		case "Binary Output":
-			return ObjectType.binaryOutput;
-		case "Binary Value":
-			return ObjectType.binaryValue;
-		case "Calendar":
-			return ObjectType.calendar;
-		case "Command":
-			return ObjectType.command;
-		case "Device":
-			return ObjectType.device;
-		case "Event Enrollment":
-			return ObjectType.eventEnrollment;
-		case "File":
-			return ObjectType.file;
-		case "Group":
-			return ObjectType.group;
-		case "Loop":
-			return ObjectType.loop;
-		case "Multi-state Input":
-			return ObjectType.multiStateInput;
-		case "Multi-state Output":
-			return ObjectType.multiStateOutput;
-		case "Notification Class":
-			return ObjectType.notificationClass;
-		case "Program":
-			return ObjectType.program;
-		case "Schedule":
-			return ObjectType.schedule;
-		case "Averaging":
-			return ObjectType.averaging;
-		case "Multi-state Value":
-			return ObjectType.multiStateValue;
-		case "Trend Log":
-			return ObjectType.trendLog;
-		case "Life Safety Point":
-			return ObjectType.lifeSafetyPoint;
-		case "Life Safety Zone":
-			return ObjectType.lifeSafetyZone;
-		case "Accumulator":
-			return ObjectType.accumulator;
-		case "Pulse Converter":
-			return ObjectType.pulseConverter;
-		case "Event Log":
-			return ObjectType.eventLog;
-		case "Trend Log Multiple":
-			return ObjectType.trendLogMultiple;
-		case "Load Control":
-			return ObjectType.loadControl;
-		case "Structured View":
-			return ObjectType.structuredView;
-		case "Access Door":
-			return ObjectType.accessDoor;
-		default:
-			return null;
 		}
 	}
 

@@ -322,7 +322,7 @@ public class Utils {
 		} catch (NumberFormatException e) {
 			return null;
 		}
-		ObjectType ot = DeviceFolder.parseObjectType(str.substring(0, str.length() - numstr.length() - 1));
+		ObjectType ot = Utils.parseObjectType(str.substring(0, str.length() - numstr.length() - 1));
 		if (ot == null)
 			return null;
 		return new ObjectIdentifier(ot, num);
@@ -775,19 +775,17 @@ public class Utils {
 
 	public static String[] enumeratedObjectTypeNames() {
 		String valuesStr = Arrays.toString(ObjectType.ALL);
-		return valuesStr.substring(1, valuesStr.length() - 1).replace(" ", "").split(",");
+		return valuesStr.substring(1, valuesStr.length() - 1).split("\\s*,\\s*");
 	}
 
 	public static ObjectType parseObjectType(String typeString) {
-
 		for (ObjectType type : ObjectType.ALL) {
-			if (type.toString().replace(" ", "").equals(typeString.replace(" ", ""))) {
+			if (type.toString().equals(typeString)) {
 				return type;
 			}
 		}
 
 		return null;
-
 	}
 
 	public static DataType getDataType(ObjectType objectType) {

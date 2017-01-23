@@ -16,8 +16,6 @@ import org.slf4j.LoggerFactory;
 
 import com.serotonin.bacnet4j.LocalDevice;
 
-import bacnet.BacnetConn.CovType;
-
 public class LocalDeviceNode extends LocalDeviceFolder {
 
 	private static final Logger LOGGER;

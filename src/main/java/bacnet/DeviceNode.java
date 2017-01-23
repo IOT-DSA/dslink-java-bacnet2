@@ -25,8 +25,6 @@ import org.dsa.iot.dslink.util.json.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import bacnet.BacnetConn.CovType;
-
 import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.ServiceFuture;
 import com.serotonin.bacnet4j.exception.BACnetException;
@@ -121,10 +119,7 @@ public class DeviceNode extends DeviceFolder {
 		} catch (Exception e) {
 		}
 
-		if (conn.isIP)
-			this.deviceStpe = Objects.createDaemonThreadPool();
-		else
-			this.deviceStpe = conn.getDaemonThreadPool();
+		this.deviceStpe = conn.getDaemonThreadPool();
 
 		makeEditAction();
 
@@ -237,8 +232,7 @@ public class DeviceNode extends DeviceFolder {
 	@Override
 	protected void remove() {
 		super.remove();
-		if (conn.isIP)
-			deviceStpe.shutdown();
+
 		conn.deviceNodes.remove(this);
 	}
 
@@ -342,13 +336,7 @@ public class DeviceNode extends DeviceFolder {
 		node.createChild("get event information").setAction(act).build().setSerializable(false);
 
 		act = new Action(Permission.READ, new AckAlarmHandler());
-		act.addParameter(new Parameter("Event Object Type",
-				ValueType.makeEnum("Analog Input", "Analog Output", "Analog Value", "Binary Input", "Binary Output",
-						"Binary Value", "Calendar", "Command", "Device", "Event Enrollment", "File", "Group", "Loop",
-						"Multi-state Input", "Multi-state Output", "Notification Class", "Program", "Schedule",
-						"Averaging", "Multi-state Value", "Trend Log", "Life Safety Point", "Life Safety Zone",
-						"Accumulator", "Pulse Converter", "Event Log", "Trend Log Multiple", "Load Control",
-						"Structured View", "Access Door")));
+		act.addParameter(new Parameter("Event Object Type", ValueType.makeEnum(Utils.enumeratedObjectTypeNames())));
 		act.addParameter(new Parameter("Event Object Instance Number", ValueType.NUMBER, new Value(0)));
 		act.addParameter(new Parameter("Event State",
 				ValueType.makeEnum("normal", "fault", "offnormal", "highLimit", "lowLimit", "lifeSafetyAlarm")));
@@ -360,7 +348,7 @@ public class DeviceNode extends DeviceFolder {
 
 	private class AckAlarmHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
-			ObjectType ot = DeviceFolder.parseObjectType(event.getParameter("Event Object Type").getString());
+			ObjectType ot = Utils.parseObjectType(event.getParameter("Event Object Type").getString());
 			int inum = event.getParameter("Event Object Instance Number", ValueType.NUMBER).getNumber().intValue();
 			ObjectIdentifier oid = new ObjectIdentifier(ot, inum);
 			EventState estate = Utils.eventStateFromString(event.getParameter("Event State").getString());
@@ -487,6 +475,7 @@ public class DeviceNode extends DeviceFolder {
 					conn.stop();
 					return;
 				}
+
 				PropertyReferences refs = new PropertyReferences();
 				for (ObjectIdentifier oid : subscribedPoints.keySet()) {
 					DeviceFolder.addPropertyReferences(refs, oid);

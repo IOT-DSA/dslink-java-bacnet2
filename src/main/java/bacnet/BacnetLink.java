@@ -22,11 +22,9 @@ import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.serializer.Deserializer;
 import org.dsa.iot.dslink.serializer.Serializer;
 import org.dsa.iot.dslink.util.handler.Handler;
-import org.dsa.iot.dslink.util.json.JsonArray;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import bacnet.BacnetConn.CovType;
 
 import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
 import com.serotonin.io.serial.CommPortConfigException;
@@ -66,23 +64,7 @@ public class BacnetLink {
 
 		restoreLastSession();
 
-		Action act = new Action(Permission.READ, new AddIpConnHandler(true));
-		act.addParameter(new Parameter("name", ValueType.STRING));
-		act.addParameter(new Parameter("broadcast ip", ValueType.STRING, new Value(IpNetwork.DEFAULT_BROADCAST_IP)));
-		act.addParameter(new Parameter("port", ValueType.NUMBER, new Value(IpNetwork.DEFAULT_PORT)));
-		act.addParameter(new Parameter("local bind address", ValueType.STRING, new Value(IpNetwork.DEFAULT_BIND_IP)));
-		act.addParameter(new Parameter("local network number", ValueType.NUMBER, new Value(0)));
-		act.addParameter(new Parameter("register as foreign device in bbmd", ValueType.BOOL, new Value(false)));
-		act.addParameter(new Parameter(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, ValueType.STRING));
-		act.addParameter(new Parameter("strict device comparisons", ValueType.BOOL, new Value(true)));
-		act.addParameter(new Parameter("Timeout", ValueType.NUMBER, new Value(6000)));
-		act.addParameter(new Parameter("segment timeout", ValueType.NUMBER, new Value(5000)));
-		act.addParameter(new Parameter("segment window", ValueType.NUMBER, new Value(5)));
-		act.addParameter(new Parameter("retries", ValueType.NUMBER, new Value(2)));
-		act.addParameter(new Parameter("local device id", ValueType.NUMBER, new Value(1212)));
-		act.addParameter(new Parameter("local device name", ValueType.STRING, new Value("DSLink")));
-		act.addParameter(new Parameter("local device vendor", ValueType.STRING, new Value("DGLogik Inc.")));
-		act.addParameter(new Parameter("default polling interval", ValueType.NUMBER, new Value(5)));
+		Action act = getAddIpConnAction();
 		node.createChild("add ip connection").setAction(act).build().setSerializable(false);
 
 		// act = new Action(Permission.READ, new RxtxSetupHandler());
@@ -172,6 +154,28 @@ public class BacnetLink {
 		}
 	}
 
+	private Action getAddIpConnAction() {
+		Action act = new Action(Permission.READ, new AddIpConnHandler(true));
+		act.addParameter(new Parameter("name", ValueType.STRING));
+		act.addParameter(new Parameter("broadcast ip", ValueType.STRING, new Value(IpNetwork.DEFAULT_BROADCAST_IP)));
+		act.addParameter(new Parameter("port", ValueType.NUMBER, new Value(IpNetwork.DEFAULT_PORT)));
+		act.addParameter(new Parameter("local bind address", ValueType.STRING, new Value(IpNetwork.DEFAULT_BIND_IP)));
+		act.addParameter(new Parameter("local network number", ValueType.NUMBER, new Value(0)));
+		act.addParameter(new Parameter("register as foreign device in bbmd", ValueType.BOOL, new Value(false)));
+		act.addParameter(new Parameter(ATTRIBUTE_BBMD_IP_WITH_NETWORK_NUMBER, ValueType.STRING));
+		act.addParameter(new Parameter("strict device comparisons", ValueType.BOOL, new Value(true)));
+		act.addParameter(new Parameter("Timeout", ValueType.NUMBER, new Value(6000)));
+		act.addParameter(new Parameter("segment timeout", ValueType.NUMBER, new Value(5000)));
+		act.addParameter(new Parameter("segment window", ValueType.NUMBER, new Value(5)));
+		act.addParameter(new Parameter("retries", ValueType.NUMBER, new Value(2)));
+		act.addParameter(new Parameter("local device id", ValueType.NUMBER, new Value(1212)));
+		act.addParameter(new Parameter("local device name", ValueType.STRING, new Value("DSLink")));
+		act.addParameter(new Parameter("local device vendor", ValueType.STRING, new Value("DGLogik Inc.")));
+		act.addParameter(new Parameter("default polling interval", ValueType.NUMBER, new Value(5)));
+
+		return act;
+	}
+
 	private Action getAddSerialAction() {
 		Action act = new Action(Permission.READ, new AddSerialConnHandler(false));
 		act.addParameter(new Parameter("name", ValueType.STRING));
@@ -201,8 +205,8 @@ public class BacnetLink {
 	public void restoreLastSession() {
 		if (node.getChildren() == null)
 			return;
+
 		for (Node child : node.getChildren().values()) {
-			Value isip = child.getAttribute("isIP");
 			// IP transport
 			Value broadcastIp = child.getAttribute("broadcast ip");
 			Value port = child.getAttribute("port");
@@ -243,7 +247,7 @@ public class BacnetLink {
 					&& segmentWindow != null && retries != null && localDeviceId != null && localDeviceName != null
 					&& localDeviceVendor != null && interval != null) {
 				BacnetConn bc = null;
-				if (isip != null && isip.getBool() && broadcastIp != null && port != null && localBindAddress != null) {
+				if (broadcastIp != null && port != null && localBindAddress != null) {
 					bc = new BacnetIpConnection(getMe(), child);
 				} else if (commPort != null && baud != null && station != null && ferc != null) {
 					bc = new BacnetSerialConnection(getMe(), child);
@@ -390,7 +394,6 @@ public class BacnetLink {
 					* event.getParameter("default polling interval", ValueType.NUMBER).getNumber().doubleValue());
 
 			Node child = node.createChild(name).build();
-			child.setAttribute("isIP", new Value(isIP));
 			// IP transport
 			child.setAttribute("broadcast ip", new Value(broadcastIp));
 			child.setAttribute("port", new Value(port));
