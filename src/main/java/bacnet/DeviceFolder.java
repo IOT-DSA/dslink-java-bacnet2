@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
@@ -61,7 +62,7 @@ public class DeviceFolder {
 
 	protected Node node;
 	protected BacnetConn conn;
-	protected DeviceNode root;
+	protected DeviceFolder root;
 	private int unnamedCount;
 	final Set<ObjectIdentifier> pointSet = new HashSet<ObjectIdentifier>();
 
@@ -98,14 +99,13 @@ public class DeviceFolder {
 		act.addParameter(new Parameter("name", ValueType.STRING));
 		node.createChild("make copy").setAction(act).build().setSerializable(false);
 
-		if (!(this instanceof DeviceNode)) {
-			act = new Action(Permission.READ, new RenameHandler());
-			act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
-			node.createChild("rename").setAction(act).build().setSerializable(false);
-		}
+		act = new Action(Permission.READ, new RenameHandler());
+		act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
+		node.createChild("edit").setAction(act).build().setSerializable(false);
+
 	}
 
-	DeviceFolder(BacnetConn conn, Node node, DeviceNode root) {
+	DeviceFolder(BacnetConn conn, Node node, DeviceFolder root) {
 		this(conn, node);
 		this.root = root;
 	}
@@ -132,7 +132,7 @@ public class DeviceFolder {
 				} else {
 					node.removeChild(child);
 				}
-			} else if (child.getAction() == null && child != root.statnode && child != root.eventnode) {
+			} else if (child.getAction() == null && child != root.getStatusNode() && child != root.getEventNode()) {
 				node.removeChild(child);
 			}
 		}
@@ -162,13 +162,15 @@ public class DeviceFolder {
 
 	protected class ObjectDiscoveryHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
-			if (root.device == null)
+			if (root.getRemoteDevice() == null)
 				return;
+
 			final PropertyReferences refs = new PropertyReferences();
 			final Map<ObjectIdentifier, BacnetPoint> points = new HashMap<ObjectIdentifier, BacnetPoint>();
 			try {
-				RequestUtils.sendReadPropertyAllowNull(root.conn.localDevice, root.device,
-						root.device.getObjectIdentifier(), PropertyIdentifier.objectList, null, new RequestListener() {
+				RequestUtils.sendReadPropertyAllowNull(root.conn.localDevice, root.getRemoteDevice(),
+						root.getRemoteDevice().getObjectIdentifier(), PropertyIdentifier.objectList, null,
+						new RequestListener() {
 							public boolean requestProgress(double prog, ObjectIdentifier oidin, PropertyIdentifier pid,
 									UnsignedInteger pin, Encodable value) {
 								if (pin == null) {
@@ -202,7 +204,7 @@ public class DeviceFolder {
 	}
 
 	void setupCov(final BacnetPoint point, DeviceEventAdapter listener) {
-		if (root.device == null)
+		if (root.getRemoteDevice() == null)
 			return;
 		CovType ct = CovType.NONE;
 		try {
@@ -221,7 +223,8 @@ public class DeviceFolder {
 		root.getDaemonThreadPool().schedule(new Runnable() {
 			public void run() {
 				try {
-					conn.localDevice.send(root.device, new SubscribeCOVRequest(id, point.oid, confirmed, lifetime));
+					conn.localDevice.send(root.getRemoteDevice(),
+							new SubscribeCOVRequest(id, point.oid, confirmed, lifetime));
 				} catch (Exception e) {
 					LOGGER.debug("error: ", e);
 				}
@@ -243,7 +246,7 @@ public class DeviceFolder {
 		public void covNotificationReceived(final UnsignedInteger subscriberProcessIdentifier,
 				final RemoteDevice initiatingDevice, final ObjectIdentifier monitoredObjectIdentifier,
 				final UnsignedInteger timeRemaining, final SequenceOf<PropertyValue> listOfValues) {
-			if (root.device != null && root.device.equals(initiatingDevice)
+			if (root.getRemoteDevice() != null && root.getRemoteDevice().equals(initiatingDevice)
 					&& point.oid.equals(monitoredObjectIdentifier)) {
 				event.clear();
 				event.add(listOfValues);
@@ -276,10 +279,10 @@ public class DeviceFolder {
 	// }
 
 	void getProperties(PropertyReferences refs, final Map<ObjectIdentifier, BacnetPoint> points) {
-		if (root.device == null)
+		if (root.getRemoteDevice() == null)
 			return;
 		try {
-			RequestUtils.readProperties(root.conn.localDevice, root.device, refs, new RequestListener() {
+			RequestUtils.readProperties(root.conn.localDevice, root.getRemoteDevice(), refs, new RequestListener() {
 
 				public boolean requestProgress(double prog, ObjectIdentifier oid, PropertyIdentifier pid,
 						UnsignedInteger unsignedinteger, Encodable encodable) {
@@ -351,11 +354,11 @@ public class DeviceFolder {
 			DeviceObjectPropertyReference ref = (DeviceObjectPropertyReference) encodable;
 			if (ref.getDeviceIdentifier() != null)
 				pt.setReferenceDevice(ref.getDeviceIdentifier().toString());
-			else if (root.device != null)
-				pt.setReferenceDevice(root.device.getObjectIdentifier().toString());
+			else if (root.getRemoteDevice() != null)
+				pt.setReferenceDevice(root.getRemoteDevice().getObjectIdentifier().toString());
 			if (ref.getObjectIdentifier() != null) {
 				pt.setReferenceObject(ref.getObjectIdentifier().toString());
-				pt.setDataType(getDataType(ref.getObjectIdentifier().getObjectType()));
+				pt.setDataType(Utils.getDataType(ref.getObjectIdentifier().getObjectType()));
 			}
 			if (ref.getPropertyIdentifier() != null)
 				pt.setReferenceProperty(ref.getPropertyIdentifier().toString());
@@ -427,7 +430,7 @@ public class DeviceFolder {
 
 		BacnetPoint pt = new BacnetPoint(this, node, oid);
 
-		boolean defaultSettable = isOneOf(oid.getObjectType(), ObjectType.analogOutput, ObjectType.analogValue,
+		boolean defaultSettable = Utils.isOneOf(oid.getObjectType(), ObjectType.analogOutput, ObjectType.analogValue,
 				ObjectType.binaryOutput, ObjectType.binaryValue, ObjectType.multiStateOutput,
 				ObjectType.multiStateValue);
 		pt.setSettable(defaultSettable);
@@ -435,73 +438,51 @@ public class DeviceFolder {
 		points.put(oid, pt);
 	}
 
-	public static enum DataType {
-		BINARY, MULTISTATE, NUMERIC, ALPHANUMERIC
-	}
-
-	public static DataType getDataType(ObjectType objectType) {
-		if (isOneOf(objectType, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue))
-			return DataType.BINARY;
-		else if (isOneOf(objectType, ObjectType.multiStateInput, ObjectType.multiStateOutput,
-				ObjectType.multiStateValue, ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone))
-			return DataType.MULTISTATE;
-
-		else
-			return DataType.NUMERIC;
-	}
-
-	public static boolean isOneOf(int objectTypeId, ObjectType... types) {
-		for (ObjectType type : types) {
-			if (type.intValue() == objectTypeId)
-				return true;
-		}
-		return false;
-	}
-
 	static void addPropertyReferences(PropertyReferences refs, ObjectIdentifier oid) {
 		refs.add(oid, PropertyIdentifier.objectName);
 
 		ObjectType type = oid.getObjectType();
-		if (isOneOf(type, ObjectType.accumulator)) {
+		if (Utils.isOneOf(type, ObjectType.accumulator)) {
 			refs.add(oid, PropertyIdentifier.units);
 			refs.add(oid, PropertyIdentifier.presentValue);
-		} else if (isOneOf(type, ObjectType.analogInput, ObjectType.analogOutput, ObjectType.analogValue,
+		} else if (Utils.isOneOf(type, ObjectType.analogInput, ObjectType.analogOutput, ObjectType.analogValue,
 				ObjectType.pulseConverter)) {
 			refs.add(oid, PropertyIdentifier.units);
 			refs.add(oid, PropertyIdentifier.presentValue);
-		} else if (isOneOf(type, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
+		} else if (Utils.isOneOf(type, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
 			refs.add(oid, PropertyIdentifier.inactiveText);
 			refs.add(oid, PropertyIdentifier.activeText);
 			refs.add(oid, PropertyIdentifier.presentValue);
-		} else if (isOneOf(type, ObjectType.device)) {
+		} else if (Utils.isOneOf(type, ObjectType.device)) {
 			refs.add(oid, PropertyIdentifier.modelName);
-		} else if (isOneOf(type, ObjectType.lifeSafetyPoint)) {
+		} else if (Utils.isOneOf(type, ObjectType.lifeSafetyPoint)) {
 			refs.add(oid, PropertyIdentifier.units);
 			refs.add(oid, PropertyIdentifier.presentValue);
-		} else if (isOneOf(type, ObjectType.loop)) {
+		} else if (Utils.isOneOf(type, ObjectType.loop)) {
 			refs.add(oid, PropertyIdentifier.outputUnits);
 			refs.add(oid, PropertyIdentifier.presentValue);
-		} else if (isOneOf(type, ObjectType.multiStateInput, ObjectType.multiStateOutput, ObjectType.multiStateValue)) {
+		} else if (Utils.isOneOf(type, ObjectType.multiStateInput, ObjectType.multiStateOutput,
+				ObjectType.multiStateValue)) {
 			refs.add(oid, PropertyIdentifier.stateText);
 			refs.add(oid, PropertyIdentifier.presentValue);
-		} else if (isOneOf(type, ObjectType.schedule)) {
+		} else if (Utils.isOneOf(type, ObjectType.schedule)) {
 			refs.add(oid, PropertyIdentifier.presentValue);
 			refs.add(oid, PropertyIdentifier.effectivePeriod);
 			refs.add(oid, PropertyIdentifier.weeklySchedule);
 			refs.add(oid, PropertyIdentifier.exceptionSchedule);
-		} else if (isOneOf(type, ObjectType.trendLog)) {
+		} else if (Utils.isOneOf(type, ObjectType.trendLog)) {
 			refs.add(oid, PropertyIdentifier.logDeviceObjectProperty);
 			refs.add(oid, PropertyIdentifier.recordCount);
 			refs.add(oid, PropertyIdentifier.startTime);
 			refs.add(oid, PropertyIdentifier.stopTime);
 			refs.add(oid, PropertyIdentifier.bufferSize);
 			// refs.add(oid, PropertyIdentifier.logBuffer);
-		} else if (isOneOf(type, ObjectType.notificationClass)) {
+		} else if (Utils.isOneOf(type, ObjectType.notificationClass)) {
 			refs.add(oid, PropertyIdentifier.notificationClass);
 			refs.add(oid, PropertyIdentifier.priority);
 			refs.add(oid, PropertyIdentifier.ackRequired);
 			refs.add(oid, PropertyIdentifier.recipientList);
-		} else if (isOneOf(type, ObjectType.calendar)) {
+		} else if (Utils.isOneOf(type, ObjectType.calendar)) {
 			refs.add(oid, PropertyIdentifier.presentValue);
 			refs.add(oid, PropertyIdentifier.dateList);
 		}
@@ -531,10 +512,6 @@ public class DeviceFolder {
 			pt.setDataType(DataType.ALPHANUMERIC);
 		else if (primitive instanceof Enumerated || primitive instanceof UnsignedInteger)
 			pt.setDataType(DataType.MULTISTATE);
-	}
-
-	public static boolean isOneOf(ObjectType objectType, ObjectType... types) {
-		return isOneOf(objectType.intValue(), types);
 	}
 
 	protected class RemoveHandler implements Handler<ActionResult> {
@@ -599,4 +576,29 @@ public class DeviceFolder {
 		return this;
 	}
 
+	public RemoteDevice getRemoteDevice() {
+		return null;
+	}
+
+	public Node getEventNode() {
+		return null;
+	}
+
+	public Node getStatusNode() {
+		return null;
+	}
+
+	public ScheduledThreadPoolExecutor getDaemonThreadPool() {
+		return null;
+	}
+
+	void addPointSub(BacnetPoint point) {
+	}
+
+	void removePointSub(BacnetPoint point) {
+	}
+
+	CovType getCovType() {
+		return null;
+	}
 }

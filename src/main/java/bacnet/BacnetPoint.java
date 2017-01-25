@@ -67,7 +67,6 @@ import com.serotonin.bacnet4j.util.PropertyReferences;
 import com.serotonin.bacnet4j.util.RequestUtils;
 
 import bacnet.DeviceFolder.CovListener;
-import bacnet.DeviceFolder.DataType;
 
 public class BacnetPoint {
 	private static final Logger LOGGER;
@@ -143,9 +142,9 @@ public class BacnetPoint {
 		setObjectTypeId(oid.getObjectType().intValue());
 		setObjectTypeDescription(oid.getObjectType().toString());
 		setInstanceNumber(oid.getInstanceNumber());
-		setDataType(DeviceFolder.getDataType(oid.getObjectType()));
+		setDataType(Utils.getDataType(oid.getObjectType()));
 
-		if (DeviceFolder.isOneOf(oid.getObjectType(), ObjectType.binaryInput, ObjectType.binaryOutput,
+		if (Utils.isOneOf(oid.getObjectType(), ObjectType.binaryInput, ObjectType.binaryOutput,
 				ObjectType.binaryValue)) {
 			getUnitsDescription().add("0");
 			getUnitsDescription().add("1");
@@ -159,26 +158,26 @@ public class BacnetPoint {
 		this.node = node;
 		ObjectType ot = Utils.parseObjectType(node.getAttribute("object type").getString());
 		int instNum = node.getAttribute("object instance number").getNumber().intValue();
-		boolean usecov = node.getAttribute("use COV").getBool();
-		boolean canset = node.getAttribute("settable").getBool();
-		int defprio = node.getAttribute("default priority").getNumber().intValue();
-		Value pidval = node.getAttribute("pid");
+		boolean useCov = node.getAttribute("use COV").getBool();
+		boolean canSet = node.getAttribute("settable").getBool();
+		int defPrio = node.getAttribute("default priority").getNumber().intValue();
+		Value pidVal = node.getAttribute("pid");
 		this.oid = new ObjectIdentifier(ot, instNum);
 
-		if (pidval != null)
-			pid = new PropertyIdentifier(pidval.getNumber().intValue());
+		if (pidVal != null)
+			pid = new PropertyIdentifier(pidVal.getNumber().intValue());
 
-		setCov(usecov);
-		setSettable(canset);
-		setDefaultPriority(defprio);
+		setCov(useCov);
+		setSettable(canSet);
+		setDefaultPriority(defPrio);
 		try {
 			setObjectTypeId(ot.intValue());
 
 			setObjectTypeDescription(ot.toString());
 			setInstanceNumber(instNum);
-			setDataType(DeviceFolder.getDataType(ot));
+			setDataType(Utils.getDataType(ot));
 
-			if (DeviceFolder.isOneOf(ot, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
+			if (Utils.isOneOf(ot, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
 				getUnitsDescription().add("0");
 				getUnitsDescription().add("1");
 			}
@@ -443,7 +442,8 @@ public class BacnetPoint {
 			if (request != null) {
 				ReadRangeAck response = null;
 				try {
-					response = (ReadRangeAck) folder.conn.localDevice.send(folder.root.device, request).get();
+					response = (ReadRangeAck) folder.conn.localDevice.send(folder.root.getRemoteDevice(), request)
+							.get();
 				} catch (BACnetException e) {
 					LOGGER.debug("", e);
 				}
@@ -478,7 +478,7 @@ public class BacnetPoint {
 			if (enc == null)
 				return;
 
-			folder.conn.localDevice.send(folder.root.device,
+			folder.conn.localDevice.send(folder.root.getRemoteDevice(),
 					new WritePropertyRequest(oid, prop, null, enc, new UnsignedInteger(defaultPriority)));
 
 		}
@@ -506,7 +506,7 @@ public class BacnetPoint {
 			folder.conn.stop();
 			return;
 		}
-		if (folder.root.device == null)
+		if (folder.root.getRemoteDevice() == null)
 			return;
 		if (dataType == DataType.BINARY) {
 			if (raw) {
@@ -527,7 +527,7 @@ public class BacnetPoint {
 		Encodable enc = valueToEncodable(newval, oid.getObjectType(), pid);
 		try {
 			LOGGER.debug("Sending write request");
-			folder.conn.localDevice.send(folder.root.device,
+			folder.conn.localDevice.send(folder.root.getRemoteDevice(),
 					new WritePropertyRequest(oid, pid, null, enc, new UnsignedInteger(priority)));
 			// Thread.sleep(500);
 		} catch (Exception e) {
@@ -551,9 +551,9 @@ public class BacnetPoint {
 			oid = new ObjectIdentifier(ot, instanceNumber);
 			setObjectTypeId(ot.intValue());
 			setObjectTypeDescription(ot.toString());
-			setDataType(DeviceFolder.getDataType(ot));
+			setDataType(Utils.getDataType(ot));
 
-			if (DeviceFolder.isOneOf(ot, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
+			if (Utils.isOneOf(ot, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
 				getUnitsDescription().add("0");
 				getUnitsDescription().add("1");
 			}
@@ -994,10 +994,10 @@ public class BacnetPoint {
 				node.setValue(val);
 			}
 			Value units = null;
-			if (!(DeviceFolder.isOneOf(objectTypeId, ObjectType.binaryInput, ObjectType.binaryOutput,
-					ObjectType.binaryValue, ObjectType.multiStateInput, ObjectType.multiStateOutput,
-					ObjectType.multiStateValue, ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone,
-					ObjectType.trendLog)) && unitsDescription.size() > 0) {
+			if (!(Utils.isOneOf(objectTypeId, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue,
+					ObjectType.multiStateInput, ObjectType.multiStateOutput, ObjectType.multiStateValue,
+					ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone, ObjectType.trendLog))
+					&& unitsDescription.size() > 0) {
 				units = new Value(unitsDescription.get(0));
 			}
 			Node unode = node.getChild("units");
@@ -1213,11 +1213,11 @@ public class BacnetPoint {
 			folder.conn.stop();
 			return null;
 		}
-		if (folder.root.device == null)
+		if (folder.root.getRemoteDevice() == null)
 			return null;
 		Encodable encodable = null;
 		try {
-			encodable = RequestUtils.getProperty(folder.conn.localDevice, folder.root.device, oid,
+			encodable = RequestUtils.getProperty(folder.conn.localDevice, folder.root.getRemoteDevice(), oid,
 					PropertyIdentifier.priorityArray);
 		} catch (BACnetErrorException ex) {
 			LOGGER.debug(ex.getMessage());
@@ -1273,10 +1273,10 @@ public class BacnetPoint {
 			folder.conn.stop();
 			return;
 		}
-		if (folder.root.device == null)
+		if (folder.root.getRemoteDevice() == null)
 			return;
 		try {
-			folder.conn.localDevice.send(folder.root.device,
+			folder.conn.localDevice.send(folder.root.getRemoteDevice(),
 					new WritePropertyRequest(oid, pid, null, new Null(), new UnsignedInteger(priority)));
 		} catch (Exception e) {
 			LOGGER.error("error: ", e);
@@ -1334,8 +1334,7 @@ public class BacnetPoint {
 
 	public static String getPrettyPresentValue(int objectTypeId, String presentValue, List<String> unitsDescription,
 			String referenceObjectTypeDescription, int referenceInstanceNumber, int referenceDeviceId) {
-		if (DeviceFolder.isOneOf(objectTypeId, ObjectType.binaryInput, ObjectType.binaryOutput,
-				ObjectType.binaryValue)) {
+		if (Utils.isOneOf(objectTypeId, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
 			if ("0".equals(presentValue)) {
 				if (unitsDescription.size() > 0)
 					return unitsDescription.get(0);
@@ -1348,7 +1347,7 @@ public class BacnetPoint {
 				else
 					return "1";
 			}
-		} else if (DeviceFolder.isOneOf(objectTypeId, ObjectType.multiStateInput, ObjectType.multiStateOutput,
+		} else if (Utils.isOneOf(objectTypeId, ObjectType.multiStateInput, ObjectType.multiStateOutput,
 				ObjectType.multiStateValue)) {
 			try {
 				int index = Integer.parseInt(presentValue) - 1;
@@ -1362,14 +1361,14 @@ public class BacnetPoint {
 			} catch (NumberFormatException e) {
 				// no op
 			}
-		} else if (DeviceFolder.isOneOf(objectTypeId, ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone)) {
+		} else if (Utils.isOneOf(objectTypeId, ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone)) {
 			try {
 				int index = Integer.parseInt(presentValue);
 				return new LifeSafetyState(index).toString();
 			} catch (NumberFormatException e) {
 				// no op
 			}
-		} else if (DeviceFolder.isOneOf(objectTypeId, ObjectType.trendLog)) {
+		} else if (Utils.isOneOf(objectTypeId, ObjectType.trendLog)) {
 			if (StringUtils.isEmpty(referenceObjectTypeDescription))
 				return "";
 			return referenceObjectTypeDescription + " " + referenceInstanceNumber + " @ " + ObjectType.device.toString()
@@ -1549,7 +1548,8 @@ public class BacnetPoint {
 			ByTime bytime = new ByTime(start, new SignedInteger(bufferSize));
 			ReadRangeRequest request = new ReadRangeRequest(oid, PropertyIdentifier.logBuffer, null, bytime);
 			try {
-				ReadRangeAck response = (ReadRangeAck) folder.conn.localDevice.send(folder.root.device, request).get();
+				ReadRangeAck response = (ReadRangeAck) folder.conn.localDevice
+						.send(folder.root.getRemoteDevice(), request).get();
 				for (LogRecord record : (SequenceOf<LogRecord>) response.getItemData()) {
 					long ts = record.getTimestamp().getGC().getTimeInMillis();
 					if (ts > to)
