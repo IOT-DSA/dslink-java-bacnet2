@@ -997,7 +997,7 @@ public class BacnetPoint {
 			if (!(Utils.isOneOf(objectTypeId, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue,
 					ObjectType.multiStateInput, ObjectType.multiStateOutput, ObjectType.multiStateValue,
 					ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone, ObjectType.trendLog))
-					&& unitsDescription.size() > 0) {
+					&& !unitsDescription.isEmpty()) {
 				units = new Value(unitsDescription.get(0));
 			}
 			Node unode = node.getChild("units");

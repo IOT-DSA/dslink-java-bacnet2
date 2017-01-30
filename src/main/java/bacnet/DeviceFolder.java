@@ -576,18 +576,30 @@ public class DeviceFolder {
 		return this;
 	}
 
+	/*
+	 * Template method. Derived class returns remote device object.
+	 */
 	public RemoteDevice getRemoteDevice() {
 		return null;
 	}
 
+	/*
+	 * Template method. Derived class returns event node.
+	 */
 	public Node getEventNode() {
 		return null;
 	}
 
+	/*
+	 * Template method. Derived class returns status node.
+	 */
 	public Node getStatusNode() {
 		return null;
 	}
 
+	/*
+	 * Template method. Derived class returns a thread pool.
+	 */
 	public ScheduledThreadPoolExecutor getDaemonThreadPool() {
 		return null;
 	}
@@ -598,6 +610,9 @@ public class DeviceFolder {
 	void removePointSub(BacnetPoint point) {
 	}
 
+	/*
+	 * Template method. Derived class returns CoV type.
+	 */
 	CovType getCovType() {
 		return null;
 	}
