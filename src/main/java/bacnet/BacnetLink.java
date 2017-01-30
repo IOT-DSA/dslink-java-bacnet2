@@ -269,7 +269,7 @@ public class BacnetLink {
 		setupNode(point, devicefold, 1);
 	}
 
-	private void setupNode(final BacnetPoint point, final DeviceFolder devicefold, final int nodeIndex) {
+	private void setupNode(final BacnetPoint point, final DeviceFolder folder, final int nodeIndex) {
 		LOGGER.debug("setting up node " + nodeIndex + " of point " + point.node.getName());
 		final Node child;
 		switch (nodeIndex) {
@@ -284,7 +284,7 @@ public class BacnetLink {
 		}
 		child.getListener().setOnSubscribeHandler(new Handler<Node>() {
 			public void handle(final Node event) {
-				if (devicefold.root.covType != CovType.NONE && point.isCov()) {
+				if (folder.root.getCovType() != CovType.NONE && point.isCov()) {
 					LOGGER.debug("subscribed (with cov) to node " + child.getName());
 					point.subscribe(nodeIndex, true);
 				} else {

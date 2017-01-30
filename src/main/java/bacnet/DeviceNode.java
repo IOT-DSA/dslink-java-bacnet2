@@ -129,7 +129,8 @@ public class DeviceNode extends DeviceFolder {
 
 	}
 
-	ScheduledThreadPoolExecutor getDaemonThreadPool() {
+	@Override
+	public ScheduledThreadPoolExecutor getDaemonThreadPool() {
 		return deviceStpe;
 	}
 
@@ -441,7 +442,7 @@ public class DeviceNode extends DeviceFolder {
 		return jobj.get(conn.node.getName());
 	}
 
-	// polling
+	@Override
 	void addPointSub(BacnetPoint point) {
 		if (subscribedPoints.containsKey(point.oid))
 			return;
@@ -450,6 +451,7 @@ public class DeviceNode extends DeviceFolder {
 			startPolling();
 	}
 
+	@Override
 	void removePointSub(BacnetPoint point) {
 		subscribedPoints.remove(point.oid);
 		if (subscribedPoints.size() == 0)
@@ -487,4 +489,23 @@ public class DeviceNode extends DeviceFolder {
 
 	}
 
+	@Override
+	public RemoteDevice getRemoteDevice() {
+		return this.device;
+	}
+
+	@Override
+	public Node getEventNode() {
+		return this.eventnode;
+	}
+
+	@Override
+	public Node getStatusNode() {
+		return this.statnode;
+	}
+
+	@Override
+	CovType getCovType() {
+		return this.covType;
+	}
 }
