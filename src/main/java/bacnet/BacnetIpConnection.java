@@ -69,19 +69,19 @@ public class BacnetIpConnection extends BacnetConn {
 			entry = entry.trim();
 			if (!entry.isEmpty()) {
 				Pattern p = Pattern.compile("^\\s*(.*?):(\\d+):(\\d+)$");
-                Matcher m = p.matcher(entry);
-                if (m.matches()) {
-                    bbmdIp = m.group(1);
-                    bbmdPort = Integer.parseInt(m.group(2));
-                    networkNumber = Integer.parseInt(m.group(3));
-                    if (!bbmdIp.isEmpty()) {
-                        bbmdIpToPort.put(bbmdIp, bbmdPort);
-                        OctetString os = IpNetworkUtils.toOctetString(bbmdIp, bbmdPort);
-                        networkRouters.put(networkNumber, os);
-                    }
-                }
-            }
-        }
+				Matcher m = p.matcher(entry);
+				if (m.matches()) {
+					bbmdIp = m.group(1);
+					bbmdPort = Integer.parseInt(m.group(2));
+					networkNumber = Integer.parseInt(m.group(3));
+					if (!bbmdIp.isEmpty()) {
+						bbmdIpToPort.put(bbmdIp, bbmdPort);
+						OctetString os = IpNetworkUtils.toOctetString(bbmdIp, bbmdPort);
+						networkRouters.put(networkNumber, os);
+					}
+				}
+			}
+		}
 	}
 
 	@Override
@@ -134,14 +134,17 @@ public class BacnetIpConnection extends BacnetConn {
 
 	@Override
 	String getDefaultMac() {
+		String defaultMac = IpNetwork.DEFAULT_BIND_IP;
 		InetAddress ip = null;
 		try {
 			ip = InetAddress.getLocalHost();
+			defaultMac = ip.getHostAddress();
 		} catch (UnknownHostException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		return ip.getHostAddress() + ":" + IpNetwork.DEFAULT_PORT;
+
+		return defaultMac + ":" + IpNetwork.DEFAULT_PORT;
 	}
 
 	@Override
