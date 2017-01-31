@@ -36,7 +36,7 @@ public class BacnetLink {
 
 	private Node node;
 	final Map<BacnetPoint, ScheduledFuture<?>> futures;
-	final Set<BacnetConn> serialConns;
+	final Set<BacnetConn> connections;
 	Serializer copySerializer;
 	Deserializer copyDeserializer;
 
@@ -51,7 +51,7 @@ public class BacnetLink {
 		this.futures = new ConcurrentHashMap<BacnetPoint, ScheduledFuture<?>>();
 		this.copyDeserializer = deser;
 		this.copySerializer = ser;
-		this.serialConns = new HashSet<BacnetConn>();
+		this.connections = new HashSet<BacnetConn>();
 	}
 
 	public static void start(Node parent, Serializer ser, Deserializer deser) {
@@ -93,7 +93,7 @@ public class BacnetLink {
 				anode.setAction(act);
 			}
 
-			for (BacnetConn conn : serialConns) {
+			for (BacnetConn conn : connections) {
 				anode = conn.node.getChild("edit");
 				if (anode != null) {
 					act = conn.getEditAction();

@@ -60,7 +60,6 @@ public class DeviceNode extends DeviceFolder {
 	long interval;
 	CovType covType;
 
-	private final ScheduledThreadPoolExecutor deviceStpe;
 	private final ConcurrentMap<ObjectIdentifier, BacnetPoint> subscribedPoints = new ConcurrentHashMap<ObjectIdentifier, BacnetPoint>();
 	private ScheduledFuture<?> pollingFuture = null;
 	private ScheduledFuture<?> reconnectFuture = null;
@@ -119,19 +118,12 @@ public class DeviceNode extends DeviceFolder {
 		} catch (Exception e) {
 		}
 
-		this.deviceStpe = conn.getDaemonThreadPool();
-
 		makeEditAction();
 
 		if ("not connected".equals(statnode.getValue().getString())) {
 			scheduleRetry();
 		}
 
-	}
-
-	@Override
-	public ScheduledThreadPoolExecutor getDaemonThreadPool() {
-		return deviceStpe;
 	}
 
 	void enable(boolean userDriven) {
@@ -471,7 +463,7 @@ public class DeviceNode extends DeviceFolder {
 			return;
 
 		LOGGER.debug("starting polling for device " + node.getName());
-		pollingFuture = deviceStpe.scheduleWithFixedDelay(new Runnable() {
+		pollingFuture = conn.getDaemonThreadPool().scheduleWithFixedDelay(new Runnable() {
 			public void run() {
 				if (conn.localDevice == null) {
 					conn.stop();
