@@ -8,7 +8,7 @@ import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
-import org.dsa.iot.dslink.util.Objects;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,8 +17,6 @@ import com.serotonin.bacnet4j.npdu.mstp.MasterNode;
 import com.serotonin.bacnet4j.npdu.mstp.MstpNetwork;
 import com.serotonin.bacnet4j.util.sero.SerialPortWrapper;
 import com.serotonin.io.serial.SerialPortException;
-
-import bacnet.BacnetConn.SerialPortWrapperImpl;
 
 public class BacnetSerialConnection extends BacnetConn {
 	private static final Logger LOGGER;
@@ -99,19 +97,8 @@ public class BacnetSerialConnection extends BacnetConn {
 	}
 
 	@Override
-	void shutdown() {
-		serialStpe.shutdown();
-	}
-
-	@Override
 	BacnetConn getBacnetConnection(BacnetLink link2, Node newnode) {
 		BacnetConn bc = new BacnetSerialConnection(link, newnode);
 		return bc;
-	}
-
-	@Override
-	void initializeScheduledThreadPoolExecutor() {
-		link.serialConns.add(this);
-		serialStpe = Objects.createDaemonThreadPool();
 	}
 }

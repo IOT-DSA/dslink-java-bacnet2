@@ -2,9 +2,6 @@ package bacnet;
 
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -40,15 +37,10 @@ import org.slf4j.LoggerFactory;
 import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.RemoteObject;
-import com.serotonin.bacnet4j.base.BACnetUtils;
 import com.serotonin.bacnet4j.event.DeviceEventAdapter;
 import com.serotonin.bacnet4j.event.DeviceEventListener;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.npdu.Network;
-import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
-import com.serotonin.bacnet4j.npdu.ip.IpNetworkUtils;
-import com.serotonin.bacnet4j.npdu.mstp.MasterNode;
-import com.serotonin.bacnet4j.npdu.mstp.MstpNetwork;
 import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.service.confirmed.ReinitializeDeviceRequest.ReinitializedStateOfDevice;
 import com.serotonin.bacnet4j.service.unconfirmed.WhoIsRequest;
@@ -134,7 +126,7 @@ abstract class BacnetConn {
 	private ScheduledFuture<?> reconnectFuture = null;
 	private int retryDelay = 1;
 
-	ScheduledThreadPoolExecutor serialStpe;
+	ScheduledThreadPoolExecutor stpe;
 	DeviceEventListener listener;
 
 	BacnetConn(BacnetLink link, Node node) {
@@ -161,11 +153,12 @@ abstract class BacnetConn {
 	}
 
 	void initializeScheduledThreadPoolExecutor() {
-		serialStpe = null;
+		link.connections.add(this);
+		stpe = Objects.createDaemonThreadPool();
 	}
 
 	ScheduledThreadPoolExecutor getDaemonThreadPool() {
-		return serialStpe;
+		return stpe;
 	}
 
 	void init() {
@@ -505,14 +498,14 @@ abstract class BacnetConn {
 	private void remove() {
 		stop();
 		node.clearChildren();
-		link.serialConns.remove(getMe());
+		link.connections.remove(getMe());
 		node.getParent().removeChild(node);
 
 		shutdown();
 	}
 
 	void shutdown() {
-
+		stpe.shutdown();
 	}
 
 	protected void rename(String name) {

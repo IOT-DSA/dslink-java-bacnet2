@@ -36,7 +36,7 @@ public class BacnetLink {
 
 	private Node node;
 	final Map<BacnetPoint, ScheduledFuture<?>> futures;
-	final Set<BacnetConn> serialConns;
+	final Set<BacnetConn> connections;
 	Serializer copySerializer;
 	Deserializer copyDeserializer;
 
@@ -51,7 +51,7 @@ public class BacnetLink {
 		this.futures = new ConcurrentHashMap<BacnetPoint, ScheduledFuture<?>>();
 		this.copyDeserializer = deser;
 		this.copySerializer = ser;
-		this.serialConns = new HashSet<BacnetConn>();
+		this.connections = new HashSet<BacnetConn>();
 	}
 
 	public static void start(Node parent, Serializer ser, Deserializer deser) {
@@ -93,7 +93,7 @@ public class BacnetLink {
 				anode.setAction(act);
 			}
 
-			for (BacnetConn conn : serialConns) {
+			for (BacnetConn conn : connections) {
 				anode = conn.node.getChild("edit");
 				if (anode != null) {
 					act = conn.getEditAction();
@@ -155,7 +155,7 @@ public class BacnetLink {
 	}
 
 	private Action getAddIpConnAction() {
-		Action act = new Action(Permission.READ, new AddIpConnHandler(true));
+		Action act = new Action(Permission.READ, new AddIpConnHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING));
 		act.addParameter(new Parameter("broadcast ip", ValueType.STRING, new Value(IpNetwork.DEFAULT_BROADCAST_IP)));
 		act.addParameter(new Parameter("port", ValueType.NUMBER, new Value(IpNetwork.DEFAULT_PORT)));
@@ -177,7 +177,7 @@ public class BacnetLink {
 	}
 
 	private Action getAddSerialAction() {
-		Action act = new Action(Permission.READ, new AddSerialConnHandler(false));
+		Action act = new Action(Permission.READ, new AddSerialConnHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING));
 		Set<String> portids = listPorts();
 		if (portids.size() > 0) {
@@ -246,14 +246,16 @@ public class BacnetLink {
 			if (localNetworkNumber != null && strict != null && timeout != null && segmentTimeout != null
 					&& segmentWindow != null && retries != null && localDeviceId != null && localDeviceName != null
 					&& localDeviceVendor != null && interval != null) {
-				BacnetConn bc = null;
+				BacnetConn connection = null;
 				if (broadcastIp != null && port != null && localBindAddress != null) {
-					bc = new BacnetIpConnection(getMe(), child);
+					connection = new BacnetIpConnection(getMe(), child);
 				} else if (commPort != null && baud != null && station != null && ferc != null) {
-					bc = new BacnetSerialConnection(getMe(), child);
+					connection = new BacnetSerialConnection(getMe(), child);
 				}
 
-				bc.restoreLastSession();
+				if (connection != null) {
+					connection.restoreLastSession();
+				}
 			} else if (!child.getName().equals("defs")) {
 				node.removeChild(child);
 			}
@@ -303,11 +305,6 @@ public class BacnetLink {
 
 	class AddIpConnHandler extends AddConnHandler {
 
-		AddIpConnHandler(boolean isIP) {
-			super(isIP);
-			// TODO Auto-generated constructor stub
-		}
-
 		@Override
 		void addTransportParameters(ActionResult event) {
 			broadcastIp = event.getParameter("broadcast ip", ValueType.STRING).getString();
@@ -329,11 +326,6 @@ public class BacnetLink {
 
 	class AddSerialConnHandler extends AddConnHandler {
 
-		AddSerialConnHandler(boolean isIP) {
-			super(isIP);
-			// TODO Auto-generated constructor stub
-		}
-
 		@Override
 		void addTransportParameters(ActionResult event) {
 			commPort = event.getParameter("comm port id", ValueType.STRING).getString();
@@ -352,7 +344,6 @@ public class BacnetLink {
 	}
 
 	abstract class AddConnHandler implements Handler<ActionResult> {
-		private boolean isIP;
 		// ip transport
 		String broadcastIp = " ";
 		int port = 0;
@@ -365,10 +356,6 @@ public class BacnetLink {
 		int baud = 0;
 		int station = 0;
 		int frameErrorRetryCount = 1;
-
-		AddConnHandler(boolean isIP) {
-			this.isIP = isIP;
-		}
 
 		abstract void addTransportParameters(ActionResult event);
 
