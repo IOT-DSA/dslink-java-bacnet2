@@ -345,14 +345,14 @@ public class BacnetLink {
 
 	abstract class AddConnHandler implements Handler<ActionResult> {
 		// ip transport
-		String broadcastIp = " ";
+		String broadcastIp = null;
 		int port = 0;
-		String localBindAddress = " ";
+		String localBindAddress = null;
 		boolean isRegisteredAsFeignDevice = false;
 		String bbmdIpList = " ";
 
 		// mstp transport
-		String commPort = " ";
+		String commPort = null;
 		int baud = 0;
 		int station = 0;
 		int frameErrorRetryCount = 1;

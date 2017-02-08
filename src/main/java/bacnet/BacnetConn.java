@@ -142,7 +142,6 @@ abstract class BacnetConn {
 		localDeviceId = node.getAttribute("local device id").getNumber().intValue();
 		localDeviceName = node.getAttribute("local device name").getString();
 		localDeviceVendor = node.getAttribute("local device vendor").getString();
-		defaultInterval = node.getAttribute("default polling interval").getNumber().longValue();
 
 		initializeScheduledThreadPoolExecutor();
 
@@ -430,6 +429,7 @@ abstract class BacnetConn {
 	}
 
 	void stop() {
+		reconnectFuture.cancel(false);
 		if (localDevice != null) {
 			localDevice.terminate();
 			localDevice = null;
