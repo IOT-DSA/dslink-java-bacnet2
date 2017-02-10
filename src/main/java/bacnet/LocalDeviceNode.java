@@ -56,19 +56,19 @@ public class LocalDeviceNode extends LocalDeviceFolder {
 		this.localDevice = device;
 		this.root = this;
 
-		if (node.getChild(NODE_STATUS) != null) {
-			this.statNode = node.getChild(NODE_STATUS);
+		if (node.getChild(NODE_STATUS, true) != null) {
+			this.statNode = node.getChild(NODE_STATUS, true);
 			enabled = new Value(STATUS_ENABLED).equals(statNode.getValue());
 		} else {
-			this.statNode = node.createChild(NODE_STATUS).setValueType(ValueType.STRING)
+			this.statNode = node.createChild(NODE_STATUS, true).setValueType(ValueType.STRING)
 					.setValue(new Value(STATUS_ENABLED)).build();
 			enabled = true;
 		}
 
-		if (node.getChild(NODE_EVENTS) != null) {
-			this.eventNode = node.getChild(NODE_EVENTS);
+		if (node.getChild(NODE_EVENTS, true) != null) {
+			this.eventNode = node.getChild(NODE_EVENTS, true);
 		} else {
-			this.eventNode = node.createChild(NODE_EVENTS).setValueType(ValueType.ARRAY)
+			this.eventNode = node.createChild(NODE_EVENTS, true).setValueType(ValueType.ARRAY)
 					.setValue(new Value(new JsonArray())).build();
 		}
 
@@ -83,7 +83,7 @@ public class LocalDeviceNode extends LocalDeviceFolder {
 					// disable(true);
 				}
 			});
-			node.createChild(ACTION_DISABLE).setAction(act).build().setSerializable(false);
+			node.createChild(ACTION_DISABLE, true).setAction(act).build().setSerializable(false);
 
 		}
 		if (!STATUS_ENABLED.equals(statNode.getValue().getString())) {
@@ -92,7 +92,7 @@ public class LocalDeviceNode extends LocalDeviceFolder {
 					// enable(true);
 				}
 			});
-			node.createChild(ACTION_ENABLE).setAction(act).build().setSerializable(false);
+			node.createChild(ACTION_ENABLE, true).setAction(act).build().setSerializable(false);
 		}
 
 		makeEditAction();
@@ -116,9 +116,9 @@ public class LocalDeviceNode extends LocalDeviceFolder {
 		Action act = new Action(Permission.READ, new EditHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
 
-		Node editNode = node.getChild(ACTION_EDIT);
+		Node editNode = node.getChild(ACTION_EDIT, true);
 		if (editNode == null)
-			node.createChild(ACTION_EDIT).setAction(act).build().setSerializable(false);
+			node.createChild(ACTION_EDIT, true).setAction(act).build().setSerializable(false);
 		else
 			editNode.setAction(act);
 	}

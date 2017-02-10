@@ -208,14 +208,14 @@ public class LocalBacnetPoint extends EditablePoint {
 
 	private void setupDataTypeProperty() {
 		if (dataType != null) {
-			Node dataTypeNode = node.getChild(PROPERTY_DATA_TYPE);
+			Node dataTypeNode = node.getChild(PROPERTY_DATA_TYPE, true);
 			if (dataTypeNode != null) {
 				if (!new Value(dataType.toString()).equals(dataTypeNode.getValue())) {
 					dataTypeNode.setValue(new Value(dataType.toString()));
 					LOGGER.debug("dataType updated to " + dataType);
 				}
 			} else {
-				node.createChild(PROPERTY_DATA_TYPE).setValueType(ValueType.STRING)
+				node.createChild(PROPERTY_DATA_TYPE, true).setValueType(ValueType.STRING)
 						.setValue(new Value(dataType.toString())).build();
 				LOGGER.debug("dataType set to " + dataType);
 			}
@@ -226,14 +226,14 @@ public class LocalBacnetPoint extends EditablePoint {
 		objectName = node.getName();
 
 		if (objectName != null) {
-			Node objectNameNode = node.getChild(PROPERTY_OBJECT_NAME);
+			Node objectNameNode = node.getChild(PROPERTY_OBJECT_NAME, true);
 			if (objectNameNode != null) {
 				if (!new Value(objectName).equals(objectNameNode.getValue())) {
 					objectNameNode.setValue(new Value(objectName));
 					LOGGER.debug("objectName updated to " + objectName);
 				}
 			} else {
-				node.createChild(PROPERTY_OBJECT_NAME).setValueType(ValueType.STRING).setValue(new Value(objectName))
+				node.createChild(PROPERTY_OBJECT_NAME, true).setValueType(ValueType.STRING).setValue(new Value(objectName))
 						.build();
 				LOGGER.debug("objectName set to " + objectName);
 			}
@@ -338,11 +338,11 @@ public class LocalBacnetPoint extends EditablePoint {
 
 	private Node buildPropertyNode(PropertyIdentifier pid) {
 		String name = pid.toString();
-		Node propertyNode = node.getChild(name);
+		Node propertyNode = node.getChild(name, true);
 		NodeBuilder b = null;
 
 		if (null == propertyNode) {
-			b = node.createChild(name);
+			b = node.createChild(name, true);
 			propertyNode = b.getChild();
 		}
 		if (b != null) {

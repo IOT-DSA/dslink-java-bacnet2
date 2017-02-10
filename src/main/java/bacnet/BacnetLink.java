@@ -65,7 +65,7 @@ public class BacnetLink {
 		restoreLastSession();
 
 		Action act = getAddIpConnAction();
-		node.createChild("add ip connection").setAction(act).build().setSerializable(false);
+		node.createChild("add ip connection", true).setAction(act).build().setSerializable(false);
 
 		// act = new Action(Permission.READ, new RxtxSetupHandler());
 		// act.addParameter(new Parameter("Operating System",
@@ -75,26 +75,26 @@ public class BacnetLink {
 		// rxtx").setAction(act).build().setSerializable(false);
 
 		act = getAddSerialAction();
-		node.createChild("add mstp connection").setAction(act).build().setSerializable(false);
+		node.createChild("add mstp connection", true).setAction(act).build().setSerializable(false);
 
 		act = new Action(Permission.READ, new PortScanHandler());
-		node.createChild("scan for serial ports").setAction(act).build().setSerializable(false);
+		node.createChild("scan for serial ports", true).setAction(act).build().setSerializable(false);
 	}
 
 	private class PortScanHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			LOGGER.debug("port scan invoked");
 			Action act = getAddSerialAction();
-			Node anode = node.getChild("add mstp connection");
+			Node anode = node.getChild("add mstp connection", true);
 			if (anode == null) {
-				anode = node.createChild("add mstp connection").setAction(act).build();
+				anode = node.createChild("add mstp connection", true).setAction(act).build();
 				anode.setSerializable(false);
 			} else {
 				anode.setAction(act);
 			}
 
 			for (BacnetConn conn : connections) {
-				anode = conn.node.getChild("edit");
+				anode = conn.node.getChild("edit", true);
 				if (anode != null) {
 					act = conn.getEditAction();
 					anode.setAction(act);
@@ -279,7 +279,7 @@ public class BacnetLink {
 			child = point.node;
 			break;
 		case 1:
-			child = point.node.getChild("present value");
+			child = point.node.getChild("present value", true);
 			break;
 		default:
 			return;
@@ -380,7 +380,7 @@ public class BacnetLink {
 			long interval = (long) (1000
 					* event.getParameter("default polling interval", ValueType.NUMBER).getNumber().doubleValue());
 
-			Node child = node.createChild(name).build();
+			Node child = node.createChild(name, true).build();
 			// IP transport
 			child.setAttribute("broadcast ip", new Value(broadcastIp));
 			child.setAttribute("port", new Value(port));

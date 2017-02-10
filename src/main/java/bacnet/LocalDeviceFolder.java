@@ -107,7 +107,7 @@ public class LocalDeviceFolder extends EditableFolder {
 		boolean cov = event.getParameter(ATTRIBUTE_USE_COV, ValueType.BOOL).getBool();
 		boolean settable = event.getParameter(ATTRIBUTE_SETTABLE, ValueType.BOOL).getBool();
 
-		Node pointNode = node.createChild(name).build();
+		Node pointNode = node.createChild(name, true).build();
 		pointNode.setAttribute(ATTRIBUTE_OBJECT_TYPE, new Value(objectType.toString()));
 		pointNode.setAttribute(ATTRIBUTE_OBJECT_INSTANCE_NUMBER, new Value(instNum));
 		pointNode.setAttribute(ATTRIBUTE_USE_COV, new Value(cov));
@@ -129,7 +129,7 @@ public class LocalDeviceFolder extends EditableFolder {
 
 	@Override
 	protected void addFolder(String name) {
-		Node child = node.createChild(name).build();
+		Node child = node.createChild(name, true).build();
 		new LocalDeviceFolder(conn, root, child);
 	}
 
@@ -139,9 +139,9 @@ public class LocalDeviceFolder extends EditableFolder {
 
 		act.addParameter(new Parameter(ATTRIBUTE_NAME, ValueType.STRING, new Value(node.getName())));
 
-		Node editNode = node.getChild(ACTION_EDIT);
+		Node editNode = node.getChild(ACTION_EDIT, true);
 		if (editNode == null)
-			node.createChild(ACTION_EDIT).setAction(act).build().setSerializable(false);
+			node.createChild(ACTION_EDIT, true).setAction(act).build().setSerializable(false);
 		else
 			editNode.setAction(act);
 	}

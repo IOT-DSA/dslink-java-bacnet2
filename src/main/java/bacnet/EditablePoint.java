@@ -85,9 +85,9 @@ public abstract class EditablePoint {
 
 	protected void makeRemoveAction() {
 		Action act = new Action(Permission.READ, new RemoveHandler());
-		Node actionNode = node.getChild(ACTION_REMOVE);
+		Node actionNode = node.getChild(ACTION_REMOVE, true);
 		if (actionNode == null)
-			node.createChild(ACTION_REMOVE).setAction(act).build().setSerializable(false);
+			node.createChild(ACTION_REMOVE, true).setAction(act).build().setSerializable(false);
 		else
 			actionNode.setAction(act);
 	}
@@ -102,9 +102,9 @@ public abstract class EditablePoint {
 		act.addParameter(new Parameter(ATTRIBUTE_SETTABLE, ValueType.BOOL, node.getAttribute(ATTRIBUTE_SETTABLE)));
 		act.addParameter(new Parameter(ATTRIBUTE_DEFAULT_PRIORITY, ValueType.NUMBER,
 				node.getAttribute(ATTRIBUTE_DEFAULT_PRIORITY)));
-		Node actionNode = node.getChild(ACTION_EDIT);
+		Node actionNode = node.getChild(ACTION_EDIT, true);
 		if (actionNode == null)
-			node.createChild(ACTION_EDIT).setAction(act).build().setSerializable(false);
+			node.createChild(ACTION_EDIT, true).setAction(act).build().setSerializable(false);
 		else
 			actionNode.setAction(act);
 
@@ -113,9 +113,9 @@ public abstract class EditablePoint {
 	protected void makeCopyAction() {
 		Action act = new Action(Permission.READ, new CopyHandler());
 		act.addParameter(new Parameter(ATTRIBUTE_NAME, ValueType.STRING));
-		Node actionNode = node.getChild(ACTION_MAKE_COPY);
+		Node actionNode = node.getChild(ACTION_MAKE_COPY, true);
 		if (actionNode == null) {
-			node.createChild(ACTION_MAKE_COPY).setAction(act).build().setSerializable(false);
+			node.createChild(ACTION_MAKE_COPY, true).setAction(act).build().setSerializable(false);
 		} else {
 			actionNode.setAction(act);
 		}
@@ -162,7 +162,7 @@ public abstract class EditablePoint {
 			int newProirity = (priority > -1) ? priority : defaultPriority;
 			handleSet(newVal, newProirity, true);
 
-			Node presentValueNode = node.getChild(PropertyIdentifier.presentValue.toString());
+			Node presentValueNode = node.getChild(PropertyIdentifier.presentValue.toString(), true);
 			presentValueNode.setValue(newVal);
 		}
 	}
@@ -170,7 +170,7 @@ public abstract class EditablePoint {
 	protected class CopyHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			String name = event.getParameter("name", ValueType.STRING).getString();
-			Node newnode = parent.createChild(name).build();
+			Node newnode = parent.createChild(name, true).build();
 			newnode.setAttribute(RESTORE_TYPE, new Value(RESTORE_EDITABLE_POINT));
 
 			makeCopy();
@@ -198,7 +198,7 @@ public abstract class EditablePoint {
 		if (newname != null && newname.length() > 0 && !newname.equals(node.getName())) {
 			Node parent = node.getParent();
 			parent.removeChild(node);
-			node = parent.createChild(newname).build();
+			node = parent.createChild(newname, true).build();
 		}
 	}
 
