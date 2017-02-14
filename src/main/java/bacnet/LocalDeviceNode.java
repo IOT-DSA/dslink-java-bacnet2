@@ -80,7 +80,6 @@ public class LocalDeviceNode extends LocalDeviceFolder {
 		if (!STATUS_DISABLED.equals(statNode.getValue().getString())) {
 			Action act = new Action(Permission.READ, new Handler<ActionResult>() {
 				public void handle(ActionResult event) {
-					// disable(true);
 				}
 			});
 			node.createChild(ACTION_DISABLE, true).setAction(act).build().setSerializable(false);
@@ -89,7 +88,6 @@ public class LocalDeviceNode extends LocalDeviceFolder {
 		if (!STATUS_ENABLED.equals(statNode.getValue().getString())) {
 			Action act = new Action(Permission.READ, new Handler<ActionResult>() {
 				public void handle(ActionResult event) {
-					// enable(true);
 				}
 			});
 			node.createChild(ACTION_ENABLE, true).setAction(act).build().setSerializable(false);

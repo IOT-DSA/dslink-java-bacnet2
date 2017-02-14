@@ -286,72 +286,8 @@ public class BacnetPoint {
 		node.getChild("present value", true).setWritable(Writable.NEVER);
 		folder.conn.link.setupPoint(this, folder);
 
-		// if (DeviceFolder.isOneOf(oid.getObjectType(), ObjectType.trendLog)) {
-		//
-		// Action act = new Action(Permission.READ, new GetLogHandler(0));
-		// act.addParameter(new Parameter("position", ValueType.NUMBER, new
-		// Value(0)));
-		// act.addParameter(new Parameter("count", ValueType.NUMBER, new
-		// Value(0)));
-		// act.addResult(new Parameter("Timestamp", ValueType.STRING));
-		// act.addResult(new Parameter("Status Flags", ValueType.STRING));
-		// act.addResult(new Parameter("Data", ValueType.STRING));
-		// act.setResultType(ResultType.TABLE);
-		// Node anode = node.getChild("Get Log by Position");
-		// if (anode == null) node.createChild("Get Log by
-		// Position").setAction(act).build().setSerializable(false);
-		// else anode.setAction(act);
-		//
-		// act = new Action(Permission.READ, new GetLogHandler(1));
-		// act.addParameter(new Parameter("sequence number", ValueType.NUMBER,
-		// new Value(0)));
-		// act.addParameter(new Parameter("count", ValueType.NUMBER, new
-		// Value(0)));
-		// act.addResult(new Parameter("Timestamp", ValueType.STRING));
-		// act.addResult(new Parameter("Status Flags", ValueType.STRING));
-		// act.addResult(new Parameter("Data", ValueType.STRING));
-		// act.setResultType(ResultType.TABLE);
-		// anode = node.getChild("Get Log by Sequence Number");
-		// if (anode == null) node.createChild("Get Log by Sequence
-		// Number").setAction(act).build().setSerializable(false);
-		// else anode.setAction(act);
-		//
-		// act = new Action(Permission.READ, new GetLogHandler(2));
-		// act.addParameter(new Parameter("time", ValueType.STRING));
-		// act.addParameter(new Parameter("count", ValueType.NUMBER, new
-		// Value(0)));
-		// act.addResult(new Parameter("Timestamp", ValueType.STRING));
-		// act.addResult(new Parameter("Status Flags", ValueType.STRING));
-		// act.addResult(new Parameter("Data", ValueType.STRING));
-		// act.setResultType(ResultType.TABLE);
-		// anode = node.getChild("Get Log by Time");
-		// if (anode == null) node.createChild("Get Log by
-		// Time").setAction(act).build().setSerializable(false);
-		// else anode.setAction(act);
-		// }
-
-		// setObjectTypeId(objectTypeId);
-		// setInstanceNumber(instanceNumber);
-		// setObjectTypeDescription(objectTypeDescription);
-		// if (presentValue != null) setPresentValue(presentValue, pid);
-		// else node.createChild("present
-		// value").setValueType(ValueType.STRING).setValue(new Value("
-		// ")).build();
-		// setCov(cov);
-		// setEngineeringUnits(engineeringUnits);
-		// setDataType(dataType);
-		// setUnitsDescription(unitsDescription);
-		// setReferenceDeviceId(referenceDeviceId);
-		// setReferenceObjectTypeId(referenceObjectTypeId);
-		// setReferenceObjectTypeDescription(referenceObjectTypeDescription);
-		// setReferenceInstanceNumber(referenceInstanceNumber);
-		// clearActions();
 		makeActions();
 		update();
-
-		// if (listener!=null)
-		// folder.conn.localDevice.getEventHandler().removeListener(listener);
-
 	}
 
 	private void makeActions() {
