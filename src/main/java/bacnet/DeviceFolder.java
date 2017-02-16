@@ -127,8 +127,7 @@ public class DeviceFolder {
 				if (defp == null)
 					child.setAttribute("default priority", new Value(8));
 				if (ot != null && inum != null && cov != null && sett != null) {
-					new BacnetPoint(this, node, child);
-					// conn.link.setupPoint(bp, this);
+					BacnetPoint point = new BacnetPoint(this, node, child);
 				} else {
 					node.removeChild(child);
 				}
@@ -155,8 +154,7 @@ public class DeviceFolder {
 			pnode.setAttribute("restore type", new Value("point"));
 			pnode.setAttribute("default priority", new Value(defprio));
 
-			new BacnetPoint(getMe(), node, pnode);
-			// conn.link.setupPoint(pt, getMe());
+			BacnetPoint point = new BacnetPoint(DeviceFolder.this, node, pnode);
 		}
 	}
 
@@ -570,10 +568,6 @@ public class DeviceFolder {
 			Node child = node.createChild(name, true).build();
 			new DeviceFolder(conn, child, root);
 		}
-	}
-
-	public DeviceFolder getMe() {
-		return this;
 	}
 
 	/*
