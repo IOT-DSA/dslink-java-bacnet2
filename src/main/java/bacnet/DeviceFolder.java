@@ -128,7 +128,6 @@ public class DeviceFolder {
 					child.setAttribute("default priority", new Value(8));
 				if (ot != null && inum != null && cov != null && sett != null) {
 					BacnetPoint point = new BacnetPoint(this, node, child);
-					conn.link.setupPoint(point, this);
 				} else {
 					node.removeChild(child);
 				}
@@ -156,7 +155,6 @@ public class DeviceFolder {
 			pnode.setAttribute("default priority", new Value(defprio));
 
 			BacnetPoint point = new BacnetPoint(getMe(), node, pnode);
-			conn.link.setupPoint(point, getMe());
 		}
 	}
 

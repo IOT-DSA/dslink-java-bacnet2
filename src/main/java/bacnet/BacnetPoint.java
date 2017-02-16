@@ -492,7 +492,6 @@ public class BacnetPoint {
 				getUnitsDescription().add("1");
 			}
 			setupNode();
-			// folder.conn.link.setupPoint(getMe(), folder);
 		}
 	}
 
@@ -859,7 +858,8 @@ public class BacnetPoint {
 					LOGGER.debug("objectName updated to " + objectName);
 				}
 			} else {
-				node.createChild("objectName", true).setValueType(ValueType.STRING).setValue(new Value(objectName)).build();
+				node.createChild("objectName", true).setValueType(ValueType.STRING).setValue(new Value(objectName))
+						.build();
 				LOGGER.debug("objectName set to " + objectName);
 			}
 
@@ -872,8 +872,8 @@ public class BacnetPoint {
 					LOGGER.debug("dataType updated to " + dataType);
 				}
 			} else {
-				node.createChild("dataType", true).setValueType(ValueType.STRING).setValue(new Value(dataType.toString()))
-						.build();
+				node.createChild("dataType", true).setValueType(ValueType.STRING)
+						.setValue(new Value(dataType.toString())).build();
 				LOGGER.debug("dataType set to " + dataType);
 			}
 		}
@@ -1047,7 +1047,8 @@ public class BacnetPoint {
 			if (propnode != null)
 				propnode.setValue(new Value(value));
 			else
-				propnode = node.createChild(name, true).setValueType(ValueType.ARRAY).setValue(new Value(value)).build();
+				propnode = node.createChild(name, true).setValueType(ValueType.ARRAY).setValue(new Value(value))
+						.build();
 			if (propnode.getWritable() != Writable.WRITE) {
 				propnode.setWritable(Writable.WRITE);
 				propnode.getListener().setValueHandler(new PropertySetHandler(p));
