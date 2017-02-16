@@ -77,14 +77,14 @@ public class DeviceFolder {
 		node.setAttribute("restore type", new Value("folder"));
 
 		Action act = new Action(Permission.READ, new RemoveHandler());
-		node.createChild("remove").setAction(act).build().setSerializable(false);
+		node.createChild("remove", true).setAction(act).build().setSerializable(false);
 
 		act = new Action(Permission.READ, new AddFolderHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING));
-		node.createChild("add folder").setAction(act).build().setSerializable(false);
+		node.createChild("add folder", true).setAction(act).build().setSerializable(false);
 
 		act = new Action(Permission.READ, new ObjectDiscoveryHandler());
-		node.createChild("discover objects").setAction(act).build().setSerializable(false);
+		node.createChild("discover objects", true).setAction(act).build().setSerializable(false);
 
 		act = new Action(Permission.READ, new AddObjectHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING));
@@ -93,15 +93,15 @@ public class DeviceFolder {
 		act.addParameter(new Parameter("use COV", ValueType.BOOL, new Value(false)));
 		act.addParameter(new Parameter("settable", ValueType.BOOL, new Value(false)));
 		act.addParameter(new Parameter("default priority", ValueType.NUMBER, new Value(8)));
-		node.createChild("add object").setAction(act).build().setSerializable(false);
+		node.createChild("add object", true).setAction(act).build().setSerializable(false);
 
 		act = new Action(Permission.READ, new CopyHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING));
-		node.createChild("make copy").setAction(act).build().setSerializable(false);
+		node.createChild("make copy", true).setAction(act).build().setSerializable(false);
 
 		act = new Action(Permission.READ, new RenameHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING, new Value(node.getName())));
-		node.createChild("edit").setAction(act).build().setSerializable(false);
+		node.createChild("edit", true).setAction(act).build().setSerializable(false);
 
 	}
 
@@ -147,7 +147,7 @@ public class DeviceFolder {
 			boolean sett = event.getParameter("settable", ValueType.BOOL).getBool();
 			int defprio = event.getParameter("default priority", ValueType.NUMBER).getNumber().intValue();
 
-			Node pnode = node.createChild(name).build();
+			Node pnode = node.createChild(name, true).build();
 			pnode.setAttribute("object type", new Value(ot.toString()));
 			pnode.setAttribute("object instance number", new Value(instNum));
 			pnode.setAttribute("use COV", new Value(cov));
@@ -550,9 +550,9 @@ public class DeviceFolder {
 		JsonObject jobj = conn.link.copySerializer.serialize();
 		JsonObject parentobj = getParentJson(jobj, node);
 		JsonObject nodeobj = parentobj.get(node.getName());
-		parentobj.put(name, nodeobj);
+		parentobj.put(org.dsa.iot.dslink.util.StringUtils.encodeName(name), nodeobj);
 		conn.link.copyDeserializer.deserialize(jobj);
-		Node newnode = node.getParent().getChild(name);
+		Node newnode = node.getParent().getChild(name, true);
 		DeviceFolder df = new DeviceFolder(conn, newnode, root);
 		df.restoreLastSession();
 	}
@@ -567,7 +567,7 @@ public class DeviceFolder {
 	protected class AddFolderHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			String name = event.getParameter("name", ValueType.STRING).getString();
-			Node child = node.createChild(name).build();
+			Node child = node.createChild(name, true).build();
 			new DeviceFolder(conn, child, root);
 		}
 	}

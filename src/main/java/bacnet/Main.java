@@ -36,15 +36,15 @@ public class Main extends DSLinkHandler {
 		Serializer copyser = new Serializer(manager);
 		Deserializer copydeser = new Deserializer(manager);
 
-		NodeBuilder b = superRoot.createChild("defs");
+		NodeBuilder b = superRoot.createChild("defs", true);
 		b.setSerializable(false);
 		b.setHidden(true);
 		Node node = b.build();
 
-		b = node.createChild("profile");
+		b = node.createChild("profile", true);
 		node = b.build();
 
-		b = node.createChild("getHistory_");
+		b = node.createChild("getHistory_", true);
 		Action act = new Action(Permission.READ, null);
 		GetHistory.initProfile(act);
 		b.setAction(act);

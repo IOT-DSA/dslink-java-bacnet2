@@ -145,7 +145,7 @@ abstract class BacnetConn {
 
 		initializeScheduledThreadPoolExecutor();
 
-		this.statnode = node.createChild(NODE_STATUS).setValueType(ValueType.STRING).setValue(new Value("")).build();
+		this.statnode = node.createChild(NODE_STATUS, true).setValueType(ValueType.STRING).setValue(new Value("")).build();
 		this.statnode.setSerializable(false);
 
 		this.listener = new EventListenerImpl();
@@ -168,16 +168,16 @@ abstract class BacnetConn {
 		statnode.setValue(new Value(NODE_STATUS_SETTING_UP_CONNECTION));
 
 		Action act = new Action(Permission.READ, new RemoveHandler());
-		Node anode = node.getChild(ACTION_REMOVE);
+		Node anode = node.getChild(ACTION_REMOVE, true);
 		if (anode == null)
-			node.createChild(ACTION_REMOVE).setAction(act).build().setSerializable(false);
+			node.createChild(ACTION_REMOVE, true).setAction(act).build().setSerializable(false);
 		else
 			anode.setAction(act);
 
 		act = getEditAction();
-		anode = node.getChild(ACTION_EDIT);
+		anode = node.getChild(ACTION_EDIT, true);
 		if (anode == null) {
-			anode = node.createChild(ACTION_EDIT).setAction(act).build();
+			anode = node.createChild(ACTION_EDIT, true).setAction(act).build();
 			anode.setSerializable(false);
 		} else {
 			anode.setAction(act);
@@ -230,31 +230,31 @@ abstract class BacnetConn {
 
 		if (!NODE_STATUS_STOPPED.equals(statnode.getValue().getString())) {
 			act = new Action(Permission.READ, new StopHandler());
-			anode = node.getChild(ACTION_STOP);
+			anode = node.getChild(ACTION_STOP, true);
 			if (anode == null)
-				node.createChild(ACTION_STOP).setAction(act).build().setSerializable(false);
+				node.createChild(ACTION_STOP, true).setAction(act).build().setSerializable(false);
 			else
 				anode.setAction(act);
 		}
 
 		act = new Action(Permission.READ, new RestartHandler());
-		anode = node.getChild(ACTION_RESTART);
+		anode = node.getChild(ACTION_RESTART, true);
 		if (anode == null)
-			node.createChild(ACTION_RESTART).setAction(act).build().setSerializable(false);
+			node.createChild(ACTION_RESTART, true).setAction(act).build().setSerializable(false);
 		else
 			anode.setAction(act);
 
 		if (localDevice != null) {
 			retryDelay = 1;
 			act = new Action(Permission.READ, new DeviceDiscoveryHandler());
-			anode = node.getChild(ACTION_DISCOVER_DEVICES);
+			anode = node.getChild(ACTION_DISCOVER_DEVICES, true);
 			if (anode == null)
-				node.createChild(ACTION_DISCOVER_DEVICES).setAction(act).build().setSerializable(false);
+				node.createChild(ACTION_DISCOVER_DEVICES, true).setAction(act).build().setSerializable(false);
 			else
 				anode.setAction(act);
 
 			act = getMakeSlaveAction();
-			node.createChild(ACTION_ADD_LOCAL_SLAVE).setAction(act).build().setSerializable(false);
+			node.createChild(ACTION_ADD_LOCAL_SLAVE, true).setAction(act).build().setSerializable(false);
 
 			act = new Action(Permission.READ, new AddDeviceHandler());
 			act.addParameter(new Parameter("name", ValueType.STRING));
@@ -270,9 +270,9 @@ abstract class BacnetConn {
 			act.addParameter(
 					new Parameter(ATTRIBUTE_COV_USAGE, ValueType.makeEnum("NONE", "UNCONFIRMED", "CONFIRMED")));
 			act.addParameter(new Parameter(ATTRIBUTE_COV_LEASE_TIME, ValueType.NUMBER, new Value(60)));
-			anode = node.getChild(ACTION_ADD_DEVICE);
+			anode = node.getChild(ACTION_ADD_DEVICE, true);
 			if (anode == null)
-				node.createChild(ACTION_ADD_DEVICE).setAction(act).build().setSerializable(false);
+				node.createChild(ACTION_ADD_DEVICE, true).setAction(act).build().setSerializable(false);
 			else
 				anode.setAction(act);
 			statnode.setValue(new Value(NODE_STATUS_CONNECTED));
@@ -516,9 +516,9 @@ abstract class BacnetConn {
 	protected void duplicate(String name) {
 		JsonObject jobj = link.copySerializer.serialize();
 		JsonObject nodeobj = jobj.get(node.getName());
-		jobj.put(name, nodeobj);
+		jobj.put(StringUtils.encodeName(name), nodeobj);
 		link.copyDeserializer.deserialize(jobj);
-		Node newnode = node.getParent().getChild(name);
+		Node newnode = node.getParent().getChild(name, true);
 		BacnetConn bc = getBacnetConnection(link, newnode);
 		bc.restoreLastSession();
 	}
@@ -603,7 +603,7 @@ abstract class BacnetConn {
 
 			String name = event.getParameter(ATTRIBUTE_NAME, ValueType.STRING).getString();
 			Node slaveNode;
-			slaveNode = node.createChild(name).build();
+			slaveNode = node.createChild(name, true).build();
 
 			localDeviceNode = new LocalDeviceNode(getMe(), slaveNode, localDevice);
 		}
@@ -718,14 +718,14 @@ abstract class BacnetConn {
 		if (name != null) {
 			if (child == null) {
 				String modname = name;
-				child = node.getChild(modname);
+				child = node.getChild(modname, true);
 				int i = 1;
 				while (child != null) {
 					i++;
 					modname = name + i;
-					child = node.getChild(modname);
+					child = node.getChild(modname, true);
 				}
-				child = node.createChild(modname).build();
+				child = node.createChild(modname, true).build();
 			}
 			if (d != null) {
 				mac = Utils.getMac(d);
@@ -803,9 +803,9 @@ abstract class BacnetConn {
 			}
 			final CovType ct = ctype;
 
-			boolean disabled = child.getChild("STATUS") != null
-					&& (new Value("disabled").equals(child.getChild("STATUS").getValue())
-							|| new Value("not connected").equals(child.getChild("STATUS").getValue()));
+			boolean disabled = child.getChild("STATUS", true) != null
+					&& (new Value("disabled").equals(child.getChild("STATUS", true).getValue())
+							|| new Value("not connected").equals(child.getChild("STATUS", true).getValue()));
 			DeviceNode dn = null;
 			if (!disabled) {
 				ScheduledThreadPoolExecutor gstpe = Objects.getDaemonThreadPool();

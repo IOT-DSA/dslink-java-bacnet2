@@ -19,7 +19,6 @@ import org.dsa.iot.dslink.node.Writable;
 import org.dsa.iot.dslink.node.actions.Action;
 import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
-import org.dsa.iot.dslink.node.actions.ResultType;
 import org.dsa.iot.dslink.node.actions.table.Row;
 import org.dsa.iot.dslink.node.actions.table.Table;
 import org.dsa.iot.dslink.node.value.Value;
@@ -29,7 +28,6 @@ import org.dsa.iot.dslink.util.handler.CompleteHandler;
 import org.dsa.iot.dslink.util.handler.Handler;
 import org.dsa.iot.dslink.util.json.JsonArray;
 import org.dsa.iot.historian.database.Database;
-import org.dsa.iot.historian.database.DatabaseProvider;
 import org.dsa.iot.historian.stats.GetHistory;
 import org.dsa.iot.historian.utils.QueryData;
 import org.slf4j.Logger;
@@ -262,10 +260,10 @@ public class BacnetPoint {
 			if (!(objectTypeDescription.startsWith("Analog") || objectTypeDescription.startsWith("Binary"))) {
 				name += " - " + objectTypeDescription;
 			}
-			if (parent.getChild(name) != null) {
+			if (parent.getChild(name, true) != null) {
 				name += oid.getInstanceNumber();
 			}
-			NodeBuilder b = parent.createChild(name);
+			NodeBuilder b = parent.createChild(name, true);
 			b.setDisplayName(objectName);
 			b.setValueType(ValueType.STRING);
 			b.setValue(new Value(""));
@@ -282,85 +280,21 @@ public class BacnetPoint {
 		node.setAttribute("default priority", new Value(defaultPriority));
 		node.setAttribute("restore type", new Value("point"));
 
-		if (node.getChild("present value") == null) {
-			node.createChild("present value").setValueType(ValueType.STRING).setValue(new Value("")).build();
+		if (node.getChild("present value", true) == null) {
+			node.createChild("present value", true).setValueType(ValueType.STRING).setValue(new Value("")).build();
 		}
-		node.getChild("present value").setWritable(Writable.NEVER);
+		node.getChild("present value", true).setWritable(Writable.NEVER);
 		folder.conn.link.setupPoint(this, folder);
 
-		// if (DeviceFolder.isOneOf(oid.getObjectType(), ObjectType.trendLog)) {
-		//
-		// Action act = new Action(Permission.READ, new GetLogHandler(0));
-		// act.addParameter(new Parameter("position", ValueType.NUMBER, new
-		// Value(0)));
-		// act.addParameter(new Parameter("count", ValueType.NUMBER, new
-		// Value(0)));
-		// act.addResult(new Parameter("Timestamp", ValueType.STRING));
-		// act.addResult(new Parameter("Status Flags", ValueType.STRING));
-		// act.addResult(new Parameter("Data", ValueType.STRING));
-		// act.setResultType(ResultType.TABLE);
-		// Node anode = node.getChild("Get Log by Position");
-		// if (anode == null) node.createChild("Get Log by
-		// Position").setAction(act).build().setSerializable(false);
-		// else anode.setAction(act);
-		//
-		// act = new Action(Permission.READ, new GetLogHandler(1));
-		// act.addParameter(new Parameter("sequence number", ValueType.NUMBER,
-		// new Value(0)));
-		// act.addParameter(new Parameter("count", ValueType.NUMBER, new
-		// Value(0)));
-		// act.addResult(new Parameter("Timestamp", ValueType.STRING));
-		// act.addResult(new Parameter("Status Flags", ValueType.STRING));
-		// act.addResult(new Parameter("Data", ValueType.STRING));
-		// act.setResultType(ResultType.TABLE);
-		// anode = node.getChild("Get Log by Sequence Number");
-		// if (anode == null) node.createChild("Get Log by Sequence
-		// Number").setAction(act).build().setSerializable(false);
-		// else anode.setAction(act);
-		//
-		// act = new Action(Permission.READ, new GetLogHandler(2));
-		// act.addParameter(new Parameter("time", ValueType.STRING));
-		// act.addParameter(new Parameter("count", ValueType.NUMBER, new
-		// Value(0)));
-		// act.addResult(new Parameter("Timestamp", ValueType.STRING));
-		// act.addResult(new Parameter("Status Flags", ValueType.STRING));
-		// act.addResult(new Parameter("Data", ValueType.STRING));
-		// act.setResultType(ResultType.TABLE);
-		// anode = node.getChild("Get Log by Time");
-		// if (anode == null) node.createChild("Get Log by
-		// Time").setAction(act).build().setSerializable(false);
-		// else anode.setAction(act);
-		// }
-
-		// setObjectTypeId(objectTypeId);
-		// setInstanceNumber(instanceNumber);
-		// setObjectTypeDescription(objectTypeDescription);
-		// if (presentValue != null) setPresentValue(presentValue, pid);
-		// else node.createChild("present
-		// value").setValueType(ValueType.STRING).setValue(new Value("
-		// ")).build();
-		// setCov(cov);
-		// setEngineeringUnits(engineeringUnits);
-		// setDataType(dataType);
-		// setUnitsDescription(unitsDescription);
-		// setReferenceDeviceId(referenceDeviceId);
-		// setReferenceObjectTypeId(referenceObjectTypeId);
-		// setReferenceObjectTypeDescription(referenceObjectTypeDescription);
-		// setReferenceInstanceNumber(referenceInstanceNumber);
-		// clearActions();
 		makeActions();
 		update();
-
-		// if (listener!=null)
-		// folder.conn.localDevice.getEventHandler().removeListener(listener);
-
 	}
 
 	private void makeActions() {
 		Action act = new Action(Permission.READ, new RemoveHandler());
-		Node anode = node.getChild("remove");
+		Node anode = node.getChild("remove", true);
 		if (anode == null)
-			node.createChild("remove").setAction(act).build().setSerializable(false);
+			node.createChild("remove", true).setAction(act).build().setSerializable(false);
 		else
 			anode.setAction(act);
 
@@ -373,17 +307,17 @@ public class BacnetPoint {
 		act.addParameter(new Parameter("use COV", ValueType.BOOL, node.getAttribute("use COV")));
 		act.addParameter(new Parameter("settable", ValueType.BOOL, node.getAttribute("settable")));
 		act.addParameter(new Parameter("default priority", ValueType.NUMBER, node.getAttribute("default priority")));
-		anode = node.getChild("edit");
+		anode = node.getChild("edit", true);
 		if (anode == null)
-			node.createChild("edit").setAction(act).build().setSerializable(false);
+			node.createChild("edit", true).setAction(act).build().setSerializable(false);
 		else
 			anode.setAction(act);
 
 		act = new Action(Permission.READ, new CopyHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING));
-		anode = node.getChild("make copy");
+		anode = node.getChild("make copy", true);
 		if (anode == null)
-			node.createChild("make copy").setAction(act).build().setSerializable(false);
+			node.createChild("make copy", true).setAction(act).build().setSerializable(false);
 		else
 			anode.setAction(act);
 
@@ -541,7 +475,7 @@ public class BacnetPoint {
 			String newname = event.getParameter("name", ValueType.STRING).getString();
 			if (newname != null && newname.length() > 0 && !newname.equals(node.getName())) {
 				parent.removeChild(node);
-				node = parent.createChild(newname).build();
+				node = parent.createChild(newname, true).build();
 			}
 			settable = event.getParameter("settable", ValueType.BOOL).getBool();
 			cov = event.getParameter("use COV", ValueType.BOOL).getBool();
@@ -572,7 +506,7 @@ public class BacnetPoint {
 	private class CopyHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			String name = event.getParameter("name", ValueType.STRING).getString();
-			Node newnode = parent.createChild(name).build();
+			Node newnode = parent.createChild(name, true).build();
 			newnode.setAttribute("object type", new Value(objectTypeDescription));
 			newnode.setAttribute("object instance number", new Value(instanceNumber));
 			newnode.setAttribute("use COV", new Value(cov));
@@ -918,32 +852,32 @@ public class BacnetPoint {
 			return;
 
 		if (objectName != null) {
-			Node vnode = node.getChild("objectName");
+			Node vnode = node.getChild("objectName", true);
 			if (vnode != null) {
 				if (!new Value(objectName).equals(vnode.getValue())) {
 					vnode.setValue(new Value(objectName));
 					LOGGER.debug("objectName updated to " + objectName);
 				}
 			} else {
-				node.createChild("objectName").setValueType(ValueType.STRING).setValue(new Value(objectName)).build();
+				node.createChild("objectName", true).setValueType(ValueType.STRING).setValue(new Value(objectName)).build();
 				LOGGER.debug("objectName set to " + objectName);
 			}
 
 		}
 		if (dataType != null) {
-			Node vnode = node.getChild("dataType");
+			Node vnode = node.getChild("dataType", true);
 			if (vnode != null) {
 				if (!new Value(dataType.toString()).equals(vnode.getValue())) {
 					vnode.setValue(new Value(dataType.toString()));
 					LOGGER.debug("dataType updated to " + dataType);
 				}
 			} else {
-				node.createChild("dataType").setValueType(ValueType.STRING).setValue(new Value(dataType.toString()))
+				node.createChild("dataType", true).setValueType(ValueType.STRING).setValue(new Value(dataType.toString()))
 						.build();
 				LOGGER.debug("dataType set to " + dataType);
 			}
 		}
-		Node vnode = node.getChild("present value");
+		Node vnode = node.getChild("present value", true);
 		Value oldval = null;
 		if (vnode != null)
 			oldval = vnode.getValue();
@@ -1000,7 +934,7 @@ public class BacnetPoint {
 					&& !unitsDescription.isEmpty()) {
 				units = new Value(unitsDescription.get(0));
 			}
-			Node unode = node.getChild("units");
+			Node unode = node.getChild("units", true);
 			if (unode != null) {
 				if (units == null)
 					node.removeChild("units");
@@ -1008,7 +942,7 @@ public class BacnetPoint {
 					unode.setValue(units);
 			} else {
 				if (units != null)
-					node.createChild("units").setValueType(ValueType.STRING).setValue(units).build();
+					node.createChild("units", true).setValueType(ValueType.STRING).setValue(units).build();
 			}
 			if (vnode != null) {
 				if (!areEqual(vt, vnode.getValueType()) || !val.equals(vnode.getValue())) {
@@ -1017,7 +951,7 @@ public class BacnetPoint {
 					LOGGER.debug("presentValue updated to " + val);
 				}
 			} else {
-				vnode = node.createChild("present value").setValueType(vt).setValue(val).build();
+				vnode = node.createChild("present value", true).setValueType(vt).setValue(val).build();
 				LOGGER.debug("presentValue set to " + val);
 			}
 		}
@@ -1066,7 +1000,7 @@ public class BacnetPoint {
 						|| vnode.getChildren().size() < pa.getCount() + 3)) {
 					makeRelinquishAction(vnode, -1);
 					Action act = new Action(Permission.READ, new RelinquishAllHandler());
-					vnode.createChild("relinquish all").setAction(act).build().setSerializable(false);
+					vnode.createChild("relinquish all", true).setAction(act).build().setSerializable(false);
 					refreshPriorities(pa);
 				}
 			} else {
@@ -1082,12 +1016,12 @@ public class BacnetPoint {
 	}
 
 	private void updateProperty(String name, String value) {
-		Node propnode = node.getChild(name);
+		Node propnode = node.getChild(name, true);
 		if (value != null) {
 			if (propnode != null)
 				propnode.setValue(new Value(value));
 			else
-				node.createChild(name).setValueType(ValueType.STRING).setValue(new Value(value)).build();
+				node.createChild(name, true).setValueType(ValueType.STRING).setValue(new Value(value)).build();
 		} else {
 			if (propnode != null)
 				node.removeChild(propnode);
@@ -1095,12 +1029,12 @@ public class BacnetPoint {
 	}
 
 	private void updateProperty(String name, int value) {
-		Node propnode = node.getChild(name);
+		Node propnode = node.getChild(name, true);
 		if (value >= 0) {
 			if (propnode != null)
 				propnode.setValue(new Value(value));
 			else
-				node.createChild(name).setValueType(ValueType.NUMBER).setValue(new Value(value)).build();
+				node.createChild(name, true).setValueType(ValueType.NUMBER).setValue(new Value(value)).build();
 		} else {
 			if (propnode != null)
 				node.removeChild(propnode);
@@ -1108,12 +1042,12 @@ public class BacnetPoint {
 	}
 
 	private void updateProperty(String name, JsonArray value, PropertyIdentifier p) {
-		Node propnode = node.getChild(name);
+		Node propnode = node.getChild(name, true);
 		if (value != null) {
 			if (propnode != null)
 				propnode.setValue(new Value(value));
 			else
-				propnode = node.createChild(name).setValueType(ValueType.ARRAY).setValue(new Value(value)).build();
+				propnode = node.createChild(name, true).setValueType(ValueType.ARRAY).setValue(new Value(value)).build();
 			if (propnode.getWritable() != Writable.WRITE) {
 				propnode.setWritable(Writable.WRITE);
 				propnode.getListener().setValueHandler(new PropertySetHandler(p));
@@ -1129,7 +1063,7 @@ public class BacnetPoint {
 	}
 
 	private void refreshPriorities(PriorityArray priorities) {
-		Node vnode = node.getChild("present value");
+		Node vnode = node.getChild("present value", true);
 		if (priorities == null) {
 			try {
 				priorities = getPriorityArray();
@@ -1186,16 +1120,16 @@ public class BacnetPoint {
 					val = new Value(p);
 			}
 			}
-			Node pnode = vnode.getChild("Priority " + i);
+			Node pnode = vnode.getChild("Priority " + i, true);
 			if (pnode != null) {
 				pnode.setValueType(vt);
 				pnode.setValue(val);
-				if (pnode.getChild("relinquish") == null) {
+				if (pnode.getChild("relinquish", true) == null) {
 					makeSetAction(pnode, i);
 					makeRelinquishAction(pnode, i);
 				}
 			} else {
-				pnode = vnode.createChild("Priority " + i).setValueType(vt).setValue(val).build();
+				pnode = vnode.createChild("Priority " + i, true).setValueType(vt).setValue(val).build();
 				makeSetAction(pnode, i);
 				makeRelinquishAction(pnode, i);
 			}
@@ -1205,7 +1139,7 @@ public class BacnetPoint {
 
 	private void makeRelinquishAction(Node valnode, int priority) {
 		Action act = new Action(Permission.READ, new RelinquishHandler(priority));
-		valnode.createChild("relinquish").setAction(act).build().setSerializable(false);
+		valnode.createChild("relinquish", true).setAction(act).build().setSerializable(false);
 	}
 
 	private PriorityArray getPriorityArray() throws BACnetException {

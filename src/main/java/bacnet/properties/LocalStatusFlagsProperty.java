@@ -64,9 +64,9 @@ public class LocalStatusFlagsProperty extends LocalBacnetProperty {
 		act.addParameter(new Parameter(ATTRIBUTE_STATUS_FLAG_OUTOFSERVICE, ValueType.BOOL,
 				node.getAttribute(ATTRIBUTE_STATUS_FLAG_OUTOFSERVICE)));
 
-		Node editNode = node.getChild(ACTION_EDIT);
+		Node editNode = node.getChild(ACTION_EDIT, true);
 		if (editNode == null)
-			node.createChild(ACTION_EDIT).setAction(act).build().setSerializable(false);
+			node.createChild(ACTION_EDIT, true).setAction(act).build().setSerializable(false);
 		else
 			editNode.setAction(act);
 	}

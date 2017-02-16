@@ -69,7 +69,7 @@ public abstract class EditableFolder {
 	protected class AddFolderHandler implements Handler<ActionResult> {
 		public void handle(ActionResult event) {
 			String name = event.getParameter(ATTRIBUTE_NAME, ValueType.STRING).getString();
-			node.createChild(name).build();
+			node.createChild(name, true).build();
 			addFolder(name);
 		}
 	}
@@ -101,7 +101,7 @@ public abstract class EditableFolder {
 		if (newname != null && newname.length() > 0 && !newname.equals(node.getName())) {
 			Node parent = node.getParent();
 			parent.removeChild(node);
-			node = parent.createChild(newname).build();
+			node = parent.createChild(newname, true).build();
 		}
 	}
 
@@ -118,7 +118,7 @@ public abstract class EditableFolder {
 
 	private void setRemoveAction() {
 		Action act = new Action(Permission.READ, new RemoveHandler());
-		node.createChild("remove").setAction(act).build().setSerializable(false);
+		node.createChild("remove", true).setAction(act).build().setSerializable(false);
 
 	}
 
@@ -129,14 +129,14 @@ public abstract class EditableFolder {
 		act.addParameter(new Parameter(ATTRIBUTE_OBJECT_INSTANCE_NUMBER, ValueType.NUMBER, new Value(0)));
 		act.addParameter(new Parameter(ATTRIBUTE_USE_COV, ValueType.BOOL, new Value(false)));
 		act.addParameter(new Parameter(ATTRIBUTE_SETTABLE, ValueType.BOOL, new Value(false)));
-		node.createChild(ACTION_ADD_OBJECT).setAction(act).build().setSerializable(false);
+		node.createChild(ACTION_ADD_OBJECT, true).setAction(act).build().setSerializable(false);
 	}
 
 	private void setAddFolderAction() {
 
 		Action act = new Action(Permission.READ, new AddFolderHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING));
-		node.createChild("add folder").setAction(act).build().setSerializable(false);
+		node.createChild("add folder", true).setAction(act).build().setSerializable(false);
 
 	}
 
@@ -144,7 +144,7 @@ public abstract class EditableFolder {
 
 		Action act = new Action(Permission.READ, new CopyHandler());
 		act.addParameter(new Parameter("name", ValueType.STRING));
-		node.createChild("make copy").setAction(act).build().setSerializable(false);
+		node.createChild("make copy", true).setAction(act).build().setSerializable(false);
 
 	}
 

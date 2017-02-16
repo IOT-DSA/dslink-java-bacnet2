@@ -19,6 +19,7 @@ import org.dsa.iot.dslink.node.actions.table.Table;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.util.Objects;
+import org.dsa.iot.dslink.util.StringUtils;
 import org.dsa.iot.dslink.util.handler.Handler;
 import org.dsa.iot.dslink.util.json.JsonArray;
 import org.dsa.iot.dslink.util.json.JsonObject;
@@ -71,19 +72,19 @@ public class DeviceNode extends DeviceFolder {
 		this.root = this;
 		conn.deviceNodes.add(this);
 
-		if (node.getChild("STATUS") != null) {
-			this.statnode = node.getChild("STATUS");
+		if (node.getChild("STATUS", true) != null) {
+			this.statnode = node.getChild("STATUS", true);
 			enabled = new Value("enabled").equals(statnode.getValue());
 		} else {
-			this.statnode = node.createChild("STATUS").setValueType(ValueType.STRING).setValue(new Value("enabled"))
+			this.statnode = node.createChild("STATUS", true).setValueType(ValueType.STRING).setValue(new Value("enabled"))
 					.build();
 			enabled = true;
 		}
 
-		if (node.getChild("EVENTS") != null) {
-			this.eventnode = node.getChild("EVENTS");
+		if (node.getChild("EVENTS", true) != null) {
+			this.eventnode = node.getChild("EVENTS", true);
 		} else {
-			this.eventnode = node.createChild("EVENTS").setValueType(ValueType.ARRAY)
+			this.eventnode = node.createChild("EVENTS", true).setValueType(ValueType.ARRAY)
 					.setValue(new Value(new JsonArray())).build();
 		}
 
@@ -98,7 +99,7 @@ public class DeviceNode extends DeviceFolder {
 					disable(true);
 				}
 			});
-			node.createChild("disable").setAction(act).build().setSerializable(false);
+			node.createChild("disable", true).setAction(act).build().setSerializable(false);
 
 			makeAlarmActions();
 		}
@@ -108,7 +109,7 @@ public class DeviceNode extends DeviceFolder {
 					enable(true);
 				}
 			});
-			node.createChild("enable").setAction(act).build().setSerializable(false);
+			node.createChild("enable", true).setAction(act).build().setSerializable(false);
 		}
 
 		this.interval = node.getAttribute("polling interval").getNumber().longValue();
@@ -164,7 +165,7 @@ public class DeviceNode extends DeviceFolder {
 				disable(true);
 			}
 		});
-		node.createChild("disable").setAction(act).build().setSerializable(false);
+		node.createChild("disable", true).setAction(act).build().setSerializable(false);
 
 		makeAlarmActions();
 
@@ -194,7 +195,7 @@ public class DeviceNode extends DeviceFolder {
 				enable(true);
 			}
 		});
-		node.createChild("enable").setAction(act).build().setSerializable(false);
+		node.createChild("enable", true).setAction(act).build().setSerializable(false);
 		if (node.getChildren() == null)
 			return;
 		for (Node child : node.getChildren().values()) {
@@ -242,9 +243,9 @@ public class DeviceNode extends DeviceFolder {
 				node.getAttribute("cov usage")));
 		act.addParameter(new Parameter("cov lease time (minutes)", ValueType.NUMBER,
 				node.getAttribute("cov lease time (minutes)")));
-		Node anode = node.getChild("edit");
+		Node anode = node.getChild("edit", true);
 		if (anode == null)
-			node.createChild("edit").setAction(act).build().setSerializable(false);
+			node.createChild("edit", true).setAction(act).build().setSerializable(false);
 		else
 			anode.setAction(act);
 	}
@@ -307,7 +308,7 @@ public class DeviceNode extends DeviceFolder {
 		act.addResult(new Parameter("Acked Transitions: To-Fault", ValueType.BOOL));
 		act.addResult(new Parameter("Acked Transitions: To-Normal", ValueType.BOOL));
 		act.setResultType(ResultType.TABLE);
-		node.createChild("get alarm summary").setAction(act).build().setSerializable(false);
+		node.createChild("get alarm summary", true).setAction(act).build().setSerializable(false);
 
 		act = new Action(Permission.READ, new EventInfoHandler());
 		act.addResult(new Parameter("Object", ValueType.STRING));
@@ -326,7 +327,7 @@ public class DeviceNode extends DeviceFolder {
 		act.addResult(new Parameter("Event Timestamp: To-Fault", ValueType.BOOL));
 		act.addResult(new Parameter("Event Timestamp: To-Normal", ValueType.BOOL));
 		act.setResultType(ResultType.TABLE);
-		node.createChild("get event information").setAction(act).build().setSerializable(false);
+		node.createChild("get event information", true).setAction(act).build().setSerializable(false);
 
 		act = new Action(Permission.READ, new AckAlarmHandler());
 		act.addParameter(new Parameter("Event Object Type", ValueType.makeEnum(Utils.enumeratedObjectTypeNames())));
@@ -336,7 +337,7 @@ public class DeviceNode extends DeviceFolder {
 		act.addParameter(new Parameter("Event Timestamp", ValueType.STRING));
 		act.addParameter(new Parameter("Acknowledging Process Identifier", ValueType.NUMBER));
 		act.addParameter(new Parameter("Acknowledgment Source", ValueType.STRING));
-		node.createChild("acknowledge alarm").setAction(act).build().setSerializable(false);
+		node.createChild("acknowledge alarm", true).setAction(act).build().setSerializable(false);
 	}
 
 	private class AckAlarmHandler implements Handler<ActionResult> {
@@ -422,9 +423,9 @@ public class DeviceNode extends DeviceFolder {
 		JsonObject jobj = conn.link.copySerializer.serialize();
 		JsonObject parentobj = getParentJson(jobj, node);
 		JsonObject nodeobj = parentobj.get(node.getName());
-		parentobj.put(name, nodeobj);
+		parentobj.put(StringUtils.encodeName(name), nodeobj);
 		conn.link.copyDeserializer.deserialize(jobj);
-		Node newnode = node.getParent().getChild(name);
+		Node newnode = node.getParent().getChild(name, true);
 		conn.restoreDevice(newnode);
 		return;
 
