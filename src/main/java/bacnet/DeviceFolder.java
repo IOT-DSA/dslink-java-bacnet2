@@ -154,7 +154,7 @@ public class DeviceFolder {
 			pnode.setAttribute("restore type", new Value("point"));
 			pnode.setAttribute("default priority", new Value(defprio));
 
-			BacnetPoint point = new BacnetPoint(getMe(), node, pnode);
+			BacnetPoint point = new BacnetPoint(DeviceFolder.this, node, pnode);
 		}
 	}
 
@@ -568,10 +568,6 @@ public class DeviceFolder {
 			Node child = node.createChild(name, true).build();
 			new DeviceFolder(conn, child, root);
 		}
-	}
-
-	public DeviceFolder getMe() {
-		return this;
 	}
 
 	/*
