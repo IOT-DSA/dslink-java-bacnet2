@@ -145,7 +145,8 @@ abstract class BacnetConn {
 
 		initializeScheduledThreadPoolExecutor();
 
-		this.statnode = node.createChild(NODE_STATUS, true).setValueType(ValueType.STRING).setValue(new Value("")).build();
+		this.statnode = node.createChild(NODE_STATUS, true).setValueType(ValueType.STRING).setValue(new Value(""))
+				.build();
 		this.statnode.setSerializable(false);
 
 		this.listener = new EventListenerImpl();
@@ -429,6 +430,9 @@ abstract class BacnetConn {
 	}
 
 	void stop() {
+		if (null == reconnectFuture) {
+			return;
+		}
 		reconnectFuture.cancel(false);
 		if (localDevice != null) {
 			localDevice.terminate();
