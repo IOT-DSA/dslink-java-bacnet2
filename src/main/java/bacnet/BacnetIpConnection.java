@@ -38,7 +38,7 @@ public class BacnetIpConnection extends BacnetConn {
 	String broadcastIp;
 	int port;
 	String localBindAddress;
-	boolean isRegisteredAsForegnDevice;
+	boolean isRegisteredAsForeignDevice;
 	String bbmdIpList;
 
 	BacnetIpConnection(BacnetLink link, Node node) {
@@ -47,9 +47,9 @@ public class BacnetIpConnection extends BacnetConn {
 		broadcastIp = node.getAttribute(ATTR_BROADCAST_IP).getString();
 		port = node.getAttribute(ATTR_PORT).getNumber().intValue();
 		localBindAddress = node.getAttribute(ATTR_LOCAL_BIND_ADDRESS).getString();
-		isRegisteredAsForegnDevice = node.getAttribute(ATTR_REGISTER_AS_FOREIGN_DEVICE).getBool();
+		isRegisteredAsForeignDevice = node.getAttribute(ATTR_REGISTER_AS_FOREIGN_DEVICE).getBool();
 		bbmdIpList = node.getAttribute(ATTR_BBMD_IP_WITH_NETWORK_NUMBER).getString();
-		if (null != bbmdIpList && isRegisteredAsForegnDevice) {
+		if (null != bbmdIpList && isRegisteredAsForeignDevice) {
 			this.parseBroadcastManagementDevice(bbmdIpList);
 		}
 	}
@@ -113,7 +113,7 @@ public class BacnetIpConnection extends BacnetConn {
 
 	@Override
 	void registerAsFeignDevice(Network network) {
-		if (!isRegisteredAsForegnDevice)
+		if (!isRegisteredAsForeignDevice)
 			return;
 
 		for (Map.Entry<String, Integer> entry : bbmdIpToPort.entrySet()) {
