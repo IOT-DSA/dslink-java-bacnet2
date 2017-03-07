@@ -145,7 +145,8 @@ abstract class BacnetConn {
 
 		initializeScheduledThreadPoolExecutor();
 
-		this.statnode = node.createChild(NODE_STATUS, true).setValueType(ValueType.STRING).setValue(new Value("")).build();
+		this.statnode = node.createChild(NODE_STATUS, true).setValueType(ValueType.STRING).setValue(new Value(""))
+				.build();
 		this.statnode.setSerializable(false);
 
 		this.listener = new EventListenerImpl();
@@ -429,6 +430,9 @@ abstract class BacnetConn {
 	}
 
 	void stop() {
+		if (null == reconnectFuture) {
+			return;
+		}
 		reconnectFuture.cancel(false);
 		if (localDevice != null) {
 			localDevice.terminate();
@@ -666,7 +670,7 @@ abstract class BacnetConn {
 		return false;
 	}
 
-	void getDeviceProps(final RemoteDevice d) {
+	void getDeviceProperties(final RemoteDevice d) {
 		LocalDevice ld = localDevice;
 		if (d == null || ld == null)
 			return;
@@ -708,7 +712,7 @@ abstract class BacnetConn {
 	private DeviceNode setupDeviceNode(final RemoteDevice d, Node child, String name, String mac, Integer instanceNum,
 			Integer netNum, String linkMac, long interval, CovType covtype, int covlife) {
 		if (d != null)
-			getDeviceProps(d);
+			getDeviceProperties(d);
 		if (name == null && d != null)
 			name = d.getName();
 		if (linkMac == null)

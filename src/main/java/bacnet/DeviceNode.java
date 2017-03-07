@@ -155,7 +155,7 @@ public class DeviceNode extends DeviceFolder {
 			}
 			int covlife = node.getAttribute("cov lease time (minutes)").getNumber().intValue();
 			final RemoteDevice d = conn.getDevice(mac, instNum, netNum, linkMac, interval, covtype, covlife);
-			conn.getDeviceProps(d);
+			conn.getDeviceProperties(d);
 			device = d;
 		}
 		statnode.setValue(new Value("enabled"));
@@ -271,7 +271,7 @@ public class DeviceNode extends DeviceFolder {
 					|| instNum != node.getAttribute("instance number").getNumber().intValue()) {
 
 				final RemoteDevice d = conn.getDevice(mac, instNum, netNum, linkMac, interv, covtype, covlife);
-				conn.getDeviceProps(d);
+				conn.getDeviceProperties(d);
 				device = d;
 			}
 			interval = interv;
