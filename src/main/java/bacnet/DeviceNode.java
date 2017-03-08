@@ -76,8 +76,8 @@ public class DeviceNode extends DeviceFolder {
 			this.statnode = node.getChild("STATUS", true);
 			enabled = new Value("enabled").equals(statnode.getValue());
 		} else {
-			this.statnode = node.createChild("STATUS", true).setValueType(ValueType.STRING).setValue(new Value("enabled"))
-					.build();
+			this.statnode = node.createChild("STATUS", true).setValueType(ValueType.STRING)
+					.setValue(new Value("enabled")).build();
 			enabled = true;
 		}
 
@@ -439,9 +439,9 @@ public class DeviceNode extends DeviceFolder {
 	void addPointSub(BacnetPoint point) {
 		if (subscribedPoints.containsKey(point.oid))
 			return;
+
 		subscribedPoints.put(point.oid, point);
-		if (pollingFuture == null)
-			startPolling();
+		startPolling();
 	}
 
 	@Override
