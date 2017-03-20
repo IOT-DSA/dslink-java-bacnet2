@@ -477,7 +477,6 @@ public class DeviceNode extends DeviceFolder {
 				for (ObjectIdentifier oid : subscribedPoints.keySet()) {
 					DeviceFolder.addPropertyReferences(refs, oid);
 				}
-				LOGGER.info("polling for device " + node.getName());
 				getProperties(refs, new ConcurrentHashMap<ObjectIdentifier, BacnetPoint>(subscribedPoints));
 			}
 		}, 0, interval, TimeUnit.MILLISECONDS);
