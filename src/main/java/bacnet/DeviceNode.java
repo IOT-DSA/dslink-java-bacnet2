@@ -441,7 +441,9 @@ public class DeviceNode extends DeviceFolder {
 			return;
 
 		subscribedPoints.put(point.oid, point);
-		startPolling();
+		if (pollingFuture == null) {
+			startPolling();
+		}
 	}
 
 	@Override
@@ -475,7 +477,6 @@ public class DeviceNode extends DeviceFolder {
 				for (ObjectIdentifier oid : subscribedPoints.keySet()) {
 					DeviceFolder.addPropertyReferences(refs, oid);
 				}
-				LOGGER.debug("polling for device " + node.getName());
 				getProperties(refs, new ConcurrentHashMap<ObjectIdentifier, BacnetPoint>(subscribedPoints));
 			}
 		}, 0, interval, TimeUnit.MILLISECONDS);
