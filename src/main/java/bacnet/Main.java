@@ -14,6 +14,21 @@ import org.dsa.iot.historian.stats.GetHistory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.serotonin.bacnet4j.LocalDevice;
+import com.serotonin.bacnet4j.RemoteDevice;
+import com.serotonin.bacnet4j.RemoteObject;
+import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
+import com.serotonin.bacnet4j.npdu.ip.IpNetworkBuilder;
+import com.serotonin.bacnet4j.service.confirmed.ReadPropertyMultipleRequest;
+import com.serotonin.bacnet4j.service.confirmed.ReadPropertyRequest;
+import com.serotonin.bacnet4j.service.unconfirmed.WhoIsRequest;
+import com.serotonin.bacnet4j.transport.DefaultTransport;
+import com.serotonin.bacnet4j.transport.Transport;
+import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.enumerated.ObjectType;
+import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
+import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
+
 public class Main extends DSLinkHandler {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
@@ -30,27 +45,33 @@ public class Main extends DSLinkHandler {
 	@Override
 	public void onResponderInitialized(DSLink link) {
 		LOGGER.info("Initialized");
-
 		NodeManager manager = link.getNodeManager();
 		Node superRoot = manager.getNode("/").getNode();
-		Serializer copyser = new Serializer(manager);
-		Deserializer copydeser = new Deserializer(manager);
+		BacnetLink.start(superRoot);
 
-		NodeBuilder b = superRoot.createChild("defs", true);
-		b.setSerializable(false);
-		b.setHidden(true);
-		Node node = b.build();
-
-		b = node.createChild("profile", true);
-		node = b.build();
-
-		b = node.createChild("getHistory_", true);
-		Action act = new Action(Permission.READ, null);
-		GetHistory.initProfile(act);
-		b.setAction(act);
-		b.build();
-
-		BacnetLink.start(superRoot, copyser, copydeser);
+//		IpNetwork network = new IpNetworkBuilder().build();
+//        Transport transport = new DefaultTransport(network);
+//        //        transport.setTimeout(15000);
+//        //        transport.setSegTimeout(15000);
+//        LocalDevice localDevice = new LocalDevice(1234, transport);
+//        //localDevice.getEventHandler().addListener(new BacnetListener(localDevice));
+//        
+//        try {
+//			localDevice.initialize();
+//			localDevice.sendGlobalBroadcast(new WhoIsRequest());
+//			
+//			RemoteDevice d = localDevice.getRemoteDeviceBlocking(1195);
+//			localDevice.send(d, new ReadPropertyMultipleRequest())
+//			RemoteObject ro = d.getObject(new ObjectIdentifier(ObjectType.analogInput, 100502));
+//			String name = ro.getObjectName();
+//			Encodable en = ro.getProperty(PropertyIdentifier.presentValue);
+//			LOGGER.info(name + " : " + en.toString());
+//			
+//		} catch (Exception e) {
+//			LOGGER.error("", e);
+//		}
+        
+        
 	}
 
 	@Override

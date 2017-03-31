@@ -9,27 +9,31 @@ version = '0.1.53-SNAPSHOT'
 
 repositories {
     mavenCentral()
-    maven {
-    	url '.m2/repository'
-    }
+    flatDir { dirs 'external' }
     maven {
         url 'https://oss.sonatype.org/content/repositories/snapshots/'
     }
 }
  
 dependencies {
-    compile 'org.iot-dsa:dslink:0.17.1-SNAPSHOT'
-    compile 'org.iot-dsa:historian:0.17.1-SNAPSHOT'
+    compile 'org.iot-dsa:dslink:0.17.2-SNAPSHOT'
+    compile 'org.iot-dsa:historian:0.17.2-SNAPSHOT'
     compile 'org.apache.commons:commons-lang3:3.0'
     compile 'commons-logging:commons-logging:1.1.1'
     compile 'org.scream3r:jssc:2.8.0'
-	compile fileTree('external')
-	//compile project(':BACnet4J')
+	compile ':sero-scheduler:1.+'
+    compile ':sero-warp:1.+'
+    compile ':BACnet4J:4.+'
 }
 
 run {
     args System.getProperty("exec.args", "").split()
     workingDir project.buildDir
+}
+
+task sourcesJar(group: 'build', type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
 }
 
 tasks.withType(FindBugs) {
