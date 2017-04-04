@@ -16,6 +16,7 @@ public class BacnetProperty {
 	static final String ACTION_REMOVE = "remove";
 	
 	BacnetDevice device;
+	BacnetObject object;
 	Node node;
 	ObjectIdentifier oid;
 	PropertyIdentifier pid;
@@ -27,23 +28,35 @@ public class BacnetProperty {
 		this.pid = pid;
 	}
 	
+	BacnetProperty(BacnetDevice device, BacnetObject object, Node node, ObjectIdentifier oid, PropertyIdentifier pid) {
+		this(device, node, oid, pid);
+		this.object = object;
+	}
+	
 	
 	protected void setup() {
 		makeRemoveAction();
 		
-		final BacnetProperty prop = this;
 		node.getListener().setOnSubscribeHandler(new Handler<Node>() {
 			@Override
 			public void handle(Node event) {
-				device.subscribeProperty(prop);
+				subscribe();
 			}
 		});
 		node.getListener().setOnUnsubscribeHandler(new Handler<Node>() {
 			@Override
 			public void handle(Node event) {
-				device.unsubscribeProperty(prop);
+				unsubscribe();
 			}
 		});
+	}
+	
+	protected void subscribe() {
+		device.subscribeProperty(this);
+	}
+	
+	protected void unsubscribe() {
+		device.unsubscribeProperty(this);
 	}
 	
 	public void updateValue(Encodable value) {

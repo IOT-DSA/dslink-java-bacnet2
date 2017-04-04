@@ -13,7 +13,15 @@ import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.node.value.ValueUtils;
 
 import com.serotonin.bacnet4j.RemoteDevice;
+import com.serotonin.bacnet4j.obj.ObjectProperties;
+import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.enumerated.BinaryPV;
+import com.serotonin.bacnet4j.type.enumerated.LifeSafetyState;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
+import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
+import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
+import com.serotonin.bacnet4j.type.primitive.Real;
+import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 
 import jssc.SerialNativeInterface;
 import jssc.SerialPortList;
@@ -136,6 +144,92 @@ public class Utils {
 
 	public static boolean isOneOf(ObjectType objectType, ObjectType... types) {
 		return isOneOf(objectType.intValue(), types);
+	}
+
+	public static Encodable booleanToEncodable(Boolean b, ObjectIdentifier oid, PropertyIdentifier pid) {
+		Class<? extends Encodable> clazz = ObjectProperties.getObjectPropertyTypeDefinition(oid.getObjectType(), pid).getPropertyTypeDefinition().getClazz();
+		
+		if (clazz == BinaryPV.class) {
+			if (b) {
+				return BinaryPV.active;
+			}
+			return BinaryPV.inactive;
+		}
+
+		if (clazz == UnsignedInteger.class) {
+			return new UnsignedInteger(b ? 1 : 0);
+		}
+		
+		if (clazz == LifeSafetyState.class) {
+			return LifeSafetyState.forId(b ? 1 : 0);
+		}
+
+		if (clazz == Real.class) {
+			return new Real(b ? 1 : 0);
+		}
+		return BinaryPV.inactive;
+	}
+	
+	public static Encodable multistateToEncodable(int i, ObjectIdentifier oid, PropertyIdentifier pid) {
+		if (i == -1) {
+			return null;
+		}
+		Class<? extends Encodable> clazz = ObjectProperties.getObjectPropertyTypeDefinition(oid.getObjectType(), pid).getPropertyTypeDefinition().getClazz();
+				
+		if (clazz == BinaryPV.class) {
+			if (i != 0) {
+				return BinaryPV.active;
+			}
+			return BinaryPV.inactive;
+		}
+
+		if (clazz == UnsignedInteger.class) {
+			return new UnsignedInteger(i);
+		}
+
+		if (clazz == LifeSafetyState.class) {
+			return LifeSafetyState.forId(i);
+		}
+
+		if (clazz == Real.class) {
+			return new Real(i);
+		}
+		return new UnsignedInteger(i);
+	}
+
+	public static Encodable numberToEncodable(Number n, ObjectIdentifier oid, PropertyIdentifier pid) {
+		double d = n.doubleValue();
+		Class<? extends Encodable> clazz = ObjectProperties.getObjectPropertyTypeDefinition(oid.getObjectType(), pid).getPropertyTypeDefinition().getClazz();
+		
+		if (clazz == BinaryPV.class) {
+			if (d != 0) {
+				return BinaryPV.active;
+			}
+			return BinaryPV.inactive;
+		}
+
+		if (clazz == UnsignedInteger.class) {
+			return new UnsignedInteger((int) d);
+		}
+
+		if (clazz == LifeSafetyState.class) {
+			return LifeSafetyState.forId((int) d);
+		}
+
+		return new Real((float) d);
+	}
+	
+	public static DataType getDataType(ObjectType objectType) {
+		if (isOneOf(objectType, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
+			return DataType.BINARY;
+		} else if (isOneOf(objectType, ObjectType.multiStateInput, ObjectType.multiStateOutput,
+				ObjectType.multiStateValue, ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone)) {
+			return DataType.MULTISTATE;
+		} else if (isOneOf(objectType, ObjectType.analogInput, ObjectType.analogOutput, ObjectType.analogValue, ObjectType.largeAnalogValue, ObjectType.integerValue, ObjectType.positiveIntegerValue)) {
+			return DataType.NUMERIC;
+		} else {
+			return DataType.STRING;
+		}
 	}
 	
 
