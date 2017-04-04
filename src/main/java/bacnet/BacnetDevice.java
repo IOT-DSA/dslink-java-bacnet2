@@ -47,7 +47,7 @@ public class BacnetDevice {
 	private final Node statnode;
 	
 	RemoteDevice remoteDevice;
-	Object lock = new Object();
+	ReadWriteMonitor monitor = new ReadWriteMonitor();
 	
 	private int instanceNumber;
 	private double pollingIntervalSeconds;
@@ -59,8 +59,12 @@ public class BacnetDevice {
 	public BacnetDevice(BacnetConn conn, Node node, RemoteDevice d) {
 		this.conn = conn;
 		this.node = node;
-		synchronized(lock) {
+		try {
+			monitor.checkInWriter();
 			this.remoteDevice = d;
+			monitor.checkOutWriter();
+		} catch (InterruptedException e) {
+			
 		}
 		
 		instanceNumber = Utils.getAndMaybeSetRoConfigNum(node, "Instance Number", 0).intValue();
@@ -109,10 +113,12 @@ public class BacnetDevice {
 	}
 	
 	public void init() {
-		synchronized(lock) {
+		try {
+			monitor.checkInWriter();
 			if (remoteDevice == null) {
 				statnode.setValue(new Value("Connecting"));
-				synchronized(conn.lock) {
+				try {
+					conn.monitor.checkInReader();
 					if (conn.localDevice != null) {
 						try {
 							remoteDevice = conn.localDevice.getRemoteDeviceBlocking(instanceNumber);
@@ -123,11 +129,17 @@ public class BacnetDevice {
 					} else {
 						statnode.setValue(new Value("Connection Down"));
 					}
+					conn.monitor.checkOutReader();
+				} catch (InterruptedException e) {
+					
 				}
 			}
 			if (remoteDevice != null) {
 				statnode.setValue(new Value("Ready"));
 			}
+			monitor.checkOutWriter();
+		} catch (InterruptedException e) {
+			
 		}
 		
 		makeFolderActions(node);
@@ -188,11 +200,13 @@ public class BacnetDevice {
 			props.add(entry.getKey());
 		}
 		List<Pair<ObjectPropertyReference, Encodable>> results = null;
-		synchronized(lock) {
+		try {
+			monitor.checkInReader();
 			if (remoteDevice == null) {
 				return;
 			}
-			synchronized(conn.lock) {
+			try {
+				conn.monitor.checkInReader();
 				if (conn.localDevice == null) {
 					return;
 				}
@@ -201,7 +215,13 @@ public class BacnetDevice {
 				} catch (BACnetException e) {
 					LOGGER.debug("", e);
 				}
+				conn.monitor.checkOutReader();
+			} catch (InterruptedException e) {
+				
 			}
+			monitor.checkOutReader();
+		} catch (InterruptedException e) {
+			
 		}
 		if (results == null) {
 			return;
@@ -307,11 +327,13 @@ public class BacnetDevice {
 	
 	private void discoverObjects(Node fnode) {
 		SequenceOf<ObjectIdentifier> oids = null;
-		synchronized (lock) {
+		try {
+			monitor.checkInReader();
 			if (remoteDevice == null) {
 				return;
 			}
-			synchronized (conn.lock) {
+			try {
+				conn.monitor.checkInReader();
 				if (conn.localDevice == null) {
 					return;
 				}
@@ -320,7 +342,13 @@ public class BacnetDevice {
 				} catch (BACnetException e) {
 					LOGGER.debug("", e);
 				}
+				conn.monitor.checkOutReader();
+			} catch (InterruptedException e) {
+				
 			}
+			monitor.checkOutReader();
+		} catch (InterruptedException e) {
+			
 		}
 		if (oids == null) {
 			return;
@@ -401,9 +429,13 @@ public class BacnetDevice {
 	}
 	
 	private void stop() {
-		synchronized(lock) {
+		try {
+			monitor.checkInWriter();
 			remoteDevice = null;
 			statnode.setValue(new Value("Stopped"));
+			monitor.checkOutWriter();
+		} catch (InterruptedException e) {
+			
 		}
 	}
 

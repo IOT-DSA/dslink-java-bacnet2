@@ -72,7 +72,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 	
 	private final Map<Integer, RemoteDevice> discovered = new ConcurrentHashMap<Integer, RemoteDevice>();
 	LocalDevice localDevice = null;
-	Object lock = new Object();
+	ReadWriteMonitor monitor = new ReadWriteMonitor();
 	
 	final Map<Integer, OctetString> networkRouters = new HashMap<Integer, OctetString>();
 	final Map<String, Integer> bbmdIpToPort = new HashMap<String, Integer>();
@@ -177,7 +177,8 @@ public abstract class BacnetConn implements DeviceEventListener {
 		makeRemoveAction();
 		makeEditAction();
 		
-		synchronized (lock) {
+		try {
+			monitor.checkInWriter();
 			Network network = getNetwork();
 			Transport transport = new DefaultTransport(network);
 			transport.setRetries(retries);
@@ -202,7 +203,10 @@ public abstract class BacnetConn implements DeviceEventListener {
 				statnode.setValue(new Value("Error in initializing local device :" + e.getMessage()));
 				localDevice.terminate();
 				localDevice = null;
-			} 
+			}
+			monitor.checkOutWriter();
+		} catch (InterruptedException e) {
+			
 		}
 		
 		if (!NODE_STATUS_STOPPED.equals(statnode.getValue().getString())) {
@@ -298,7 +302,8 @@ public abstract class BacnetConn implements DeviceEventListener {
 	
 	private void stop() {
 		statnode.setValue(new Value(NODE_STATUS_STOPPED));
-		synchronized(lock) {
+		try {
+			monitor.checkInWriter();
 			if (localDevice != null) {
 				localDevice.terminate();
 				localDevice = null;
@@ -306,6 +311,9 @@ public abstract class BacnetConn implements DeviceEventListener {
 //				node.removeChild(ACTION_DISCOVER_DEVICES, false);
 //				node.removeChild(ACTION_ADD_DEVICE, false);
 			}
+			monitor.checkOutWriter();
+		} catch (InterruptedException e) {
+			
 		}
 	}
 	
@@ -349,10 +357,14 @@ public abstract class BacnetConn implements DeviceEventListener {
 	}
 	
 	private void discover() {
-		synchronized(lock) {
+		try {
+			monitor.checkInReader();
 			if (localDevice != null) {
 				localDevice.sendGlobalBroadcast(new WhoIsRequest());
 			}
+			monitor.checkOutReader();
+		} catch (InterruptedException e) {
+			
 		}
 		int lastLength = 0;
 		for (int i=0; i<10; i++) {
@@ -428,7 +440,8 @@ public abstract class BacnetConn implements DeviceEventListener {
 	private void addCustomDevice(ActionResult event) {
 		int inst = event.getParameter("Instance Number", ValueType.NUMBER).getNumber().intValue();
 		RemoteDevice d = null;
-		synchronized(lock) {
+		try {
+			monitor.checkInReader();
 			if (localDevice == null) {
 				return;
 			}
@@ -437,6 +450,9 @@ public abstract class BacnetConn implements DeviceEventListener {
 			} catch (BACnetException e) {
 				LOGGER.debug("" ,e);
 			}
+			monitor.checkOutReader();
+		} catch (InterruptedException e) {
+			
 		}
 		addDevice(event, d, inst);
 	}
@@ -474,6 +490,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 
 	@Override
 	public void iAmReceived(RemoteDevice d) {
+		LOGGER.info("iAm recieved: " + d);
 		discovered.put(d.getInstanceNumber(), d);
 		
 	}

@@ -69,7 +69,7 @@ public class BacnetObject extends BacnetProperty {
 	
 	void init() {
 		setup();
-		addProperties();
+//		addProperties();
 		makeSettable();
 		makeDiscoverAction();
 	}
@@ -95,11 +95,13 @@ public class BacnetObject extends BacnetProperty {
 	}
 	
 	private SequenceOf<PropertyIdentifier> getPropertyList() {
-		synchronized(device.lock) {
+		try {
+			device.monitor.checkInReader();
 			if (device.remoteDevice == null) {
 				return null;
 			}
-			synchronized(device.conn.lock) {
+			try {
+				device.conn.monitor.checkInReader();
 				if (device.conn.localDevice == null) {
 					return null;
 				}
@@ -108,7 +110,13 @@ public class BacnetObject extends BacnetProperty {
 				} catch (BACnetException e) {
 					LOGGER.debug("", e);
 				}
+				device.conn.monitor.checkOutReader();
+			} catch (InterruptedException e) {
+				
 			}
+			device.monitor.checkOutReader();
+		} catch (InterruptedException e) {
+			
 		}
 		return null;
 	}
@@ -145,16 +153,24 @@ public class BacnetObject extends BacnetProperty {
 			return;
 		}
 		
-		synchronized(device.lock) {
+		try {
+			device.monitor.checkInReader();
 			if (device.remoteDevice == null) {
 				return;
 			}
-			synchronized(device.conn.lock) {
+			try {
+				device.conn.monitor.checkInReader();
 				if (device.conn.localDevice == null) {
 					return;
 				}
 				device.conn.localDevice.send(device.remoteDevice, new WritePropertyRequest(oid, pid, null, enc, null));
+				device.conn.monitor.checkOutReader();
+			} catch (InterruptedException e) {
+				
 			}
+			device.monitor.checkOutReader();
+		} catch (InterruptedException e) {
+			
 		}
 		
 	}
