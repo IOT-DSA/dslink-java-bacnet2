@@ -2,8 +2,10 @@ package bacnet;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -31,6 +33,7 @@ import com.serotonin.bacnet4j.service.confirmed.ReinitializeDeviceRequest.Reinit
 import com.serotonin.bacnet4j.service.unconfirmed.WhoIsRequest;
 import com.serotonin.bacnet4j.transport.DefaultTransport;
 import com.serotonin.bacnet4j.transport.Transport;
+import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.constructed.Address;
 import com.serotonin.bacnet4j.type.constructed.Choice;
 import com.serotonin.bacnet4j.type.constructed.DateTime;
@@ -49,6 +52,7 @@ import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.OctetString;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
+import com.serotonin.bacnet4j.util.RequestUtils;
 
 public abstract class BacnetConn implements DeviceEventListener {
 	private static final Logger LOGGER = LoggerFactory.getLogger(BacnetConn.class);
@@ -61,6 +65,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 	static final String ACTION_DISCOVER_DEVICES = "discover devices";
 	static final String ACTION_ADD_DEVICE = "add device";
 	static final String ACTION_ADD_CUSTOM_DEVICE = "add custom device";
+	static final String ACTION_ADD_ALL = "add all discovered devices";
 	
 	static final String NODE_STATUS = "STATUS";
 	static final String NODE_STATUS_SETTING_UP_CONNECTION = "Setting up connection";
@@ -222,6 +227,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 			makeDiscoverAction();
 			makeAddDiscoveredDeviceAction();
 			makeAddCustomDeviceAction();
+			makeAddAllAction();
 		}
 		
 	}
@@ -426,6 +432,40 @@ public abstract class BacnetConn implements DeviceEventListener {
 		}
 	}
 	
+	private void makeAddAllAction() {
+		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
+			@Override
+			public void handle(ActionResult event) {
+				addAllDiscovered(event);
+			}
+		});
+		act.addParameter(new Parameter("Polling Interval", ValueType.NUMBER, new Value(5)));
+		//TODO headless polling?
+		act.addParameter(new Parameter("Use COV", ValueType.BOOL, new Value(false)));
+		Node anode = node.getChild(ACTION_ADD_ALL, true);
+		if (anode == null) {
+			node.createChild(ACTION_ADD_ALL, true).setAction(act).setDisplayName("Add All Discovered Devices").build().setSerializable(false);
+		} else {
+			anode.setAction(act);
+		}
+	}
+	
+	private void addAllDiscovered(ActionResult event) {
+		for (Entry<Integer, RemoteDevice> entry: discovered.entrySet()) {
+			Integer inst = entry.getKey();
+			RemoteDevice d = entry.getValue();
+			if (d == null || d.getDeviceProperty(PropertyIdentifier.objectName) == null) {
+				continue;
+			}
+			String name = d.getName();
+			Node child = node.createChild(name, true).build();
+			child.setRoConfig("Instance Number", new Value(inst));
+			Utils.setConfigsFromActionResult(child, event);
+			BacnetDevice bd = new BacnetDevice(this, child, d);
+			bd.init();
+		}
+	}
+	
 	private void addDiscoveredDevice(ActionResult event) {
 		String devStr = event.getParameter("Device", ValueType.STRING).getString();
 		String[] arr = devStr.split("\\(Instance ");
@@ -496,6 +536,32 @@ public abstract class BacnetConn implements DeviceEventListener {
 	public void iAmReceived(RemoteDevice d) {
 		LOGGER.info("iAm recieved: " + d);
 		discovered.put(d.getInstanceNumber(), d);
+		Objects.getDaemonThreadPool().schedule(new Runnable() {
+			@Override
+			public void run() {
+				deviceDiscovered(d);
+			}
+		}, 0, TimeUnit.MILLISECONDS);	
+	}
+	
+	private void deviceDiscovered(RemoteDevice d) {
+		if (d == null) {
+			return;
+		}
+		Encodable enc = null;
+		try {
+			monitor.checkInReader();
+			try {
+				enc = RequestUtils.sendReadPropertyAllowNull(localDevice, d, d.getObjectIdentifier(), PropertyIdentifier.objectName);
+			} catch (BACnetException e) {
+				LOGGER.debug("", e);
+			}
+			monitor.checkOutReader();
+		} catch (InterruptedException e1) {
+		}
+		if (enc != null) {
+			d.setDeviceProperty(PropertyIdentifier.objectName, enc);
+		}
 		if (discoveryLock.tryLock()) {
 			try {
 				Thread.sleep(500);
