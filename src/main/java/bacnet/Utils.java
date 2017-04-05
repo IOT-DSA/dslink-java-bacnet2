@@ -11,6 +11,8 @@ import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.node.value.ValueUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.obj.ObjectProperties;
@@ -28,7 +30,7 @@ import jssc.SerialPortList;
 
 public class Utils {
 	
-//	private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
 	
 	public static String[] getCommPorts() {
 		String[] portNames;
@@ -128,7 +130,7 @@ public class Utils {
 		for (Entry<Integer, RemoteDevice> entry: devices.entrySet()) {
 			int id = entry.getKey();
 			RemoteDevice d = entry.getValue();
-			String devString = d.getName() + " (Instance " + String.valueOf(id) + " at " + d.getAddress() + ")";
+			String devString = (d.getDeviceProperty(PropertyIdentifier.objectName)!=null ? d.getName() : "") + " (Instance " + String.valueOf(id) + " at " + d.getAddress() + ")";
 			devStringSet.add(devString);
 		}
 		return devStringSet;

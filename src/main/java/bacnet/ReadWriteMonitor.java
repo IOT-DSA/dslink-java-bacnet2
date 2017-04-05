@@ -26,7 +26,7 @@ public class ReadWriteMonitor {
 		synchronized(this) {
 			activeReaders -= 1;
 			if (activeReaders == 0 && waitingWriters > 0) {
-				this.notify();
+				this.notifyAll();
 			}
 		}
 	}

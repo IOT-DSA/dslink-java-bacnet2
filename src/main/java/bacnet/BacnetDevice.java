@@ -202,22 +202,20 @@ public class BacnetDevice {
 		List<Pair<ObjectPropertyReference, Encodable>> results = null;
 		try {
 			monitor.checkInReader();
-			if (remoteDevice == null) {
-				return;
-			}
-			try {
-				conn.monitor.checkInReader();
-				if (conn.localDevice == null) {
-					return;
-				}
+			if (remoteDevice != null) {
 				try {
-					results = RequestUtils.readProperties(conn.localDevice, remoteDevice, oprs, null);
-				} catch (BACnetException e) {
-					LOGGER.debug("", e);
+					conn.monitor.checkInReader();
+					if (conn.localDevice != null) {
+						try {
+							results = RequestUtils.readProperties(conn.localDevice, remoteDevice, oprs, null);
+						} catch (BACnetException e) {
+							LOGGER.debug("", e);
+						}
+					}
+					conn.monitor.checkOutReader();
+				} catch (InterruptedException e) {
+					
 				}
-				conn.monitor.checkOutReader();
-			} catch (InterruptedException e) {
-				
 			}
 			monitor.checkOutReader();
 		} catch (InterruptedException e) {
@@ -329,22 +327,20 @@ public class BacnetDevice {
 		SequenceOf<ObjectIdentifier> oids = null;
 		try {
 			monitor.checkInReader();
-			if (remoteDevice == null) {
-				return;
-			}
-			try {
-				conn.monitor.checkInReader();
-				if (conn.localDevice == null) {
-					return;
-				}
+			if (remoteDevice != null) {
 				try {
-					oids = RequestUtils.getObjectList(conn.localDevice, remoteDevice);
-				} catch (BACnetException e) {
-					LOGGER.debug("", e);
+					conn.monitor.checkInReader();
+					if (conn.localDevice != null) {
+						try {
+							oids = RequestUtils.getObjectList(conn.localDevice, remoteDevice);
+						} catch (BACnetException e) {
+							LOGGER.debug("", e);
+						}
+					}
+					conn.monitor.checkOutReader();
+				} catch (InterruptedException e) {
+					
 				}
-				conn.monitor.checkOutReader();
-			} catch (InterruptedException e) {
-				
 			}
 			monitor.checkOutReader();
 		} catch (InterruptedException e) {

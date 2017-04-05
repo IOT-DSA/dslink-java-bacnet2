@@ -97,22 +97,20 @@ public class BacnetObject extends BacnetProperty {
 	private SequenceOf<PropertyIdentifier> getPropertyList() {
 		try {
 			device.monitor.checkInReader();
-			if (device.remoteDevice == null) {
-				return null;
-			}
-			try {
-				device.conn.monitor.checkInReader();
-				if (device.conn.localDevice == null) {
-					return null;
-				}
+			if (device.remoteDevice != null) {
 				try {
-					return (SequenceOf<PropertyIdentifier>) RequestUtils.sendReadPropertyAllowNull(device.conn.localDevice, device.remoteDevice, oid, PropertyIdentifier.propertyList);
-				} catch (BACnetException e) {
-					LOGGER.debug("", e);
+					device.conn.monitor.checkInReader();
+					if (device.conn.localDevice != null) {
+						try {
+							return (SequenceOf<PropertyIdentifier>) RequestUtils.sendReadPropertyAllowNull(device.conn.localDevice, device.remoteDevice, oid, PropertyIdentifier.propertyList);
+						} catch (BACnetException e) {
+							LOGGER.debug("", e);
+						}
+					}
+					device.conn.monitor.checkOutReader();
+				} catch (InterruptedException e) {
+					
 				}
-				device.conn.monitor.checkOutReader();
-			} catch (InterruptedException e) {
-				
 			}
 			device.monitor.checkOutReader();
 		} catch (InterruptedException e) {
@@ -155,18 +153,16 @@ public class BacnetObject extends BacnetProperty {
 		
 		try {
 			device.monitor.checkInReader();
-			if (device.remoteDevice == null) {
-				return;
-			}
-			try {
-				device.conn.monitor.checkInReader();
-				if (device.conn.localDevice == null) {
-					return;
+			if (device.remoteDevice != null) {
+				try {
+					device.conn.monitor.checkInReader();
+					if (device.conn.localDevice != null) {
+						device.conn.localDevice.send(device.remoteDevice, new WritePropertyRequest(oid, pid, null, enc, null));
+					}
+					device.conn.monitor.checkOutReader();
+				} catch (InterruptedException e) {
+					
 				}
-				device.conn.localDevice.send(device.remoteDevice, new WritePropertyRequest(oid, pid, null, enc, null));
-				device.conn.monitor.checkOutReader();
-			} catch (InterruptedException e) {
-				
 			}
 			device.monitor.checkOutReader();
 		} catch (InterruptedException e) {

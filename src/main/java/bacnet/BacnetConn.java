@@ -4,6 +4,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
@@ -71,6 +73,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 	private final ScheduledThreadPoolExecutor stpe = Objects.createDaemonThreadPool();
 	
 	private final Map<Integer, RemoteDevice> discovered = new ConcurrentHashMap<Integer, RemoteDevice>();
+	Lock discoveryLock = new ReentrantLock();
 	LocalDevice localDevice = null;
 	ReadWriteMonitor monitor = new ReadWriteMonitor();
 	
@@ -366,20 +369,21 @@ public abstract class BacnetConn implements DeviceEventListener {
 		} catch (InterruptedException e) {
 			
 		}
-		int lastLength = 0;
-		for (int i=0; i<10; i++) {
-			if (discovered.size() > lastLength) {
-				lastLength = discovered.size();
-				makeAddDiscoveredDeviceAction();
-			}
-			try {
-				Thread.sleep(500);
-			} catch (InterruptedException e) {
-			}
-		}
+//		int lastLength = 0;
+//		for (int i=0; i<(timeout/500) + 2; i++) {
+//			if (discovered.size() > lastLength) {
+//				lastLength = discovered.size();
+//				makeAddDiscoveredDeviceAction();
+//			}
+//			try {
+//				Thread.sleep(500);
+//			} catch (InterruptedException e) {
+//			}
+//		}
 	}
 	
 	private void makeAddDiscoveredDeviceAction() {
+		LOGGER.info("updating add discovered device action");
 		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
 			@Override
 			public void handle(ActionResult event) {
@@ -396,6 +400,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 		if (anode == null) {
 			node.createChild(ACTION_ADD_DEVICE, true).setAction(act).setConfig("actionGroup", new Value("Add Device")).setConfig("actionGroupSubTitle", new Value("From Discovered")).build().setSerializable(false);
 		} else {
+			LOGGER.info("actually updating add discovered device action");
 			anode.setAction(act);
 		}
 	}
@@ -442,13 +447,12 @@ public abstract class BacnetConn implements DeviceEventListener {
 		RemoteDevice d = null;
 		try {
 			monitor.checkInReader();
-			if (localDevice == null) {
-				return;
-			}
-			try {
-				d = localDevice.getRemoteDeviceBlocking(inst);
-			} catch (BACnetException e) {
-				LOGGER.debug("" ,e);
+			if (localDevice != null) {
+				try {
+					d = localDevice.getRemoteDeviceBlocking(inst);
+				} catch (BACnetException e) {
+					LOGGER.debug("" ,e);
+				}
 			}
 			monitor.checkOutReader();
 		} catch (InterruptedException e) {
@@ -464,7 +468,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 		if (nameVal != null) {
 			name = nameVal.getString();
 		}
-		if ((name == null || name.trim().isEmpty()) && d != null) {
+		if ((name == null || name.trim().isEmpty()) && d != null && d.getDeviceProperty(PropertyIdentifier.objectName) != null) {
 			name = d.getName();
 		}
 		if (name == null || name.trim().isEmpty()) {
@@ -492,6 +496,15 @@ public abstract class BacnetConn implements DeviceEventListener {
 	public void iAmReceived(RemoteDevice d) {
 		LOGGER.info("iAm recieved: " + d);
 		discovered.put(d.getInstanceNumber(), d);
+		if (discoveryLock.tryLock()) {
+			try {
+				Thread.sleep(500);
+				makeAddDiscoveredDeviceAction();
+			} catch (InterruptedException e) {
+			} finally {
+				discoveryLock.unlock();
+			}	
+		}
 		
 	}
 
