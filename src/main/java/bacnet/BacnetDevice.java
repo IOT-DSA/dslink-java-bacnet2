@@ -207,7 +207,9 @@ public class BacnetDevice {
 					conn.monitor.checkInReader();
 					if (conn.localDevice != null) {
 						try {
+//							LOGGER.info("Sending Read Properties Request to Device: " + node.getName());
 							results = RequestUtils.readProperties(conn.localDevice, remoteDevice, oprs, null);
+//							if (results != null) LOGGER.info("Recieved Read Properties Response from Device: " + node.getName());
 						} catch (BACnetException e) {
 							LOGGER.debug("", e);
 						}
@@ -332,7 +334,9 @@ public class BacnetDevice {
 					conn.monitor.checkInReader();
 					if (conn.localDevice != null) {
 						try {
+							LOGGER.info("Sending Object List Request for Device: " + node.getName());
 							oids = RequestUtils.getObjectList(conn.localDevice, remoteDevice);
+							if (oids != null) LOGGER.info("Recieved Object List Response from Device " + node.getName());
 						} catch (BACnetException e) {
 							LOGGER.debug("", e);
 						}

@@ -114,6 +114,7 @@ public class BacnetLink {
 		act.addParameter(new Parameter("Baud Rate", ValueType.NUMBER, new Value(19200)));
 		act.addParameter(new Parameter("This Station ID", ValueType.NUMBER, new Value(0)));
 		act.addParameter(new Parameter("Frame Error Retry Count", ValueType.NUMBER, new Value(1)));
+		act.addParameter(new Parameter("Max Info Frames", ValueType.NUMBER, new Value(1)));
 		act.addParameter(new Parameter("Local Network Number", ValueType.NUMBER, new Value(0)));
 //		act.addParameter(new Parameter("strict device comparisons", ValueType.BOOL, new Value(true)));
 		act.addParameter(new Parameter("Timeout", ValueType.NUMBER, new Value(6000)));

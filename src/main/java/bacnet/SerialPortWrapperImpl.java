@@ -15,6 +15,8 @@ public class SerialPortWrapperImpl extends SerialPortWrapper {
 	private SerialInputStream is;
 	private SerialOutputStream os;
 	private int baudRate;
+	
+	private final Object portCloseMonitor = new Object();
 
 
 	public SerialPortWrapperImpl(String portName, int baudRate) {
@@ -22,10 +24,21 @@ public class SerialPortWrapperImpl extends SerialPortWrapper {
 		this.baudRate = baudRate;
 
 	}
+	
+	public Object getPortCloseMonitor() {
+		return portCloseMonitor;
+	}
+	
+	public boolean isClosed() {
+		return !port.isOpened();
+	}
 
 	@Override
 	public void close() throws Exception {
 		port.closePort();
+		synchronized (portCloseMonitor) {
+			portCloseMonitor.notifyAll();
+		}
 		LOGGER.debug("serial port " + port.getPortName() + " is closed");
 	}
 

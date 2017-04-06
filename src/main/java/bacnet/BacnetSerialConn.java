@@ -17,9 +17,7 @@ import org.slf4j.LoggerFactory;
 import com.serotonin.bacnet4j.npdu.Network;
 import com.serotonin.bacnet4j.npdu.mstp.MasterNode;
 import com.serotonin.bacnet4j.npdu.mstp.MstpNetwork;
-import com.serotonin.bacnet4j.npdu.mstp.MstpNode;
 import com.serotonin.bacnet4j.transport.Transport;
-import com.serotonin.bacnet4j.util.sero.SerialPortWrapper;
 
 public class BacnetSerialConn extends BacnetConn {
 	
@@ -29,6 +27,9 @@ public class BacnetSerialConn extends BacnetConn {
 	int baud;
 	int station;
 	int frameErrorRetryCount;
+	int maxInfoFrames;
+	
+	SerialPortWrapperImpl portWrapper;
 	
 	BacnetSerialConn(BacnetLink link, Node node) {
 		super(link, node);
@@ -37,8 +38,9 @@ public class BacnetSerialConn extends BacnetConn {
 
 	@Override
 	Network getNetwork() {
-		SerialPortWrapper wrapper = new SerialPortWrapperImpl(commPort, baud);
-		MstpNode mstpNode = new MasterNode(wrapper, (byte) station, frameErrorRetryCount);
+		portWrapper = new SerialPortWrapperImpl(commPort, baud);
+		MasterNode mstpNode = new MasterNode(portWrapper, (byte) station, frameErrorRetryCount);
+		mstpNode.setMaxInfoFrames(maxInfoFrames);
 		return new MstpNetwork(mstpNode, localNetworkNumber);
 	}
 
@@ -78,6 +80,7 @@ public class BacnetSerialConn extends BacnetConn {
 		act.addParameter(new Parameter("Baud Rate", ValueType.NUMBER, new Value(baud)));
 		act.addParameter(new Parameter("This Station ID", ValueType.NUMBER, new Value(station)));
 		act.addParameter(new Parameter("Frame Error Retry Count", ValueType.NUMBER, new Value(frameErrorRetryCount)));
+		act.addParameter(new Parameter("Max Info Frames", ValueType.NUMBER, new Value(maxInfoFrames)));
 		act.addParameter(new Parameter("Local Network Number", ValueType.NUMBER, new Value(localNetworkNumber)));
 //		act.addParameter(new Parameter("strict device comparisons", ValueType.BOOL, new Value(true)));
 		act.addParameter(new Parameter("Timeout", ValueType.NUMBER, new Value(timeout)));
@@ -103,12 +106,27 @@ public class BacnetSerialConn extends BacnetConn {
 		baud = Utils.safeGetRoConfigNum(node, "Baud Rate", baud).intValue();
 		station = Utils.safeGetRoConfigNum(node, "This Station ID", station).intValue();
 		frameErrorRetryCount = Utils.safeGetRoConfigNum(node, "Frame Error Retry Count", frameErrorRetryCount).intValue();
+		maxInfoFrames = Utils.safeGetRoConfigNum(node, "Max Info Frames", maxInfoFrames).intValue();
 	}
 	
 	@Override
 	protected void remove() {
 		super.remove();
 		link.serialConns.remove(this);
+	}
+	
+	@Override
+	protected void stop() {
+		super.stop();
+		Object monitor = portWrapper.getPortCloseMonitor();
+		synchronized(monitor) {
+			if (!portWrapper.isClosed()) {
+				try {
+					monitor.wait(timeout);
+				} catch (InterruptedException e) {
+				}
+			}
+		}
 	}
 
 

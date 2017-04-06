@@ -128,6 +128,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 		Value baud = node.getRoConfig("Baud Rate");
 		Value station = node.getRoConfig("This Station ID");
 		Value ferc = node.getRoConfig("Frame Error Retry Count");
+		Value maxInfoFrames = node.getRoConfig("Max Info Frames");
 
 		// Common attribution
 		Value localNetworkNumber = node.getRoConfig("Local Network Number");
@@ -153,12 +154,13 @@ public abstract class BacnetConn implements DeviceEventListener {
 				iconn.bbmdIpList = bbmdIpList.getString();
 				iconn.parseBroadcastManagementDevice();
 				conn = iconn;
-			} else if (commPort != null && baud != null && station != null && ferc != null) {
+			} else if (commPort != null && baud != null && station != null && ferc != null && maxInfoFrames != null) {
 				BacnetSerialConn sconn = new BacnetSerialConn(link, node);
 				sconn.commPort = commPort.getString();
 				sconn.baud = baud.getNumber().intValue();
 				sconn.station = station.getNumber().intValue();
 				sconn.frameErrorRetryCount = ferc.getNumber().intValue();
+				sconn.maxInfoFrames = maxInfoFrames.getNumber().intValue();
 				conn = sconn;
 			} else {
 				return null;
@@ -205,7 +207,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 				localDevice.getEventHandler().addListener(this);
 				localDevice.initialize();
 				localDevice.sendGlobalBroadcast(localDevice.getIAm());
-				localDevice.sendGlobalBroadcast(new WhoIsRequest());
+//				localDevice.sendGlobalBroadcast(new WhoIsRequest());
 			} catch (Exception e) {
 				LOGGER.debug("", e);
 				statnode.setValue(new Value("Error in initializing local device :" + e.getMessage()));
@@ -309,7 +311,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 		node.delete(false);
 	}
 	
-	private void stop() {
+	protected void stop() {
 		statnode.setValue(new Value(NODE_STATUS_STOPPED));
 		try {
 			monitor.checkInWriter();
@@ -389,7 +391,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 	}
 	
 	private void makeAddDiscoveredDeviceAction() {
-		LOGGER.info("updating add discovered device action");
+//		LOGGER.info("updating add discovered device action");
 		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
 			@Override
 			public void handle(ActionResult event) {
@@ -406,7 +408,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 		if (anode == null) {
 			node.createChild(ACTION_ADD_DEVICE, true).setAction(act).setConfig("actionGroup", new Value("Add Device")).setConfig("actionGroupSubTitle", new Value("From Discovered")).build().setSerializable(false);
 		} else {
-			LOGGER.info("actually updating add discovered device action");
+//			LOGGER.info("actually updating add discovered device action");
 			anode.setAction(act);
 		}
 	}
@@ -562,15 +564,17 @@ public abstract class BacnetConn implements DeviceEventListener {
 		if (enc != null) {
 			d.setDeviceProperty(PropertyIdentifier.objectName, enc);
 		}
-		if (discoveryLock.tryLock()) {
-			try {
-				Thread.sleep(500);
-				makeAddDiscoveredDeviceAction();
-			} catch (InterruptedException e) {
-			} finally {
-				discoveryLock.unlock();
-			}	
-		}
+		makeAddDiscoveredDeviceAction();
+		LOGGER.info("iAm processed: " + d);
+//		if (discoveryLock.tryLock()) {
+//			try {
+//				Thread.sleep(500);
+//				makeAddDiscoveredDeviceAction();
+//			} catch (InterruptedException e) {
+//			} finally {
+//				discoveryLock.unlock();
+//			}	
+//		}
 		
 	}
 
