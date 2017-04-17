@@ -1,6 +1,8 @@
 package bacnet;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -17,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.obj.ObjectProperties;
 import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.enumerated.BinaryPV;
 import com.serotonin.bacnet4j.type.enumerated.LifeSafetyState;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
@@ -31,6 +34,27 @@ import jssc.SerialPortList;
 public class Utils {
 	
 	private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
+	
+	private static final List<String> objectTypeList;
+	static {
+		objectTypeList = new ArrayList<String>();
+		for (int i=0; i<ObjectType.size(); i++) {
+			String s = ObjectType.nameForId(i);
+			if (s != null) {
+				objectTypeList.add(s);
+			}
+		}
+	}
+	private static final List<String> propertyList;
+	static {
+		propertyList = new ArrayList<String>();
+		for (int i=0; i<PropertyIdentifier.size(); i++) {
+			String s = PropertyIdentifier.nameForId(i);
+			if (s != null) {
+				propertyList.add(s);
+			}
+		}
+	}
 	
 	public static String[] getCommPorts() {
 		String[] portNames;
@@ -234,5 +258,11 @@ public class Utils {
 		}
 	}
 	
-
+	public static List<String> getObjectTypeList() {
+		return objectTypeList;
+	}
+	
+	public static List<String> getPropertyList() {
+		return propertyList;
+	}
 }

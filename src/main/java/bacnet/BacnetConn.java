@@ -1,8 +1,10 @@
 package bacnet;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -29,6 +31,7 @@ import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.npdu.Network;
 import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
 import com.serotonin.bacnet4j.obj.BACnetObject;
+import com.serotonin.bacnet4j.service.Service;
 import com.serotonin.bacnet4j.service.confirmed.ReinitializeDeviceRequest.ReinitializedStateOfDevice;
 import com.serotonin.bacnet4j.service.unconfirmed.WhoIsRequest;
 import com.serotonin.bacnet4j.transport.DefaultTransport;
@@ -38,7 +41,6 @@ import com.serotonin.bacnet4j.type.constructed.Address;
 import com.serotonin.bacnet4j.type.constructed.Choice;
 import com.serotonin.bacnet4j.type.constructed.DateTime;
 import com.serotonin.bacnet4j.type.constructed.PropertyValue;
-import com.serotonin.bacnet4j.type.constructed.Sequence;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.constructed.TimeStamp;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
@@ -82,6 +84,8 @@ public abstract class BacnetConn implements DeviceEventListener {
 	LocalDevice localDevice = null;
 	ReadWriteMonitor monitor = new ReadWriteMonitor();
 	
+	Set<BacnetDevice> devices = new HashSet<BacnetDevice>();
+	
 	final Map<Integer, OctetString> networkRouters = new HashMap<Integer, OctetString>();
 	final Map<String, Integer> bbmdIpToPort = new HashMap<String, Integer>();
 	
@@ -95,7 +99,15 @@ public abstract class BacnetConn implements DeviceEventListener {
 	String localDeviceVendor;
 	long defaultInterval;
 	
+	static int count = 0;
+	final int subscriberId;
+	final private static Object countLock = new Object();
+	
 	protected BacnetConn(BacnetLink link, Node node) {
+		synchronized(countLock) {
+			count += 1;
+			subscriberId = count;
+		}
 		this.link = link;
 		this.node = node;
 		
@@ -403,7 +415,8 @@ public abstract class BacnetConn implements DeviceEventListener {
 		act.addParameter(new Parameter("Name", ValueType.STRING).setDescription("Optional - will be inferred from device if left blank"));
 		act.addParameter(new Parameter("Polling Interval", ValueType.NUMBER, new Value(5)));
 		//TODO headless polling?
-		act.addParameter(new Parameter("Use COV", ValueType.BOOL, new Value(false)));
+		act.addParameter(new Parameter("Get Confirmed COV Notifications", ValueType.BOOL, new Value(false)));
+		act.addParameter(new Parameter("COV Lifetime", ValueType.NUMBER, new Value(0)));
 		Node anode = node.getChild(ACTION_ADD_DEVICE, true);
 		if (anode == null) {
 			node.createChild(ACTION_ADD_DEVICE, true).setAction(act).setConfig("actionGroup", new Value("Add Device")).setConfig("actionGroupSubTitle", new Value("From Discovered")).build().setSerializable(false);
@@ -425,7 +438,8 @@ public abstract class BacnetConn implements DeviceEventListener {
 		act.addParameter(new Parameter("Instance Number", ValueType.NUMBER));
 		act.addParameter(new Parameter("Polling Interval", ValueType.NUMBER, new Value(5)));
 		//TODO headless polling?
-		act.addParameter(new Parameter("Use COV", ValueType.BOOL, new Value(false)));
+		act.addParameter(new Parameter("Get Confirmed COV Notifications", ValueType.BOOL, new Value(false)));
+		act.addParameter(new Parameter("COV Lifetime", ValueType.NUMBER, new Value(0)));
 		Node anode = node.getChild(ACTION_ADD_CUSTOM_DEVICE, true);
 		if (anode == null) {
 			node.createChild(ACTION_ADD_CUSTOM_DEVICE, true).setAction(act).setConfig("actionGroup", new Value("Add Device")).setConfig("actionGroupSubTitle", new Value("By Instance Number")).build().setSerializable(false);
@@ -443,7 +457,8 @@ public abstract class BacnetConn implements DeviceEventListener {
 		});
 		act.addParameter(new Parameter("Polling Interval", ValueType.NUMBER, new Value(5)));
 		//TODO headless polling?
-		act.addParameter(new Parameter("Use COV", ValueType.BOOL, new Value(false)));
+		act.addParameter(new Parameter("Get Confirmed COV Notifications", ValueType.BOOL, new Value(false)));
+		act.addParameter(new Parameter("COV Lifetime", ValueType.NUMBER, new Value(0)));
 		Node anode = node.getChild(ACTION_ADD_ALL, true);
 		if (anode == null) {
 			node.createChild(ACTION_ADD_ALL, true).setAction(act).setDisplayName("Add All Discovered Devices").build().setSerializable(false);
@@ -535,7 +550,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 	}
 
 	@Override
-	public void iAmReceived(RemoteDevice d) {
+	public void iAmReceived(final RemoteDevice d) {
 		LOGGER.info("iAm recieved: " + d);
 		discovered.put(d.getInstanceNumber(), d);
 		Objects.getDaemonThreadPool().schedule(new Runnable() {
@@ -600,7 +615,18 @@ public abstract class BacnetConn implements DeviceEventListener {
 	public void covNotificationReceived(UnsignedInteger subscriberProcessIdentifier,
 			ObjectIdentifier initiatingDeviceIdentifier, ObjectIdentifier monitoredObjectIdentifier,
 			UnsignedInteger timeRemaining, SequenceOf<PropertyValue> listOfValues) {
-		// TODO Auto-generated method stub
+//		LOGGER.info("got COV notification for sub id " + subscriberProcessIdentifier + ", device " 
+//			+ initiatingDeviceIdentifier.getInstanceNumber() + ", object " + monitoredObjectIdentifier + ": "
+//			+ listOfValues + " (remaining time: " + timeRemaining + ")");
+		if (subscriberProcessIdentifier.intValue() != subscriberId) {
+			return;
+		}
+		
+		for (BacnetDevice dev: devices) {
+			if (initiatingDeviceIdentifier.getInstanceNumber() == dev.instanceNumber) {
+				dev.covNotificationReceived(monitoredObjectIdentifier, timeRemaining, listOfValues);
+			}
+		}
 		
 	}
 
@@ -622,20 +648,13 @@ public abstract class BacnetConn implements DeviceEventListener {
 	}
 
 	@Override
-	public void privateTransferReceived(Address from, UnsignedInteger vendorId, UnsignedInteger serviceNumber,
-			Sequence serviceParameters) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void reinitializeDevice(Address from, ReinitializedStateOfDevice reinitializedStateOfDevice) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
 	public void synchronizeTime(Address from, DateTime dateTime, boolean utc) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void requestReceived(Address from, Service service) {
 		// TODO Auto-generated method stub
 		
 	}

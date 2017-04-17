@@ -1,13 +1,16 @@
 package bacnet;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.Writable;
 import org.dsa.iot.dslink.node.actions.Action;
 import org.dsa.iot.dslink.node.actions.ActionResult;
+import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValuePair;
 import org.dsa.iot.dslink.node.value.ValueType;
@@ -18,9 +21,11 @@ import org.slf4j.LoggerFactory;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.service.confirmed.WritePropertyRequest;
 import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.constructed.PropertyValue;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
+import com.serotonin.bacnet4j.type.error.BACnetError;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.Enumerated;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
@@ -33,18 +38,29 @@ public class BacnetObject extends BacnetProperty {
 	private static final Logger LOGGER = LoggerFactory.getLogger(BacnetObject.class);
 	
 	static final String ACTION_DISCOVER_PROPERTIES = "discover properties";
+	static final String ACTION_ADD_PROPERTY = "add property";
+	static final String ACTION_SET_COV = "set COV usage";
 	
 	private DataType dataType = null;
+	boolean useCov;
+	
+	Set<BacnetProperty> properties = new HashSet<BacnetProperty>();
+	private int covSubCount = 0;
+	Object lock = new Object();
 	
 	private List<String> stateText = new ArrayList<String>(2);
 	
+	private BacnetProperty hiddenNameProp;
 	private BacnetProperty hiddenStateTextProp;
 	private BacnetProperty hiddenActiveTextProp;
 	private BacnetProperty hiddenInactiveTextProp;
-		
-	BacnetObject(BacnetDevice device, Node node, ObjectIdentifier oid) {
+	
+	BacnetObject(BacnetDevice device, Node node, ObjectIdentifier oid, boolean useCov) {
 		super(device, node, oid, PropertyIdentifier.presentValue);
+		device.objects.add(this);
 		this.object = this;
+		this.useCov = useCov;
+		this.hiddenNameProp = new HiddenProperty(device, this, oid, PropertyIdentifier.objectName);
 		this.hiddenStateTextProp = new HiddenProperty(device, this, oid, PropertyIdentifier.stateText);
 		this.hiddenActiveTextProp = new HiddenProperty(device, this, oid, PropertyIdentifier.activeText);
 		this.hiddenInactiveTextProp = new HiddenProperty(device, this, oid, PropertyIdentifier.inactiveText);
@@ -57,7 +73,7 @@ public class BacnetObject extends BacnetProperty {
 			for (Node child : node.getChildren().values()) {
 				try {
 					PropertyIdentifier propid = PropertyIdentifier.forName(child.getName());
-					addProperty(propid);
+					addProperty(propid, child);
 				} catch (Exception e) {
 					child.delete(false);
 				}
@@ -72,6 +88,8 @@ public class BacnetObject extends BacnetProperty {
 //		addProperties();
 		makeSettable();
 		makeDiscoverAction();
+		makeAddPropertyAction();
+		makeSetCovAction();
 	}
 	
 	private void addProperties() {
@@ -84,12 +102,18 @@ public class BacnetObject extends BacnetProperty {
 	}
 	
 	private void addProperty(PropertyIdentifier propid) {
+		addProperty(propid, null);
+	}
+	
+	private void addProperty(PropertyIdentifier propid, Node child) {
 		String name = propid.toString();
-		if (name.matches("^\\d+$") || node.hasChild(name)) {
+		if (name.matches("^\\d+$") || (child == null && node.hasChild(name, true))) {
 			return;
 		}
 		
-		Node child = node.createChild(name, true).setValueType(ValueType.STRING).setValue(new Value("")).build();
+		if (child == null) {
+			child = node.createChild(name, true).setValueType(ValueType.STRING).setValue(new Value("")).build();
+		}
 		BacnetProperty bp = new BacnetProperty(device, this, child, oid, propid);
 		bp.setup();
 	}
@@ -171,8 +195,14 @@ public class BacnetObject extends BacnetProperty {
 		
 	}
 	
+	@Override
+	protected void remove() {
+		super.remove();
+		device.objects.remove(this);
+	}
+	
 	private void makeDiscoverAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
+		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
 			@Override
 			public void handle(ActionResult event) {
 				addProperties();
@@ -186,10 +216,92 @@ public class BacnetObject extends BacnetProperty {
 		}
 	}
 	
+	private void makeAddPropertyAction() {
+		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
+			@Override
+			public void handle(ActionResult event) {
+				addProperty(event);
+			}
+		});
+		act.addParameter(new Parameter("Property Identifier", ValueType.makeEnum(Utils.getPropertyList())));
+		Node anode = node.getChild(ACTION_ADD_PROPERTY, true);
+		if (anode == null) {
+			node.createChild(ACTION_ADD_PROPERTY, true).setAction(act).build().setSerializable(false);
+		} else {
+			anode.setAction(act);
+		}
+	}
+	
+	private void addProperty(ActionResult event) {
+		String propStr = event.getParameter("Property Identifier").getString();
+		PropertyIdentifier propid;
+		try {
+			propid = PropertyIdentifier.forName(propStr);
+		} catch (Exception e) {
+			return;
+		}
+		addProperty(propid);
+	}
+	
+	private void makeSetCovAction() {
+		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
+			@Override
+			public void handle(ActionResult event) {
+				setCov(event);
+			}
+		});
+		act.addParameter(new Parameter("Use COV", ValueType.BOOL, new Value(useCov)));
+		Node anode = node.getChild(ACTION_SET_COV, true);
+		if (anode == null) {
+			node.createChild(ACTION_SET_COV, true).setAction(act).build().setSerializable(false);
+		} else {
+			anode.setAction(act);
+		}
+	}
+	
+	private void setCov(ActionResult event) {
+		boolean newCovUse = event.getParameter("Use COV", ValueType.BOOL).getBool();
+		
+		synchronized(lock) {
+			if (useCov == newCovUse) {
+				return;
+			}
+			
+			if (newCovUse) {
+				for (BacnetProperty property: properties) {
+					if (PropertyIdentifier.presentValue.equals(pid) 
+							|| PropertyIdentifier.statusFlags.equals(pid)
+							|| (ObjectType.loop.equals(oid.getObjectType()) 
+									&& (PropertyIdentifier.setpoint.equals(pid) 
+											|| PropertyIdentifier.controlledVariableValue.equals(pid)))
+							|| (ObjectType.pulseConverter.equals(oid.getObjectType()) 
+									&& PropertyIdentifier.updateTime.equals(pid))) {
+						if (device.unsubscribeProperty(property)) {
+							property.subscribeCov();
+						}
+					}
+				}
+			} else {
+				for (BacnetProperty property: properties) {
+					if (property.getCovSubscribed()) {
+						property.unsubscribeCov();
+						device.subscribeProperty(property);
+					}
+				}
+			}
+			
+			useCov = newCovUse;
+			node.setRoConfig("Use COV", new Value(useCov));
+		}
+		makeSetCovAction();
+		
+	}
+	
 	@Override
 	protected void subscribe() {
 		super.subscribe();
 		ObjectType type = oid.getObjectType();
+		device.subscribeProperty(hiddenNameProp);
 		if (Utils.isOneOf(type, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
 			device.subscribeProperty(hiddenActiveTextProp);
 			device.subscribeProperty(hiddenInactiveTextProp);
@@ -203,6 +315,7 @@ public class BacnetObject extends BacnetProperty {
 	protected void unsubscribe() {
 		super.unsubscribe();
 		ObjectType type = oid.getObjectType();
+		device.unsubscribeProperty(hiddenNameProp);
 		if (Utils.isOneOf(type, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
 			device.unsubscribeProperty(hiddenActiveTextProp);
 			device.unsubscribeProperty(hiddenInactiveTextProp);
@@ -237,6 +350,7 @@ public class BacnetObject extends BacnetProperty {
 			} else if (value instanceof com.serotonin.bacnet4j.type.primitive.Double) {
 				v = new Value(((com.serotonin.bacnet4j.type.primitive.Double) value).doubleValue());
 			}
+			break;
 		}
 		case MULTISTATE: {
 			vt = ValueType.makeEnum(stateText);
@@ -247,10 +361,12 @@ public class BacnetObject extends BacnetProperty {
 				int i  = ((UnsignedInteger) value).intValue();
 				v = new Value(stateText.get(i));
 			}
+			break;
 		}
 		case STRING: {
 			vt = ValueType.STRING;
 			v = new Value(value.toString());
+			break;
 		}
 		}
 		if (vt == null || v == null) {
@@ -264,10 +380,12 @@ public class BacnetObject extends BacnetProperty {
 	}
 	
 	public void updateProperty(Encodable value, PropertyIdentifier propid) {
-		if (value == null) {
+		if (value == null || value instanceof BACnetError) {
 			return;
 		}
-		if (PropertyIdentifier.stateText.equals(propid)) {
+		if (PropertyIdentifier.objectName.equals(propid)) {
+			node.setDisplayName(value.toString());
+		} else if (PropertyIdentifier.stateText.equals(propid)) {
 			SequenceOf<CharacterString> states = (SequenceOf<CharacterString>) value;
 			ArrayList<String> newstates = new ArrayList<String>();
 			for (CharacterString state : states) {
@@ -288,5 +406,45 @@ public class BacnetObject extends BacnetProperty {
 			dataType = Utils.getDataType(oid.getObjectType());
 		}
 		return dataType;
+	}
+	
+	void addCovSub() {
+		if (covSubCount == 0) {
+			device.subscribeObjectCov(this);
+		}
+		covSubCount += 1;
+	}
+	
+	void removeCovSub() {
+		if (covSubCount <= 0) {
+			covSubCount = 0;
+			return;
+		}
+		covSubCount -= 1;
+		if (covSubCount <= 0) {
+			covSubCount = 0;
+			device.unsubscribeObjectCov(this);
+		}
+	}
+	
+	public void covNotificationReceived(UnsignedInteger timeRemaining, SequenceOf<PropertyValue> listOfValues) {
+		for (BacnetProperty prop: properties) {
+			int index = findPropertyInSequence(listOfValues, prop.pid);
+			if (index >= 0) {
+				PropertyValue propval = listOfValues.get(index);
+				prop.updateValue(propval.getValue());
+			}
+		}
+	}
+	
+	private static int findPropertyInSequence(SequenceOf<PropertyValue> seq, PropertyIdentifier prop) {
+		int i = 0;
+		for (PropertyValue propval: seq) {
+			if (propval.getPropertyIdentifier().equals(prop)) {
+				return i;
+			}
+			i++;
+		}
+		return -1;
 	}
 }
