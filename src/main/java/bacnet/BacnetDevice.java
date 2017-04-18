@@ -106,7 +106,6 @@ public class BacnetDevice {
 			} else if (restype != null && "object".equals(restype.getString())) {
 				String typestr = Utils.safeGetRoConfigString(child, "Object Type", null);
 				Number instnum = Utils.safeGetRoConfigNum(child, "Instance Number", null);
-				boolean useCov = Utils.getAndMaybeSetRoConfigBool(child, "Use COV", false);
 				ObjectIdentifier oid = null;
 				if (typestr != null && instnum != null) {
 					try {
@@ -116,7 +115,7 @@ public class BacnetDevice {
 					}
 				}
 				if (oid != null) {
-					BacnetObject bo = new BacnetObject(this, child, oid, useCov);
+					BacnetObject bo = new BacnetObject(this, child, oid);
 					bo.restoreLastSession();
 				} else {
 					child.delete(false);
@@ -392,6 +391,7 @@ public class BacnetDevice {
 		act.addParameter(new Parameter("Object Type", ValueType.makeEnum(Utils.getObjectTypeList())));
 		act.addParameter(new Parameter("Instance Number", ValueType.NUMBER));
 		act.addParameter(new Parameter("Use COV", ValueType.BOOL));
+		act.addParameter(new Parameter("Write Priority", ValueType.NUMBER, new Value(16)));
 		Node anode = fnode.getChild(ACTION_ADD_OBJECT, true);
 		if (anode == null) {
 			fnode.createChild(ACTION_ADD_OBJECT, true).setAction(act).build().setSerializable(false);
@@ -434,8 +434,10 @@ public class BacnetDevice {
 			NodeBuilder b = fnode.createChild(name, true).setRoConfig("restoreAs", new Value("object"))
 					.setRoConfig("Object Type", new Value(oid.getObjectType().toString()))
 					.setRoConfig("Instance Number", new Value(oid.getInstanceNumber()))
-					.setRoConfig("Use COV", new Value(false)).setValueType(ValueType.STRING).setValue(new Value(""));
-			BacnetObject bo = new BacnetObject(this, b.getChild(), oid, false);
+					.setRoConfig("Use COV", new Value(false))
+					.setRoConfig("Write Priority", new Value(16))
+					.setValueType(ValueType.STRING).setValue(new Value(""));
+			BacnetObject bo = new BacnetObject(this, b.getChild(), oid);
 			bo.init();
 			b.build();
 		}
@@ -445,6 +447,12 @@ public class BacnetDevice {
 		String typeStr = event.getParameter("Object Type").getString();
 		int instNum = event.getParameter("Instance Number", ValueType.NUMBER).getNumber().intValue();
 		boolean useCov = event.getParameter("Use COV", ValueType.BOOL).getBool();
+		int writePriority = event.getParameter("Write Priority", ValueType.NUMBER).getNumber().intValue();
+		if (writePriority < 1) {
+			writePriority = 1;
+		} else if (writePriority > 16) {
+			writePriority = 16;
+		}
 		ObjectType type;
 		try {
 			type = ObjectType.forName(typeStr);
@@ -456,8 +464,10 @@ public class BacnetDevice {
 		NodeBuilder b = fnode.createChild(name, true).setRoConfig("restoreAs", new Value("object"))
 				.setRoConfig("Object Type", new Value(oid.getObjectType().toString()))
 				.setRoConfig("Instance Number", new Value(oid.getInstanceNumber()))
-				.setRoConfig("Use COV", new Value(useCov)).setValueType(ValueType.STRING).setValue(new Value(""));
-		BacnetObject bo = new BacnetObject(this, b.getChild(), oid, useCov);
+				.setRoConfig("Use COV", new Value(useCov))
+				.setRoConfig("Write Priority", new Value(writePriority))
+				.setValueType(ValueType.STRING).setValue(new Value(""));
+		BacnetObject bo = new BacnetObject(this, b.getChild(), oid);
 		bo.init();
 		b.build();
 	}

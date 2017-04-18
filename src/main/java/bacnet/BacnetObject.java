@@ -18,6 +18,7 @@ import org.dsa.iot.dslink.util.handler.Handler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.serotonin.bacnet4j.ServiceFuture;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.service.confirmed.WritePropertyRequest;
 import com.serotonin.bacnet4j.type.Encodable;
@@ -28,6 +29,7 @@ import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.error.BACnetError;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.Enumerated;
+import com.serotonin.bacnet4j.type.primitive.Null;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.Real;
 import com.serotonin.bacnet4j.type.primitive.SignedInteger;
@@ -39,10 +41,13 @@ public class BacnetObject extends BacnetProperty {
 	
 	static final String ACTION_DISCOVER_PROPERTIES = "discover properties";
 	static final String ACTION_ADD_PROPERTY = "add property";
-	static final String ACTION_SET_COV = "set COV usage";
+	static final String ACTION_EDIT = "edit";
+	static final String ACTION_WRITE = "write";
+	static final String ACTION_RELINQUISH = "relinquish";
 	
 	private DataType dataType = null;
 	boolean useCov;
+	int writePriority;
 	
 	Set<BacnetProperty> properties = new HashSet<BacnetProperty>();
 	private int covSubCount = 0;
@@ -55,11 +60,12 @@ public class BacnetObject extends BacnetProperty {
 	private BacnetProperty hiddenActiveTextProp;
 	private BacnetProperty hiddenInactiveTextProp;
 	
-	BacnetObject(BacnetDevice device, Node node, ObjectIdentifier oid, boolean useCov) {
+	BacnetObject(BacnetDevice device, Node node, ObjectIdentifier oid) {
 		super(device, node, oid, PropertyIdentifier.presentValue);
 		device.objects.add(this);
 		this.object = this;
-		this.useCov = useCov;
+		useCov = Utils.getAndMaybeSetRoConfigBool(node, "Use COV", false);
+		writePriority = Utils.getAndMaybeSetRoConfigNum(node, "Write Priority", 16).intValue();
 		this.hiddenNameProp = new HiddenProperty(device, this, oid, PropertyIdentifier.objectName);
 		this.hiddenStateTextProp = new HiddenProperty(device, this, oid, PropertyIdentifier.stateText);
 		this.hiddenActiveTextProp = new HiddenProperty(device, this, oid, PropertyIdentifier.activeText);
@@ -87,9 +93,10 @@ public class BacnetObject extends BacnetProperty {
 		setup();
 //		addProperties();
 		makeSettable();
+		makeRelinquishAction();
 		makeDiscoverAction();
 		makeAddPropertyAction();
-		makeSetCovAction();
+		makeEditAction();
 	}
 	
 	private void addProperties() {
@@ -143,6 +150,28 @@ public class BacnetObject extends BacnetProperty {
 		return null;
 	}
 	
+	private void makeRelinquishAction() {
+		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
+			@Override
+			public void handle(ActionResult event) {
+				handleRelinquish(event);
+			}
+		});
+		act.addParameter(new Parameter("Priority", ValueType.NUMBER, new Value(writePriority)));
+		Node anode = node.getChild(ACTION_RELINQUISH, true);
+		if (anode == null) {
+			node.createChild(ACTION_RELINQUISH, true).setAction(act).build().setSerializable(false);
+		} else {
+			anode.setAction(act);
+		}
+	}
+	
+	private void handleRelinquish(ActionResult event) {
+		int priority = event.getParameter("Priority", ValueType.NUMBER).getNumber().intValue();
+		
+		write(null, priority);
+	}
+	
 	private void makeSettable() {
 		if (Utils.isOneOf(oid.getObjectType(), ObjectType.analogOutput, ObjectType.analogValue,
 				ObjectType.binaryOutput, ObjectType.binaryValue, ObjectType.multiStateOutput,
@@ -162,8 +191,14 @@ public class BacnetObject extends BacnetProperty {
 			return;
 		}
 		Value newval = event.getCurrent();
+		write(newval, writePriority);
+	}
+	
+	private void write(Value newval, int priority) {
 		Encodable enc = null;
-		if (Utils.isOneOf(oid.getObjectType(), ObjectType.binaryOutput, ObjectType.binaryValue)) {
+		if (newval == null) {
+			enc = new Null();
+		} else if (Utils.isOneOf(oid.getObjectType(), ObjectType.binaryOutput, ObjectType.binaryValue)) {
 			enc = Utils.booleanToEncodable(newval.getBool(), oid, pid);
 		} else if (Utils.isOneOf(oid.getObjectType(), ObjectType.multiStateOutput, ObjectType.multiStateValue)) {
 			int i = stateText.indexOf(newval.getString());
@@ -174,14 +209,14 @@ public class BacnetObject extends BacnetProperty {
 		if (enc == null) {
 			return;
 		}
-		
+		ServiceFuture sf = null;
 		try {
 			device.monitor.checkInReader();
 			if (device.remoteDevice != null) {
 				try {
 					device.conn.monitor.checkInReader();
 					if (device.conn.localDevice != null) {
-						device.conn.localDevice.send(device.remoteDevice, new WritePropertyRequest(oid, pid, null, enc, null));
+						sf = device.conn.localDevice.send(device.remoteDevice, new WritePropertyRequest(oid, pid, null, enc, new UnsignedInteger(priority)));
 					}
 					device.conn.monitor.checkOutReader();
 				} catch (InterruptedException e) {
@@ -193,6 +228,44 @@ public class BacnetObject extends BacnetProperty {
 			
 		}
 		
+		if (!useCov) {
+			return;
+		}
+		
+		if (sf != null) {
+			try {
+				sf.get();
+			} catch (BACnetException e) {
+				LOGGER.debug("", e);
+			}
+		}
+		
+		enc = null;
+		try {
+			device.monitor.checkInReader();
+			if (device.remoteDevice != null) {
+				try {
+					device.conn.monitor.checkInReader();
+					if (device.conn.localDevice != null) {
+						try {
+							enc = RequestUtils.readProperty(device.conn.localDevice, device.remoteDevice, oid, pid, null);
+						} catch (BACnetException e) {
+							LOGGER.debug("", e);
+						}
+					}
+					device.conn.monitor.checkOutReader();
+				} catch (InterruptedException e) {
+					
+				}
+			}
+			device.monitor.checkOutReader();
+		} catch (InterruptedException e) {
+			
+		}
+		
+		if (enc != null) {
+			updateValue(enc);
+		}
 	}
 	
 	@Override
@@ -243,24 +316,41 @@ public class BacnetObject extends BacnetProperty {
 		addProperty(propid);
 	}
 	
-	private void makeSetCovAction() {
+	private void makeEditAction() {
 		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
 			@Override
 			public void handle(ActionResult event) {
-				setCov(event);
+				edit(event);
 			}
 		});
 		act.addParameter(new Parameter("Use COV", ValueType.BOOL, new Value(useCov)));
-		Node anode = node.getChild(ACTION_SET_COV, true);
+		act.addParameter(new Parameter("Write Priority", ValueType.NUMBER, new Value(writePriority)));
+		Node anode = node.getChild(ACTION_EDIT, true);
 		if (anode == null) {
-			node.createChild(ACTION_SET_COV, true).setAction(act).build().setSerializable(false);
+			node.createChild(ACTION_EDIT, true).setAction(act).build().setSerializable(false);
 		} else {
 			anode.setAction(act);
 		}
 	}
 	
-	private void setCov(ActionResult event) {
+	private void edit(ActionResult event) {
 		boolean newCovUse = event.getParameter("Use COV", ValueType.BOOL).getBool();
+		int newPriority = event.getParameter("Write Priority", ValueType.NUMBER).getNumber().intValue();
+		if (newPriority < 1) {
+			newPriority = 1;
+		} else if (newPriority > 16) {
+			newPriority = 16;
+		}
+		writePriority = newPriority;
+		node.setRoConfig("Write Priority", new Value(writePriority));
+		
+		setCov(newCovUse);
+		
+		makeEditAction();
+		makeRelinquishAction();
+	}
+	
+	private void setCov(boolean newCovUse) {
 		
 		synchronized(lock) {
 			if (useCov == newCovUse) {
@@ -293,8 +383,6 @@ public class BacnetObject extends BacnetProperty {
 			useCov = newCovUse;
 			node.setRoConfig("Use COV", new Value(useCov));
 		}
-		makeSetCovAction();
-		
 	}
 	
 	@Override
