@@ -5,7 +5,7 @@ apply plugin: 'java'
 mainClassName = 'bacnet.Main'
 sourceCompatibility = 1.7
 targetCompatibility = 1.7
-version = '2.0.1-SNAPSHOT'
+version = '2.0.2-SNAPSHOT'
 
 repositories {
     mavenCentral()
@@ -19,8 +19,8 @@ repositories {
 }
  
 dependencies {
-    compile 'org.iot-dsa:dslink:0.17.2-SNAPSHOT'
-    compile 'org.iot-dsa:historian:0.17.2-SNAPSHOT'
+    compile 'org.iot-dsa:dslink:0.17.4-SNAPSHOT'
+    compile 'org.iot-dsa:historian:0.17.4-SNAPSHOT'
     compile 'org.apache.commons:commons-lang3:3.0'
     compile 'commons-logging:commons-logging:1.1.1'
     compile 'org.scream3r:jssc:2.8.0'

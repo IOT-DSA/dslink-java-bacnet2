@@ -40,10 +40,19 @@ public class BacnetProperty {
 		this.object = object;
 	}
 	
+	protected void updateHeadless() {
+		if (object.headlessPolling) {
+			node.setShouldPostCachedValue(false);
+		} else {
+			node.setShouldPostCachedValue(true);
+		}
+	}
 	
 	protected void setup() {
 		object.properties.add(this);
 		makeRemoveAction();
+		
+		updateHeadless();
 		
 		node.getListener().setOnSubscribeHandler(new Handler<Node>() {
 			@Override

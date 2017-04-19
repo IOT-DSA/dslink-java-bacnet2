@@ -391,6 +391,7 @@ public class BacnetDevice {
 		act.addParameter(new Parameter("Object Type", ValueType.makeEnum(Utils.getObjectTypeList())));
 		act.addParameter(new Parameter("Instance Number", ValueType.NUMBER));
 		act.addParameter(new Parameter("Use COV", ValueType.BOOL));
+		act.addParameter(new Parameter("Enable Headless Polling", ValueType.BOOL, new Value(false)));
 		act.addParameter(new Parameter("Write Priority", ValueType.NUMBER, new Value(16)));
 		Node anode = fnode.getChild(ACTION_ADD_OBJECT, true);
 		if (anode == null) {
@@ -435,6 +436,7 @@ public class BacnetDevice {
 					.setRoConfig("Object Type", new Value(oid.getObjectType().toString()))
 					.setRoConfig("Instance Number", new Value(oid.getInstanceNumber()))
 					.setRoConfig("Use COV", new Value(false))
+					.setRoConfig("Enable Headless Polling", new Value(false))
 					.setRoConfig("Write Priority", new Value(16))
 					.setValueType(ValueType.STRING).setValue(new Value(""));
 			BacnetObject bo = new BacnetObject(this, b.getChild(), oid);
@@ -447,6 +449,7 @@ public class BacnetDevice {
 		String typeStr = event.getParameter("Object Type").getString();
 		int instNum = event.getParameter("Instance Number", ValueType.NUMBER).getNumber().intValue();
 		boolean useCov = event.getParameter("Use COV", ValueType.BOOL).getBool();
+		boolean headless = event.getParameter("Enable Headless Polling", ValueType.BOOL).getBool();
 		int writePriority = event.getParameter("Write Priority", ValueType.NUMBER).getNumber().intValue();
 		if (writePriority < 1) {
 			writePriority = 1;
@@ -465,6 +468,7 @@ public class BacnetDevice {
 				.setRoConfig("Object Type", new Value(oid.getObjectType().toString()))
 				.setRoConfig("Instance Number", new Value(oid.getInstanceNumber()))
 				.setRoConfig("Use COV", new Value(useCov))
+				.setRoConfig("Enable Headless Polling", new Value(headless))
 				.setRoConfig("Write Priority", new Value(writePriority))
 				.setValueType(ValueType.STRING).setValue(new Value(""));
 		BacnetObject bo = new BacnetObject(this, b.getChild(), oid);

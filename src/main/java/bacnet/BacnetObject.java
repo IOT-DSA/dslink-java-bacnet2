@@ -47,6 +47,7 @@ public class BacnetObject extends BacnetProperty {
 	
 	private DataType dataType = null;
 	boolean useCov;
+	boolean headlessPolling;
 	int writePriority;
 	
 	Set<BacnetProperty> properties = new HashSet<BacnetProperty>();
@@ -65,6 +66,7 @@ public class BacnetObject extends BacnetProperty {
 		device.objects.add(this);
 		this.object = this;
 		useCov = Utils.getAndMaybeSetRoConfigBool(node, "Use COV", false);
+		headlessPolling = Utils.getAndMaybeSetRoConfigBool(node, "Enable Headless Polling", false);
 		writePriority = Utils.getAndMaybeSetRoConfigNum(node, "Write Priority", 16).intValue();
 		this.hiddenNameProp = new HiddenProperty(device, this, oid, PropertyIdentifier.objectName);
 		this.hiddenStateTextProp = new HiddenProperty(device, this, oid, PropertyIdentifier.stateText);
@@ -324,6 +326,7 @@ public class BacnetObject extends BacnetProperty {
 			}
 		});
 		act.addParameter(new Parameter("Use COV", ValueType.BOOL, new Value(useCov)));
+		act.addParameter(new Parameter("Enable Headless Polling", ValueType.BOOL, new Value(headlessPolling)));
 		act.addParameter(new Parameter("Write Priority", ValueType.NUMBER, new Value(writePriority)));
 		Node anode = node.getChild(ACTION_EDIT, true);
 		if (anode == null) {
@@ -335,6 +338,7 @@ public class BacnetObject extends BacnetProperty {
 	
 	private void edit(ActionResult event) {
 		boolean newCovUse = event.getParameter("Use COV", ValueType.BOOL).getBool();
+		boolean headless = event.getParameter("Enable Headless Polling", ValueType.BOOL).getBool();
 		int newPriority = event.getParameter("Write Priority", ValueType.NUMBER).getNumber().intValue();
 		if (newPriority < 1) {
 			newPriority = 1;
@@ -346,8 +350,18 @@ public class BacnetObject extends BacnetProperty {
 		
 		setCov(newCovUse);
 		
+		setHeadless(headless);
+		
 		makeEditAction();
 		makeRelinquishAction();
+	}
+	
+	private void setHeadless(boolean useHeadless) {
+		headlessPolling = useHeadless;
+		node.setRoConfig("Enable Headless Polling", new Value(headlessPolling));
+		for (BacnetProperty prop: properties) {
+			prop.updateHeadless();
+		}
 	}
 	
 	private void setCov(boolean newCovUse) {
