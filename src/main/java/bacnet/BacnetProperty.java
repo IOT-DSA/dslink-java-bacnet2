@@ -1,23 +1,20 @@
 package bacnet;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
 import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.value.Value;
+import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.util.handler.Handler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
-import com.serotonin.bacnet4j.util.RequestUtils;
 
 public class BacnetProperty {
-	private static final Logger LOGGER = LoggerFactory.getLogger(BacnetProperty.class);
+//	private static final Logger LOGGER = LoggerFactory.getLogger(BacnetProperty.class);
 	
 	static final String ACTION_REMOVE = "remove";
 	
@@ -111,7 +108,11 @@ public class BacnetProperty {
 	}
 	
 	public void updateValue(Encodable value) {
-		node.setValue(new Value(value.toString()));
+		Pair<ValueType, Value> vtandv = TypeUtils.parseEncodable(value);
+		ValueType vt = vtandv.getLeft();
+		Value v = vtandv.getRight();
+		node.setValueType(vt);
+		node.setValue(v);
 	}
 	
 	protected void makeRemoveAction() {

@@ -1,5 +1,5 @@
 package bacnet;
 
 public enum DataType {
-	BINARY, MULTISTATE, NUMERIC, STRING
+	BINARY, MULTISTATE, NUMERIC, OTHER
 }

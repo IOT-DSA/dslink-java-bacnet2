@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.Writable;
@@ -465,9 +466,10 @@ public class BacnetObject extends BacnetProperty {
 			}
 			break;
 		}
-		case STRING: {
-			vt = ValueType.STRING;
-			v = new Value(value.toString());
+		case OTHER: {
+			Pair<ValueType, Value> vtandv = TypeUtils.parseEncodable(value);
+			vt = vtandv.getLeft();
+			v = vtandv.getRight();
 			break;
 		}
 		}

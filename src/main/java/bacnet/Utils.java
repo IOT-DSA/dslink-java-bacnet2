@@ -1,6 +1,7 @@
 package bacnet;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -13,17 +14,14 @@ import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.node.value.ValueUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.obj.ObjectProperties;
 import com.serotonin.bacnet4j.type.Encodable;
-import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.enumerated.BinaryPV;
 import com.serotonin.bacnet4j.type.enumerated.LifeSafetyState;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
+import com.serotonin.bacnet4j.type.primitive.Enumerated;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.Real;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
@@ -32,30 +30,37 @@ import jssc.SerialNativeInterface;
 import jssc.SerialPortList;
 
 public class Utils {
-	
-	private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
-	
-	private static final List<String> objectTypeList;
+
+//	private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
+
+	private static final Map<Class<? extends Enumerated>, List<String>> stateLists = new HashMap<Class<? extends Enumerated>, List<String>>();
+
 	static {
-		objectTypeList = new ArrayList<String>();
-		for (int i=0; i<ObjectType.size(); i++) {
-			String s = ObjectType.nameForId(i);
-			if (s != null) {
-				objectTypeList.add(s);
-			}
-		}
-	}
-	private static final List<String> propertyList;
-	static {
-		propertyList = new ArrayList<String>();
-		for (int i=0; i<PropertyIdentifier.size(); i++) {
-			String s = PropertyIdentifier.nameForId(i);
-			if (s != null) {
-				propertyList.add(s);
-			}
-		}
+		getObjectTypeList();
+		getPropertyList();
 	}
 	
+//	private static final List<String> objectTypeList;
+//	static {
+//		objectTypeList = new ArrayList<String>();
+//		for (int i = 0; i < ObjectType.size(); i++) {
+//			String s = ObjectType.nameForId(i);
+//			if (s != null) {
+//				objectTypeList.add(s);
+//			}
+//		}
+//	}
+//	private static final List<String> propertyList;
+//	static {
+//		propertyList = new ArrayList<String>();
+//		for (int i = 0; i < PropertyIdentifier.size(); i++) {
+//			String s = PropertyIdentifier.nameForId(i);
+//			if (s != null) {
+//				propertyList.add(s);
+//			}
+//		}
+//	}
+
 	public static String[] getCommPorts() {
 		String[] portNames;
 
@@ -75,11 +80,11 @@ public class Utils {
 
 		return portNames;
 	}
-	
+
 	public static Node actionResultToNode(ActionResult event, Node parent) {
 		try {
 			String name = event.getParameter("Name", ValueType.STRING).getString();
-//			Node node = new Node(name, parent, parent.getLink());
+			// Node node = new Node(name, parent, parent.getLink());
 			Node node = parent.createChild(name, true).build();
 			setConfigsFromActionResult(node, event);
 			return node;
@@ -88,41 +93,42 @@ public class Utils {
 		}
 
 	}
-	
+
 	public static void setConfigsFromActionResult(Node node, ActionResult event) {
 		String commPortId = null;
 		Value customPort = event.getParameter("Comm Port ID (Manual Entry)");
 		Value selectedPort = event.getParameter("Comm Port ID");
 		if (customPort != null && customPort.getString() != null && customPort.getString().trim().length() > 0) {
 			commPortId = customPort.getString();
-		} else if (selectedPort != null && selectedPort.getString() != null){
+		} else if (selectedPort != null && selectedPort.getString() != null) {
 			commPortId = selectedPort.getString();
 		}
 		if (commPortId != null) {
 			node.setRoConfig("Comm Port ID", new Value(commPortId));
 		}
-		for (Entry<String, Object> entry: event.getParameters().getMap().entrySet()) {
-			if (!"Name".equals(entry.getKey()) && !"Comm Port ID (Manual Entry)".equals(entry.getKey()) && !"Comm Port ID".equals(entry.getKey())) {
+		for (Entry<String, Object> entry : event.getParameters().getMap().entrySet()) {
+			if (!"Name".equals(entry.getKey()) && !"Comm Port ID (Manual Entry)".equals(entry.getKey())
+					&& !"Comm Port ID".equals(entry.getKey())) {
 				node.setRoConfig(entry.getKey(), ValueUtils.toValue(entry.getValue()));
 			}
 		}
 	}
-	
+
 	public static String safeGetRoConfigString(Node node, String config, String def) {
 		Value val = node.getRoConfig(config);
 		return (val != null && val.getString() != null) ? val.getString() : def;
 	}
-	
+
 	public static Number safeGetRoConfigNum(Node node, String config, Number def) {
 		Value val = node.getRoConfig(config);
 		return (val != null && val.getNumber() != null) ? val.getNumber() : def;
 	}
-	
+
 	public static boolean safeGetRoConfigBool(Node node, String config, boolean def) {
 		Value val = node.getRoConfig(config);
 		return (val != null && val.getBool() != null) ? val.getBool().booleanValue() : def;
 	}
-	
+
 	public static String getAndMaybeSetRoConfigString(Node node, String config, String def) {
 		String retval = safeGetRoConfigString(node, config, null);
 		if (retval == null) {
@@ -132,7 +138,7 @@ public class Utils {
 			return retval;
 		}
 	}
-	
+
 	public static Number getAndMaybeSetRoConfigNum(Node node, String config, Number def) {
 		Number retval = safeGetRoConfigNum(node, config, null);
 		if (retval == null) {
@@ -142,24 +148,25 @@ public class Utils {
 			return retval;
 		}
 	}
-	
+
 	public static boolean getAndMaybeSetRoConfigBool(Node node, String config, boolean def) {
 		boolean retval = safeGetRoConfigBool(node, config, def);
 		node.setRoConfig(config, new Value(retval));
 		return retval;
 	}
-	
+
 	public static Set<String> getDeviceEnum(Map<Integer, RemoteDevice> devices) {
 		Set<String> devStringSet = new HashSet<String>();
-		for (Entry<Integer, RemoteDevice> entry: devices.entrySet()) {
+		for (Entry<Integer, RemoteDevice> entry : devices.entrySet()) {
 			int id = entry.getKey();
 			RemoteDevice d = entry.getValue();
-			String devString = (d.getDeviceProperty(PropertyIdentifier.objectName)!=null ? d.getName() : "") + " (Instance " + String.valueOf(id) + " at " + d.getAddress() + ")";
+			String devString = (d.getDeviceProperty(PropertyIdentifier.objectName) != null ? d.getName() : "")
+					+ " (Instance " + String.valueOf(id) + " at " + d.getAddress() + ")";
 			devStringSet.add(devString);
 		}
 		return devStringSet;
 	}
-	
+
 	public static boolean isOneOf(int objectTypeId, ObjectType... types) {
 		for (ObjectType type : types) {
 			if (type.intValue() == objectTypeId)
@@ -173,8 +180,9 @@ public class Utils {
 	}
 
 	public static Encodable booleanToEncodable(Boolean b, ObjectIdentifier oid, PropertyIdentifier pid) {
-		Class<? extends Encodable> clazz = ObjectProperties.getObjectPropertyTypeDefinition(oid.getObjectType(), pid).getPropertyTypeDefinition().getClazz();
-		
+		Class<? extends Encodable> clazz = ObjectProperties.getObjectPropertyTypeDefinition(oid.getObjectType(), pid)
+				.getPropertyTypeDefinition().getClazz();
+
 		if (clazz == BinaryPV.class) {
 			if (b) {
 				return BinaryPV.active;
@@ -185,7 +193,7 @@ public class Utils {
 		if (clazz == UnsignedInteger.class) {
 			return new UnsignedInteger(b ? 1 : 0);
 		}
-		
+
 		if (clazz == LifeSafetyState.class) {
 			return LifeSafetyState.forId(b ? 1 : 0);
 		}
@@ -195,13 +203,14 @@ public class Utils {
 		}
 		return BinaryPV.inactive;
 	}
-	
+
 	public static Encodable multistateToEncodable(int i, ObjectIdentifier oid, PropertyIdentifier pid) {
 		if (i == -1) {
 			return null;
 		}
-		Class<? extends Encodable> clazz = ObjectProperties.getObjectPropertyTypeDefinition(oid.getObjectType(), pid).getPropertyTypeDefinition().getClazz();
-				
+		Class<? extends Encodable> clazz = ObjectProperties.getObjectPropertyTypeDefinition(oid.getObjectType(), pid)
+				.getPropertyTypeDefinition().getClazz();
+
 		if (clazz == BinaryPV.class) {
 			if (i != 0) {
 				return BinaryPV.active;
@@ -225,8 +234,9 @@ public class Utils {
 
 	public static Encodable numberToEncodable(Number n, ObjectIdentifier oid, PropertyIdentifier pid) {
 		double d = n.doubleValue();
-		Class<? extends Encodable> clazz = ObjectProperties.getObjectPropertyTypeDefinition(oid.getObjectType(), pid).getPropertyTypeDefinition().getClazz();
-		
+		Class<? extends Encodable> clazz = ObjectProperties.getObjectPropertyTypeDefinition(oid.getObjectType(), pid)
+				.getPropertyTypeDefinition().getClazz();
+
 		if (clazz == BinaryPV.class) {
 			if (d != 0) {
 				return BinaryPV.active;
@@ -244,25 +254,46 @@ public class Utils {
 
 		return new Real((float) d);
 	}
-	
+
 	public static DataType getDataType(ObjectType objectType) {
 		if (isOneOf(objectType, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
 			return DataType.BINARY;
 		} else if (isOneOf(objectType, ObjectType.multiStateInput, ObjectType.multiStateOutput,
 				ObjectType.multiStateValue, ObjectType.lifeSafetyPoint, ObjectType.lifeSafetyZone)) {
 			return DataType.MULTISTATE;
-		} else if (isOneOf(objectType, ObjectType.analogInput, ObjectType.analogOutput, ObjectType.analogValue, ObjectType.largeAnalogValue, ObjectType.integerValue, ObjectType.positiveIntegerValue)) {
+		} else if (isOneOf(objectType, ObjectType.analogInput, ObjectType.analogOutput, ObjectType.analogValue,
+				ObjectType.largeAnalogValue, ObjectType.integerValue, ObjectType.positiveIntegerValue)) {
 			return DataType.NUMERIC;
 		} else {
-			return DataType.STRING;
+			return DataType.OTHER;
 		}
 	}
-	
+
 	public static List<String> getObjectTypeList() {
-		return objectTypeList;
+		return getEnumeratedStateList(ObjectType.class);
 	}
-	
+
 	public static List<String> getPropertyList() {
-		return propertyList;
+		return getEnumeratedStateList(PropertyIdentifier.class);
 	}
+
+	public static List<String> getEnumeratedStateList(Class<? extends Enumerated> clazz) {
+		if (!stateLists.containsKey(clazz)) {
+			List<String> lst = new ArrayList<String>();
+			try {
+				int size = (int) clazz.getMethod("size").invoke(null);
+				for (int i=0; i<size; i++) {
+					String s = (String) clazz.getMethod("nameForId", int.class).invoke(null, i);
+					if (s != null) {
+						lst.add(s);
+					}
+				}
+			} catch (Exception e) {
+				lst = null;
+			}
+			stateLists.put(clazz, lst);
+		}
+		return stateLists.get(clazz);
+	}
+
 }
