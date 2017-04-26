@@ -28,6 +28,7 @@ import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.error.BACnetError;
+import com.serotonin.bacnet4j.type.error.BaseError;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.Enumerated;
 import com.serotonin.bacnet4j.type.primitive.Null;
@@ -430,6 +431,12 @@ public class BacnetObject extends BacnetProperty {
 	
 	@Override
 	public void updateValue(Encodable value) {
+		
+		if (value instanceof BACnetError || value instanceof BaseError) {
+			node.setValue(null);
+			return;
+		}
+		
 		ValueType vt = null;
 		Value v = null;
 		DataType type = getDataType();
@@ -484,7 +491,7 @@ public class BacnetObject extends BacnetProperty {
 	}
 	
 	public void updateProperty(Encodable value, PropertyIdentifier propid) {
-		if (value == null || value instanceof BACnetError) {
+		if (value == null || value instanceof BACnetError || value instanceof BaseError) {
 			return;
 		}
 		if (PropertyIdentifier.objectName.equals(propid)) {
