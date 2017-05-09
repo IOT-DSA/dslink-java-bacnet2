@@ -1,16 +1,24 @@
 package bacnet;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Parameter;
+import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
+import org.dsa.iot.dslink.node.value.ValueUtils;
 import org.dsa.iot.dslink.util.json.JsonArray;
 import org.dsa.iot.dslink.util.json.JsonObject;
 import org.slf4j.Logger;
@@ -19,16 +27,23 @@ import org.slf4j.LoggerFactory;
 import com.serotonin.bacnet4j.enums.DayOfWeek;
 import com.serotonin.bacnet4j.enums.Month;
 import com.serotonin.bacnet4j.npdu.NPCI.NetworkPriority;
+import com.serotonin.bacnet4j.obj.ObjectProperties;
+import com.serotonin.bacnet4j.obj.PropertyTypeDefinition;
 import com.serotonin.bacnet4j.obj.logBuffer.LogBuffer;
 import com.serotonin.bacnet4j.type.AmbiguousValue;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.EncodedValue;
+import com.serotonin.bacnet4j.type.constructed.BACnetArray;
 import com.serotonin.bacnet4j.type.constructed.BaseType;
+import com.serotonin.bacnet4j.type.constructed.ChannelValue;
 import com.serotonin.bacnet4j.type.constructed.DaysOfWeek;
 import com.serotonin.bacnet4j.type.constructed.EventTransitionBits;
 import com.serotonin.bacnet4j.type.constructed.LimitEnable;
+import com.serotonin.bacnet4j.type.constructed.LogData;
+import com.serotonin.bacnet4j.type.constructed.LogData.LogDataElement;
 import com.serotonin.bacnet4j.type.constructed.LogStatus;
 import com.serotonin.bacnet4j.type.constructed.ObjectTypesSupported;
+import com.serotonin.bacnet4j.type.constructed.PriorityArray;
 import com.serotonin.bacnet4j.type.constructed.PriorityValue;
 import com.serotonin.bacnet4j.type.constructed.ResultFlags;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
@@ -36,6 +51,8 @@ import com.serotonin.bacnet4j.type.constructed.ServicesSupported;
 import com.serotonin.bacnet4j.type.constructed.StatusFlags;
 import com.serotonin.bacnet4j.type.constructed.WeekNDay;
 import com.serotonin.bacnet4j.type.constructed.WeekNDay.WeekOfMonth;
+import com.serotonin.bacnet4j.type.enumerated.ObjectType;
+import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.BitString;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.Date;
@@ -48,6 +65,7 @@ import com.serotonin.bacnet4j.type.primitive.Real;
 import com.serotonin.bacnet4j.type.primitive.SignedInteger;
 import com.serotonin.bacnet4j.type.primitive.Time;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
+import com.serotonin.bacnet4j.util.sero.ArrayUtils;
 
 public class TypeUtils {
 	private static final int MAX_RECURSION_DEPTH = 20; //In case of infinite loops, generally should not be necessary
@@ -73,11 +91,29 @@ public class TypeUtils {
 			return Pair.of(ValueType.STRING, new Value(enc.toString()));
 		}
 	}
+	
+	public static Encodable formatEncodable(Class<? extends Encodable> clazz, Value val) {
+		return formatEncodable(clazz, val, null, null);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static Encodable formatEncodable(Class<? extends Encodable> clazz, Value val, ObjectType ot, PropertyIdentifier pid) {
+		if (val.getArray() != null && (!clazz.equals(BitString.class) || PropertyIdentifier.alarmValues.equals(pid))) {
+			return formatSequenceOf(clazz, val, ot, pid);
+		} else if (BaseType.class.isAssignableFrom(clazz)) {
+			return formatBaseType((Class<? extends BaseType>) clazz, val, ot, pid);
+		} else if (Primitive.class.isAssignableFrom(clazz)) {
+			return formatPrimitive((Class<? extends Primitive>) clazz, val);
+		} else {
+			return null;
+		}
+	}
 
 	/////////////////////////////////////////////////////////////////////////////////////////
 	// Encodable Subtypes
 	/////////////////////////////////////////////////////////////////////////////////////////
 
+	@SuppressWarnings("unchecked")
 	public static Pair<ValueType, Value> parseBaseType(BaseType enc, int maxDepth) {
 		if (maxDepth == 0) {
 			return Pair.of(ValueType.STRING, new Value(enc.toString()));
@@ -85,10 +121,49 @@ public class TypeUtils {
 		maxDepth -= 1;
 		if (enc instanceof SequenceOf<?>) {
 			return Pair.of(ValueType.ARRAY, new Value(parseSequenceOf((SequenceOf<? extends Encodable>) enc, maxDepth)));
+		} else if (enc instanceof ChannelValue) {
+			Encodable encval = ((ChannelValue) enc).getValue();
+			Value v = parseEncodable(encval, maxDepth).getRight();
+			JsonObject jo = new JsonObject();
+			jo.put("Value", ValueUtils.toObject(v));
+			jo.put("_type", encval.getClass().getName());
+			return Pair.of(ValueType.MAP, new Value(jo));
 		} else if (enc instanceof PriorityValue) {
-			return parseEncodable(((PriorityValue) enc).getValue(), maxDepth);
+			return parseEncodable(((PriorityValue) enc).getValue());
 		} else {
 			return Pair.of(ValueType.MAP, new Value(parseNonSequenceConstructed(enc, maxDepth)));
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static BaseType formatBaseType(Class<? extends BaseType> clazz, Value val, ObjectType ot, PropertyIdentifier pid) {
+		if (SequenceOf.class.isAssignableFrom(clazz)) {
+			return formatSequenceOf((Class<? extends SequenceOf<? extends Encodable>>) clazz, val, ot, pid);
+		} else if (ChannelValue.class.isAssignableFrom(clazz)) {
+			JsonObject jo = val.getMap();
+			if (jo == null) {
+				return null;
+			}
+			Value v = ValueUtils.toValue(jo.get("Value"));
+			try {
+				Class<? extends Encodable> clz = (Class<? extends Encodable>) Class.forName((String) jo.get("_type"));
+				for (Constructor<?> constr: ChannelValue.class.getConstructors()) {
+					Class<?>[] params = constr.getParameterTypes();
+					if (params.length == 1 && params[0].isAssignableFrom(clz)) {
+						return (ChannelValue) constr.newInstance(formatEncodable(clz, v));
+					}
+				}
+			} catch (Exception e) {
+			}
+			return null;
+		} else if (PriorityValue.class.isAssignableFrom(clazz)) {
+			if (val == null || ot == null) {
+				return new PriorityValue(Null.instance);
+			}
+			Class<? extends Encodable> clz = ObjectProperties.getObjectPropertyTypeDefinition(ot, PropertyIdentifier.presentValue).getPropertyTypeDefinition().getClazz();
+			return new PriorityValue(formatEncodable(clz, val));
+		} else {
+			return formatNonSequenceConstructed(clazz, val, ot);
 		}
 	}
 	
@@ -108,7 +183,7 @@ public class TypeUtils {
 		} else if (enc instanceof Enumerated) {
 			return parseEnumerated((Enumerated) enc);
 		} else if (enc instanceof Null) {
-			return Pair.of(ValueType.STRING, null); //TODO check that this is correct
+			return Pair.of(ValueType.STRING, null);
 		} else if (enc instanceof ObjectIdentifier) {
 			return Pair.of(ValueType.STRING, new Value(((ObjectIdentifier) enc).toString()));
 		} else if (enc instanceof OctetString) {
@@ -124,7 +199,46 @@ public class TypeUtils {
 		} else {
 			return Pair.of(ValueType.STRING, new Value(enc.toString()));
 		}
-
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static Primitive formatPrimitive(Class<? extends Primitive> clazz, Value val) {
+		if (BitString.class.isAssignableFrom(clazz)) {
+			return formatBitString((Class<? extends BitString>) clazz, val);
+		} else if (com.serotonin.bacnet4j.type.primitive.Boolean.class.isAssignableFrom(clazz)) {
+			return com.serotonin.bacnet4j.type.primitive.Boolean.valueOf(val.getBool());
+		} else if (CharacterString.class.isAssignableFrom(clazz)) {
+			return new CharacterString(val.getString());
+		} else if (Date.class.isAssignableFrom(clazz)) {
+			return formatDate(val);
+		} else if (com.serotonin.bacnet4j.type.primitive.Double.class.isAssignableFrom(clazz)) {
+			return new com.serotonin.bacnet4j.type.primitive.Double(val.getNumber().doubleValue());
+		} else if (Enumerated.class.isAssignableFrom(clazz)) {
+			return formatEnumerated((Class<? extends Enumerated>) clazz, val);
+		} else if (Null.class.isAssignableFrom(clazz)) {
+			return  Null.instance;
+		} else if (ObjectIdentifier.class.isAssignableFrom(clazz)) {
+			String[] arr = val.getString().split(" ");
+			int instnum = Integer.parseInt(arr[arr.length - 1]);
+			String type = arr[0];
+			return new ObjectIdentifier(ObjectType.forName(type), instnum);
+		} else if (OctetString.class.isAssignableFrom(clazz)) {
+			return formatOctetString((Class<? extends OctetString>) clazz, val);
+		} else if (Real.class.isAssignableFrom(clazz)) {
+			return new Real(val.getNumber().floatValue());
+		} else if (SignedInteger.class.isAssignableFrom(clazz)) {
+			return new SignedInteger(val.getNumber().intValue());
+		} else if (Time.class.isAssignableFrom(clazz)) {
+			return formatTime(val);
+		} else if (UnsignedInteger.class.isAssignableFrom(clazz)) {
+			try {
+				return clazz.getConstructor(int.class).newInstance(val.getNumber().intValue());
+			} catch (Exception e) {
+				return null;
+			}
+		} else {
+			return null;
+		}
 	}
 	
 	/////////////////////////////////////////////////////////////////////////////////////////
@@ -154,6 +268,56 @@ public class TypeUtils {
 		return jarr;
 	}
 	
+	public static SequenceOf<? extends Encodable> formatSequenceOf(Class<? extends Encodable> clazz, Value val, ObjectType ot, PropertyIdentifier pid) {
+		if (SequenceOf.class.isAssignableFrom(clazz)) {
+			if (PriorityArray.class.isAssignableFrom(clazz)) {
+				PriorityArray pa = new PriorityArray();
+				JsonArray ja = val.getArray();
+				if (ja != null) {
+					for (int i=0; i<16; i++) {
+						if (ja.size() > i && ja.get(i) != null) {
+							pa.put(i+1, formatBaseType(PriorityValue.class, ValueUtils.toValue(ja.get(i)), ot, pid));
+						}
+					}
+				}
+				return pa;
+			} else {
+				return null;
+			}
+		} else {
+			PropertyTypeDefinition info = ObjectProperties.getObjectPropertyTypeDefinition(ot, PropertyIdentifier.presentValue).getPropertyTypeDefinition();
+			if (info.isArray()) {
+				JsonArray ja = val.getArray();
+				if (ja != null) {
+					int size = ja.size();
+					BACnetArray<Encodable> arr = new BACnetArray<Encodable>(size, null);
+					for (int i=1; i <= size; i++) {
+						arr.setBase1(i, formatEncodable(clazz, ValueUtils.toValue(ja.get(i - 1))));
+					}
+					return arr;
+				} else {
+					return new BACnetArray<Encodable>();
+				}
+			} else if (info.isList()) {
+				return formatList(clazz, val);
+			} else {
+				return null;
+			}
+		}
+	}
+	
+	private static SequenceOf<? extends Encodable> formatList(Class<? extends Encodable> clazz, Value val) {
+		SequenceOf<Encodable> seq = new SequenceOf<Encodable>();
+		JsonArray ja = val.getArray();
+		if (ja != null) {
+			for (Object o: ja) {
+				seq.add(formatEncodable(clazz, ValueUtils.toValue(o)));
+			}
+		}
+		return seq;
+	}
+	
+	@SuppressWarnings("unchecked")
 	public static JsonObject parseNonSequenceConstructed(BaseType enc, int maxDepth) {
 		Class<? extends BaseType> clazz = enc.getClass();
 		Set<Method> gets = new HashSet<Method>();
@@ -174,6 +338,9 @@ public class TypeUtils {
 		for (Method getMethod: gets) {
 			String key = getMethod.getName().substring(3);
 			Method isMethod = ises.get(key);
+			if (isMethod == null && key.equals("Data")) {
+				isMethod = ises.get("LogData");
+			}
 			if (isMethod != null) {
 				boolean isWhatever = false;
 				try {
@@ -223,6 +390,153 @@ public class TypeUtils {
 		return jobj;
 	}
 	
+	@SuppressWarnings("unchecked")
+	public static BaseType formatNonSequenceConstructed(Class<? extends BaseType> clazz, Value val, ObjectType ot) {
+		JsonObject jobj = val.getMap();
+		if (jobj == null) {
+			return null;
+		}
+		if (LogData.class.equals(clazz)) {
+			Object o = jobj.get("Datum");
+			if (o == null) {
+				return null;
+			}
+			Value v = ValueUtils.toValue(o);
+			if (v == null) {
+				return null;
+			}
+			if (v.getMap() != null) {
+				return new LogData((LogStatus) formatBitString(LogStatus.class, v));
+			} else if (v.getArray() != null) {
+				return new LogData((SequenceOf<LogDataElement>) formatList(LogDataElement.class, v));
+			} else if (v.getNumber() != null) {
+				return new LogData((Real) formatPrimitive(Real.class, v));
+			} else {
+				return null;
+			}
+		}
+		Set<String> keyset = new HashSet<String>();
+		for (Entry<String, Object> entry: jobj) {
+			if (entry.getValue() != null) {
+				keyset.add(entry.getKey());
+			}
+		}
+		
+		Map<String, Method> sets = new HashMap<String, Method>();
+		for (Method method: clazz.getMethods()) {
+			String name = method.getName();
+			if (!method.getDeclaringClass().equals(Object.class) && method.getParameterCount() == 1 && name.startsWith("set")) {
+				sets.put(name.substring(3), method);
+			}
+		}
+		
+		Constructor<?> bestConstr = null;
+		List<String> bestParamList = null;
+		int bestMatchCount = -1;
+//		Set<Constructor<?>> constrsWithOneBadParam = new HashSet<Constructor<?>>();
+		for (Constructor<?> constr: clazz.getConstructors()) {
+			List<String> paramList = new ArrayList<String>();
+			Set<String> keysetcpy = new HashSet<String>(keyset);
+			int badParamCount = 0;
+			for (Parameter param: constr.getParameters()) {
+				String name = findIgnoreCase(keysetcpy, param.getName());
+				if (name == null) {
+					badParamCount += 1;
+					if (badParamCount > 1) {
+						break;
+					}
+				}
+				paramList.add(name);
+				keysetcpy.remove(name);
+			}
+			if (badParamCount == 0) {
+				for (String key: sets.keySet()) {
+					String name = findIgnoreCase(keysetcpy, key);
+					if (name != null) {
+						paramList.add(name);
+						keysetcpy.remove(name);
+					}
+				}
+				int matchCount = keyset.size() - keysetcpy.size();
+				if (matchCount > bestMatchCount) {
+					bestMatchCount = matchCount;
+					bestConstr = constr;
+					bestParamList = paramList;
+				}
+//			} else if (badParamCount == 1) {
+//				constrsWithOneBadParam.add(constr);
+			}
+		}
+		
+		if (bestConstr != null) {
+			Object[] params = new Object[bestConstr.getParameterCount()];
+			BaseType instance = null;
+			Class<?>[] paramTypes = bestConstr.getParameterTypes();
+			for (int i=0; i<bestParamList.size(); i++) {
+				if (i < params.length) {
+					params[i] = formatSomething(paramTypes[i], ValueUtils.toValue(jobj.get(bestParamList.get(i))));
+					if (i == params.length - 1) {
+						try {
+							instance = (BaseType) bestConstr.newInstance(params);
+						} catch (Exception e) {
+							return null;
+						}
+					}
+				} else if (instance != null) {
+					Method setMeth = sets.get(bestParamList.get(i));
+					Object param = formatSomething(setMeth.getParameterTypes()[0], ValueUtils.toValue(jobj.get(bestParamList.get(i))));
+					try {
+						setMeth.invoke(instance, param);
+					} catch (Exception e) {
+					}
+				}
+			}
+			return instance;
+		} else {
+			return null;
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	private static Object formatSomething(Class<?> clazz, Value val) {
+		Number n = val.getNumber();
+		Boolean b = val.getBool();
+		String s = val.getString();
+		if (Encodable.class.isAssignableFrom(clazz)) {
+			return formatEncodable((Class<? extends Encodable>) clazz, val);
+		} else if (clazz.equals(boolean.class) || clazz.equals(Boolean.class)) {
+			return b != null ? b.booleanValue() : null;
+		} else if (clazz.equals(byte.class) || clazz.equals(Byte.class)) {
+			return n != null ? n.byteValue() : null;
+		} else if (clazz.equals(short.class) || clazz.equals(Short.class)) {
+			return n != null ? n.shortValue() : null;
+		} else if (clazz.equals(int.class) || clazz.equals(Integer.class)) {
+			return n != null ? n.intValue() : null;
+		} else if (clazz.equals(long.class) || clazz.equals(Long.class)) {
+			return n != null ? n.longValue() : null;
+		} else if (clazz.equals(float.class) || clazz.equals(Float.class)) {
+			return n != null ? n.floatValue() : null;
+		} else if (clazz.equals(double.class) || clazz.equals(Double.class)) {
+			return n != null ? n.doubleValue() : null;
+		} else if (clazz.equals(BigInteger.class)) {
+			return n != null ? BigInteger.valueOf(n.longValue()) : null;
+		} else if (clazz.equals(String.class)) {
+			return s;
+		} else {
+			return null;
+		}
+	}
+	
+	
+	private static String findIgnoreCase(Set<String> set, String string) {
+		for (String element: set) {
+			if (element.equalsIgnoreCase(string)) {
+				return element;
+			}
+		}
+		return null;
+	}
+	
 	public static JsonArray listToJsonArray(List<? extends BaseType> list, int maxDepth) {
 		JsonArray jarr = new JsonArray();
 		for (BaseType item: list) {
@@ -237,7 +551,7 @@ public class TypeUtils {
 	/////////////////////////////////////////////////////////////////////////////////////////
 
 	public static Pair<ValueType, Value> parseBitString(BitString enc) {
-		List<String> labels = getBitStringLabels(enc);
+		List<String> labels = getBitStringLabels(enc.getClass());
 		if (labels != null) {
 			JsonObject jobj = new JsonObject();
 			for (int i = 0; i < labels.size(); i++) {
@@ -254,21 +568,58 @@ public class TypeUtils {
 			return Pair.of(ValueType.ARRAY, new Value(jarr));
 		}
 	}
+	
+	public static BitString formatBitString(Class<? extends BitString> clazz, Value val) {
+		if (clazz.equals(BitString.class)) {
+			JsonArray jarr = val.getArray();
+			boolean[] params = new boolean[jarr.size()];
+			for (int i = 0; i < params.length; i++) {
+				params[i] = jarr.get(i);
+			}
+			return new BitString(params);
+		} else if (DaysOfWeek.class.isAssignableFrom(clazz)) {
+			return formatDaysOfWeek(val);
+		} else if (ObjectTypesSupported.class.isAssignableFrom(clazz)) {
+			return formatObjectTypesSupported(val);
+		} else if (ServicesSupported.class.isAssignableFrom(clazz)) {
+			return formatServicesSupported(val);
+		} else {
+			List<String> labels = getBitStringLabels(clazz);
+			Class<?>[] parameterTypes = new Class<?>[labels.size()];
+			Boolean[] params = new Boolean[labels.size()];
+			JsonObject jobj = val.getMap();
+			JsonArray jarr = val.getArray();
+			for (int i = 0; i < parameterTypes.length; i++) {
+				parameterTypes[i] = boolean.class;
+				if (jobj != null) {
+					params[i] = jobj.get(labels.get(i), false);
+				} else if (jarr != null && jarr.size() > i) {
+					params[i] = jarr.get(i);
+				} 
+			}
+			try {
+				Constructor<? extends BitString> constr = clazz.getConstructor(parameterTypes);
+				return constr.newInstance((Object[]) params);
+			} catch (Exception e) {
+				return null;
+			}
+		}
+	}
 
-	public static List<String> getBitStringLabels(BitString enc) {
-		if (enc instanceof DaysOfWeek) {
+	public static List<String> getBitStringLabels(Class<? extends BitString> clazz) {
+		if (DaysOfWeek.class.isAssignableFrom(clazz)) {
 			return Arrays.asList("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday");
-		} else if (enc instanceof EventTransitionBits) {
+		} else if (EventTransitionBits.class.isAssignableFrom(clazz)) {
 			return Arrays.asList("To Offnormal", "To Fault", "To Normal");
-		} else if (enc instanceof LimitEnable) {
+		} else if (LimitEnable.class.isAssignableFrom(clazz)) {
 			return Arrays.asList("Low Limit Enable", "High Limit Enable");
-		} else if (enc instanceof LogStatus) {
+		} else if (LogStatus.class.isAssignableFrom(clazz)) {
 			return Arrays.asList("Log Disabled", "Buffer Purged", "Log Interrupted");
-		} else if (enc instanceof ObjectTypesSupported) {
+		} else if (ObjectTypesSupported.class.isAssignableFrom(clazz)) {
 			return Utils.getObjectTypeList();
-		} else if (enc instanceof ResultFlags) {
+		} else if (ResultFlags.class.isAssignableFrom(clazz)) {
 			return Arrays.asList("First Item", "Last Item", "More Items");
-		} else if (enc instanceof ServicesSupported) {
+		} else if (ServicesSupported.class.isAssignableFrom(clazz)) {
 			return Arrays.asList("AcknowledgeAlarm", "ConfirmedCovNotification", "ConfirmedEventNotification",
 					"GetAlarmSummary", "GetEnrollmentSummary", "SubscribeCov", "AtomicReadFile", "AtomicWriteFile",
 					"AddListElement", "RemoveListElement", "CreateObject", "DeleteObject", "ReadProperty",
@@ -280,7 +631,7 @@ public class TypeUtils {
 					"UtcTimeSynchronization", "LifeSafetyOperation", "SubscribeCovProperty", "GetEventInformation",
 					"WriteGroup", "SubscribeCovPropertyMultiple", "ConfirmedCovNotificationMultiple",
 					"UnconfirmedCovNotificationMultiple");
-		} else if (enc instanceof StatusFlags) {
+		} else if (StatusFlags.class.isAssignableFrom(clazz)) {
 			return Arrays.asList("InAlarm", "Fault", "Overridden", "OutOfService");
 		} else {
 			return null;
@@ -304,6 +655,18 @@ public class TypeUtils {
 		return dateObj;
 	}
 	
+	public static Date formatDate(Value val) {
+		JsonObject jobj = val.getMap();
+		if (jobj == null) {
+			return Date.UNSPECIFIED;
+		}
+		int yr = jobj.get("Year", -1);
+		Month mn = Month.valueOf(jobj.get("Month", Month.UNSPECIFIED.toString()));
+		int dy = jobj.get("Day", -1);
+		DayOfWeek dw = DayOfWeek.valueOf(jobj.get("Day of Week", DayOfWeek.UNSPECIFIED.toString()));
+		return new Date(yr, mn, dy, dw);
+	}
+	
 	public static Pair<ValueType, Value> parseEnumerated(Enumerated enc) {
 		Class<? extends Enumerated> clazz = enc.getClass();
 		ValueType vt = ValueType.STRING;
@@ -318,12 +681,49 @@ public class TypeUtils {
 		Value v = new Value(enc.toString());
 		return Pair.of(vt, v);
 	}
+	
+	public static Enumerated formatEnumerated(Class<? extends Enumerated> clazz, Value val) {
+		Number n = val.getNumber();
+		Boolean b = val.getBool();
+		String s = val.getString();
+		if (n == null && b != null) {
+			n = b.booleanValue() ? 1 : 0;
+		}
+		if (n != null) {
+			try {
+				Method meth = clazz.getMethod("forId", int.class);
+				if (Modifier.isStatic(meth.getModifiers()) && clazz.equals(meth.getReturnType())) {
+					return (Enumerated) meth.invoke(null, n.intValue());
+				}
+			} catch (Exception e) {
+			}
+		} else if (s != null) {
+			try {
+				Method meth = clazz.getMethod("forName", String.class);
+				if (Modifier.isStatic(meth.getModifiers()) && clazz.equals(meth.getReturnType())) {
+					return (Enumerated) meth.invoke(null, s);
+				}
+			} catch (Exception e) {
+			}
+		}
+		return new Enumerated(val.getNumber().intValue());
+		
+	}
 
 	public static Pair<ValueType, Value> parseOctetString(OctetString enc) {
 		if (enc instanceof WeekNDay) {
 			return Pair.of(ValueType.MAP, new Value(parseWeekNDay((WeekNDay) enc)));
 		} else {
-			return Pair.of(ValueType.STRING, new Value(((OctetString) enc).toString()));
+			String val = ArrayUtils.toPlainHexString(((OctetString) enc).getBytes());
+			return Pair.of(ValueType.STRING, new Value(val));
+		}
+	}
+	
+	public static OctetString formatOctetString(Class<? extends OctetString> clazz, Value val) {
+		if (WeekNDay.class.isAssignableFrom(clazz)) {
+			return formatWeekNDay(val);
+		} else {
+			return new OctetString(ArrayUtils.fromPlainHexString(val.getString()));
 		}
 	}
 	
@@ -338,6 +738,86 @@ public class TypeUtils {
 		part = (enc.isHundredthUnspecified()) ? "????" : (Integer.toString(enc.getHundredth()) + "000");
 		str += part.substring(0, 3);
 		return str;
+	}
+	
+	public static Time formatTime(Value val) {
+		String str = val.getString();
+		if (str == null) {
+			return new Time(255, 255, 255, 255);
+		}
+		int hr;
+		int min;
+		int sec;
+		int hund;
+		try {
+			hr = Integer.parseInt(str.substring(0, 2));
+		} catch (NumberFormatException e) {
+			hr = 255;
+		}
+		try {
+			min = Integer.parseInt(str.substring(3, 5));
+		} catch (NumberFormatException e) {
+			min = 255;
+		}
+		try {
+			sec = Integer.parseInt(str.substring(6, 8));
+		} catch (NumberFormatException e) {
+			sec = 255;
+		}
+		try {
+			hund = Integer.parseInt(str.substring(9, 11));
+		} catch (NumberFormatException e) {
+			hund = 255;
+		}
+		return new Time(hr, min, sec, hund);
+	}
+	
+	
+	/////////////////////////////////////////////////////////////////////////////////////////
+	// BitString Subtypes 
+	/////////////////////////////////////////////////////////////////////////////////////////
+	
+	
+	public static DaysOfWeek formatDaysOfWeek(Value val) {
+		try {
+			return (DaysOfWeek) formatDowOrSs(val, DaysOfWeek.class);
+		} catch (Exception e) {
+			return null;
+		}
+	}
+	
+	public static ServicesSupported formatServicesSupported(Value val) {
+		try {
+			return (ServicesSupported) formatDowOrSs(val, ServicesSupported.class);
+		} catch (Exception e) {
+			return null;
+		}
+	}
+	
+	private static BitString formatDowOrSs(Value val, Class<? extends BitString> clazz) throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, SecurityException {
+		JsonObject jobj = val.getMap();
+		List<String> labels = getBitStringLabels(clazz);
+		BitString obj = clazz.getConstructor().newInstance();
+		for (String label: labels) {
+			try {
+				clazz.getMethod("set" + label, boolean.class).invoke(obj, jobj.get(label, false));
+			} catch (Exception e) {
+			}
+		}
+		return obj;
+	}
+	
+	public static ObjectTypesSupported formatObjectTypesSupported(Value val) {
+		JsonObject jobj = val.getMap();
+		if (jobj == null) {
+			return new ObjectTypesSupported();
+		}
+		List<String> labels = getBitStringLabels(ObjectTypesSupported.class);
+		ObjectTypesSupported ots = new ObjectTypesSupported();
+		for (String label: labels) {
+			ots.set(ObjectType.forName(label), jobj.get(label, false));
+		}
+		return ots;
 	}
 	
 	
@@ -357,6 +837,17 @@ public class TypeUtils {
 			jo.put("Day of Week", enc.getDayOfWeek().toString());
 		}
 		return jo;
+	}
+	
+	public static WeekNDay formatWeekNDay(Value val) {
+		JsonObject jobj = val.getMap();
+		if (jobj == null) {
+			return new WeekNDay(Month.UNSPECIFIED, WeekOfMonth.any, DayOfWeek.UNSPECIFIED);
+		}
+		Month mn = Month.valueOf(jobj.get("Month", Month.UNSPECIFIED.toString()));
+		WeekOfMonth wk = WeekOfMonth.valueOf(jobj.get("Week of Month", WeekOfMonth.any.byteValue()));
+		DayOfWeek dw = DayOfWeek.valueOf(jobj.get("Day of Week", DayOfWeek.UNSPECIFIED.toString()));
+		return new WeekNDay(mn, wk, dw);
 	}
 	
 }

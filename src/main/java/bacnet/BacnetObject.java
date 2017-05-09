@@ -25,6 +25,9 @@ import com.serotonin.bacnet4j.service.confirmed.WritePropertyRequest;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.constructed.PropertyValue;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
+import com.serotonin.bacnet4j.type.enumerated.BinaryLightingPV;
+import com.serotonin.bacnet4j.type.enumerated.BinaryPV;
+import com.serotonin.bacnet4j.type.enumerated.DoorValue;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.error.BACnetError;
@@ -40,29 +43,30 @@ import com.serotonin.bacnet4j.util.RequestUtils;
 
 public class BacnetObject extends BacnetProperty {
 	private static final Logger LOGGER = LoggerFactory.getLogger(BacnetObject.class);
-	
+
 	static final String ACTION_DISCOVER_PROPERTIES = "discover properties";
 	static final String ACTION_ADD_PROPERTY = "add property";
 	static final String ACTION_EDIT = "edit";
 	static final String ACTION_WRITE = "write";
 	static final String ACTION_RELINQUISH = "relinquish";
-	
+
 	private DataType dataType = null;
 	boolean useCov;
 	boolean headlessPolling;
 	int writePriority;
-	
+
 	Set<BacnetProperty> properties = new HashSet<BacnetProperty>();
 	private int covSubCount = 0;
 	Object lock = new Object();
-	
+
 	private List<String> stateText = new ArrayList<String>(2);
-	
+
 	private BacnetProperty hiddenNameProp;
 	private BacnetProperty hiddenStateTextProp;
 	private BacnetProperty hiddenActiveTextProp;
 	private BacnetProperty hiddenInactiveTextProp;
-	
+	private BacnetProperty hiddenActionTextProp;
+
 	BacnetObject(BacnetDevice device, Node node, ObjectIdentifier oid) {
 		super(device, node, oid, PropertyIdentifier.presentValue);
 		device.objects.add(this);
@@ -74,10 +78,11 @@ public class BacnetObject extends BacnetProperty {
 		this.hiddenStateTextProp = new HiddenProperty(device, this, oid, PropertyIdentifier.stateText);
 		this.hiddenActiveTextProp = new HiddenProperty(device, this, oid, PropertyIdentifier.activeText);
 		this.hiddenInactiveTextProp = new HiddenProperty(device, this, oid, PropertyIdentifier.inactiveText);
+		this.hiddenActionTextProp = new HiddenProperty(device, this, oid, PropertyIdentifier.actionText);
 		stateText.add("inactive");
 		stateText.add("active");
 	}
-	
+
 	void restoreLastSession() {
 		if (node.getChildren() != null) {
 			for (Node child : node.getChildren().values()) {
@@ -89,46 +94,45 @@ public class BacnetObject extends BacnetProperty {
 				}
 			}
 		}
-		
+
 		init();
 	}
-	
+
 	void init() {
 		setup();
-//		addProperties();
-		makeSettable();
+		// addProperties();
 		makeRelinquishAction();
 		makeDiscoverAction();
 		makeAddPropertyAction();
 		makeEditAction();
 	}
-	
+
 	private void addProperties() {
 		SequenceOf<PropertyIdentifier> proplist = getPropertyList();
 		if (proplist != null) {
-			for (PropertyIdentifier propid: proplist) {
+			for (PropertyIdentifier propid : proplist) {
 				addProperty(propid);
 			}
 		}
 	}
-	
+
 	private void addProperty(PropertyIdentifier propid) {
 		addProperty(propid, null);
 	}
-	
+
 	private void addProperty(PropertyIdentifier propid, Node child) {
 		String name = propid.toString();
 		if (name.matches("^\\d+$") || (child == null && node.hasChild(name, true))) {
 			return;
 		}
-		
+
 		if (child == null) {
 			child = node.createChild(name, true).setValueType(ValueType.STRING).setValue(new Value("")).build();
 		}
 		BacnetProperty bp = new BacnetProperty(device, this, child, oid, propid);
 		bp.setup();
 	}
-	
+
 	private SequenceOf<PropertyIdentifier> getPropertyList() {
 		try {
 			device.monitor.checkInReader();
@@ -137,23 +141,24 @@ public class BacnetObject extends BacnetProperty {
 					device.conn.monitor.checkInReader();
 					if (device.conn.localDevice != null) {
 						try {
-							return (SequenceOf<PropertyIdentifier>) RequestUtils.sendReadPropertyAllowNull(device.conn.localDevice, device.remoteDevice, oid, PropertyIdentifier.propertyList);
+							return (SequenceOf<PropertyIdentifier>) RequestUtils.sendReadPropertyAllowNull(
+									device.conn.localDevice, device.remoteDevice, oid, PropertyIdentifier.propertyList);
 						} catch (BACnetException e) {
 							LOGGER.debug("", e);
 						}
 					}
 					device.conn.monitor.checkOutReader();
 				} catch (InterruptedException e) {
-					
+
 				}
 			}
 			device.monitor.checkOutReader();
 		} catch (InterruptedException e) {
-			
+
 		}
 		return null;
 	}
-	
+
 	private void makeRelinquishAction() {
 		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
 			@Override
@@ -169,73 +174,73 @@ public class BacnetObject extends BacnetProperty {
 			anode.setAction(act);
 		}
 	}
-	
+
 	private void handleRelinquish(ActionResult event) {
 		int priority = event.getParameter("Priority", ValueType.NUMBER).getNumber().intValue();
-		
+
 		write(null, priority);
 	}
 	
-	private void makeSettable() {
-		if (Utils.isOneOf(oid.getObjectType(), ObjectType.analogOutput, ObjectType.analogValue,
-				ObjectType.binaryOutput, ObjectType.binaryValue, ObjectType.multiStateOutput,
-				ObjectType.multiStateValue)) {
-			node.setWritable(Writable.WRITE);
-			node.getListener().setValueHandler(new Handler<ValuePair>() {
-				@Override
-				public void handle(ValuePair event) {
-					handleSet(event);
-				}
-			});
-		}
+	@Override
+	protected boolean shouldBeSettable() {
+		return Utils.isOneOf(oid.getObjectType(), ObjectType.analogOutput, ObjectType.analogValue, ObjectType.binaryOutput,
+				ObjectType.binaryValue, ObjectType.multiStateOutput, ObjectType.multiStateValue, ObjectType.command,
+				ObjectType.accessDoor, ObjectType.characterstringValue, ObjectType.datetimeValue,
+				ObjectType.largeAnalogValue, ObjectType.timeValue, ObjectType.integerValue,
+				ObjectType.positiveIntegerValue, ObjectType.dateValue, ObjectType.datetimePatternValue,
+				ObjectType.datePatternValue, ObjectType.timePatternValue, ObjectType.channel, ObjectType.lightingOutput,
+				ObjectType.binaryLightingOutput);
 	}
-	
-	private void handleSet(ValuePair event) {
-		if (!event.isFromExternalSource()) {
-			return;
-		}
-		Value newval = event.getCurrent();
+
+	@Override
+	protected void write(Value newval) {
 		write(newval, writePriority);
 	}
-	
+
 	private void write(Value newval, int priority) {
-		Encodable enc = null;
-		if (newval == null) {
-			enc = new Null();
-		} else if (Utils.isOneOf(oid.getObjectType(), ObjectType.binaryOutput, ObjectType.binaryValue)) {
-			enc = Utils.booleanToEncodable(newval.getBool(), oid, pid);
-		} else if (Utils.isOneOf(oid.getObjectType(), ObjectType.multiStateOutput, ObjectType.multiStateValue)) {
-			int i = stateText.indexOf(newval.getString());
-			enc = Utils.multistateToEncodable(i, oid, pid);
-		} else if (Utils.isOneOf(oid.getObjectType(), ObjectType.analogOutput, ObjectType.analogValue)) {
-			enc = Utils.numberToEncodable(newval.getNumber(), oid, pid);
-		}
+		Encodable enc = encodableFromValue(newval);
+//		ObjectType ot = oid.getObjectType();
+//		if (newval == null) {
+//			enc = Null.instance;
+//		} else if (Utils.isOneOf(ot, ObjectType.binaryOutput, ObjectType.binaryValue)) {
+//			enc = newval.getBool() ? BinaryPV.active : BinaryPV.inactive;
+//		} else if (Utils.isOneOf(ot, ObjectType.multiStateOutput, ObjectType.multiStateValue, ObjectType.command)) {
+//			int i = stateText.indexOf(newval.getString());
+//			enc = new UnsignedInteger(i);
+//		} else if (Utils.isOneOf(ot, ObjectType.analogOutput, ObjectType.analogValue, ObjectType.lightingOutput)) {
+//			enc = new Real(newval.getNumber().floatValue());
+//		} else if (Utils.isOneOf(ot, ObjectType.accessDoor)) {
+//			enc = DoorValue.forName(newval.getString());
+//		} else if (Utils.isOneOf(ot, ObjectType.characterstringValue)) {
+//			enc = new CharacterString(newval.getString());
+//		} else if (Utils.isOneOf(ot, ObjectType.datetimeValue)) {
+//			//TODO
+//		} else if (Utils.isOneOf(ot, ObjectType.largeAnalogValue)) {
+//			enc = new com.serotonin.bacnet4j.type.primitive.Double(newval.getNumber().doubleValue());
+//		} else if (Utils.isOneOf(ot, ObjectType.timeValue)) {
+//			//TODO
+//		} else if (Utils.isOneOf(ot, ObjectType.integerValue)) {
+//			enc = new SignedInteger(newval.getNumber().intValue());
+//		} else if (Utils.isOneOf(ot, ObjectType.positiveIntegerValue, ObjectType.timer, ObjectType.accumulator)) {
+//			enc = new UnsignedInteger(newval.getNumber().intValue());
+//		} else if (Utils.isOneOf(ot, ObjectType.dateValue)) {
+//			//TODO
+//		} else if (Utils.isOneOf(ot, ObjectType.datetimePatternValue, ObjectType.timePatternValue, ObjectType.datePatternValue)) {
+//			//TODO
+//		} else if (Utils.isOneOf(ot, ObjectType.channel)) {
+//			//TODO
+//		} else if (Utils.isOneOf(ot, ObjectType.binaryLightingOutput)) {
+//			enc = BinaryLightingPV.forName(newval.getString());
+//		}
 		if (enc == null) {
 			return;
 		}
-		ServiceFuture sf = null;
-		try {
-			device.monitor.checkInReader();
-			if (device.remoteDevice != null) {
-				try {
-					device.conn.monitor.checkInReader();
-					if (device.conn.localDevice != null) {
-						sf = device.conn.localDevice.send(device.remoteDevice, new WritePropertyRequest(oid, pid, null, enc, new UnsignedInteger(priority)));
-					}
-					device.conn.monitor.checkOutReader();
-				} catch (InterruptedException e) {
-					
-				}
-			}
-			device.monitor.checkOutReader();
-		} catch (InterruptedException e) {
-			
-		}
-		
+		ServiceFuture sf = sendWriteRequest(new WritePropertyRequest(oid, pid, null, enc, new UnsignedInteger(priority)));
+
 		if (!useCov) {
 			return;
 		}
-		
+
 		if (sf != null) {
 			try {
 				sf.get();
@@ -243,7 +248,7 @@ public class BacnetObject extends BacnetProperty {
 				LOGGER.debug("", e);
 			}
 		}
-		
+
 		enc = null;
 		try {
 			device.monitor.checkInReader();
@@ -252,32 +257,33 @@ public class BacnetObject extends BacnetProperty {
 					device.conn.monitor.checkInReader();
 					if (device.conn.localDevice != null) {
 						try {
-							enc = RequestUtils.readProperty(device.conn.localDevice, device.remoteDevice, oid, pid, null);
+							enc = RequestUtils.readProperty(device.conn.localDevice, device.remoteDevice, oid, pid,
+									null);
 						} catch (BACnetException e) {
 							LOGGER.debug("", e);
 						}
 					}
 					device.conn.monitor.checkOutReader();
 				} catch (InterruptedException e) {
-					
+
 				}
 			}
 			device.monitor.checkOutReader();
 		} catch (InterruptedException e) {
-			
+
 		}
-		
+
 		if (enc != null) {
 			updateValue(enc);
 		}
 	}
-	
+
 	@Override
 	protected void remove() {
 		super.remove();
 		device.objects.remove(this);
 	}
-	
+
 	private void makeDiscoverAction() {
 		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
 			@Override
@@ -292,7 +298,7 @@ public class BacnetObject extends BacnetProperty {
 			anode.setAction(act);
 		}
 	}
-	
+
 	private void makeAddPropertyAction() {
 		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
 			@Override
@@ -308,7 +314,7 @@ public class BacnetObject extends BacnetProperty {
 			anode.setAction(act);
 		}
 	}
-	
+
 	private void addProperty(ActionResult event) {
 		String propStr = event.getParameter("Property Identifier").getString();
 		PropertyIdentifier propid;
@@ -319,7 +325,7 @@ public class BacnetObject extends BacnetProperty {
 		}
 		addProperty(propid);
 	}
-	
+
 	private void makeEditAction() {
 		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
 			@Override
@@ -337,7 +343,7 @@ public class BacnetObject extends BacnetProperty {
 			anode.setAction(act);
 		}
 	}
-	
+
 	private void edit(ActionResult event) {
 		boolean newCovUse = event.getParameter("Use COV", ValueType.BOOL).getBool();
 		boolean headless = event.getParameter("Enable Headless Polling", ValueType.BOOL).getBool();
@@ -349,38 +355,36 @@ public class BacnetObject extends BacnetProperty {
 		}
 		writePriority = newPriority;
 		node.setRoConfig("Write Priority", new Value(writePriority));
-		
+
 		setCov(newCovUse);
-		
+
 		setHeadless(headless);
-		
+
 		makeEditAction();
 		makeRelinquishAction();
 	}
-	
+
 	private void setHeadless(boolean useHeadless) {
 		headlessPolling = useHeadless;
 		node.setRoConfig("Enable Headless Polling", new Value(headlessPolling));
-		for (BacnetProperty prop: properties) {
+		for (BacnetProperty prop : properties) {
 			prop.updateHeadless();
 		}
 	}
-	
+
 	private void setCov(boolean newCovUse) {
-		
-		synchronized(lock) {
+
+		synchronized (lock) {
 			if (useCov == newCovUse) {
 				return;
 			}
-			
+
 			if (newCovUse) {
-				for (BacnetProperty property: properties) {
-					if (PropertyIdentifier.presentValue.equals(pid) 
-							|| PropertyIdentifier.statusFlags.equals(pid)
-							|| (ObjectType.loop.equals(oid.getObjectType()) 
-									&& (PropertyIdentifier.setpoint.equals(pid) 
-											|| PropertyIdentifier.controlledVariableValue.equals(pid)))
-							|| (ObjectType.pulseConverter.equals(oid.getObjectType()) 
+				for (BacnetProperty property : properties) {
+					if (PropertyIdentifier.presentValue.equals(pid) || PropertyIdentifier.statusFlags.equals(pid)
+							|| (ObjectType.loop.equals(oid.getObjectType()) && (PropertyIdentifier.setpoint.equals(pid)
+									|| PropertyIdentifier.controlledVariableValue.equals(pid)))
+							|| (ObjectType.pulseConverter.equals(oid.getObjectType())
 									&& PropertyIdentifier.updateTime.equals(pid))) {
 						if (device.unsubscribeProperty(property)) {
 							property.subscribeCov();
@@ -388,19 +392,19 @@ public class BacnetObject extends BacnetProperty {
 					}
 				}
 			} else {
-				for (BacnetProperty property: properties) {
+				for (BacnetProperty property : properties) {
 					if (property.getCovSubscribed()) {
 						property.unsubscribeCov();
 						device.subscribeProperty(property);
 					}
 				}
 			}
-			
+
 			useCov = newCovUse;
 			node.setRoConfig("Use COV", new Value(useCov));
 		}
 	}
-	
+
 	@Override
 	protected void subscribe() {
 		super.subscribe();
@@ -412,9 +416,11 @@ public class BacnetObject extends BacnetProperty {
 		} else if (Utils.isOneOf(type, ObjectType.multiStateInput, ObjectType.multiStateOutput,
 				ObjectType.multiStateValue)) {
 			device.subscribeProperty(hiddenStateTextProp);
+		} else if (Utils.isOneOf(type, ObjectType.command)) {
+			device.subscribeProperty(hiddenActionTextProp);
 		}
 	}
-	
+
 	@Override
 	protected void unsubscribe() {
 		super.unsubscribe();
@@ -426,17 +432,19 @@ public class BacnetObject extends BacnetProperty {
 		} else if (Utils.isOneOf(type, ObjectType.multiStateInput, ObjectType.multiStateOutput,
 				ObjectType.multiStateValue)) {
 			device.unsubscribeProperty(hiddenStateTextProp);
+		} else if (Utils.isOneOf(type, ObjectType.command)) {
+			device.unsubscribeProperty(hiddenActionTextProp);
 		}
 	}
-	
+
 	@Override
 	public void updateValue(Encodable value) {
-		
+
 		if (value instanceof BACnetError || value instanceof BaseError) {
 			node.setValue(null);
 			return;
 		}
-		
+
 		ValueType vt = null;
 		Value v = null;
 		DataType type = getDataType();
@@ -451,24 +459,24 @@ public class BacnetObject extends BacnetProperty {
 			}
 			break;
 		}
-		case NUMERIC: {
-			vt = ValueType.NUMBER;
-			if (value instanceof SignedInteger) {
-				v = new Value(((SignedInteger) value).bigIntegerValue());
-			} else if (value instanceof Real) {
-				v = new Value(((Real) value).floatValue());
-			} else if (value instanceof com.serotonin.bacnet4j.type.primitive.Double) {
-				v = new Value(((com.serotonin.bacnet4j.type.primitive.Double) value).doubleValue());
-			}
-			break;
-		}
+//		case NUMERIC: {
+//			vt = ValueType.NUMBER;
+//			if (value instanceof SignedInteger) {
+//				v = new Value(((SignedInteger) value).bigIntegerValue());
+//			} else if (value instanceof Real) {
+//				v = new Value(((Real) value).floatValue());
+//			} else if (value instanceof com.serotonin.bacnet4j.type.primitive.Double) {
+//				v = new Value(((com.serotonin.bacnet4j.type.primitive.Double) value).doubleValue());
+//			}
+//			break;
+//		}
 		case MULTISTATE: {
 			vt = ValueType.makeEnum(stateText);
 			if (value instanceof Enumerated) {
 				int i = ((Enumerated) value).intValue();
 				v = new Value(stateText.get(i));
 			} else if (value instanceof UnsignedInteger) {
-				int i  = ((UnsignedInteger) value).intValue();
+				int i = ((UnsignedInteger) value).intValue();
 				v = new Value(stateText.get(i));
 			}
 			break;
@@ -484,19 +492,18 @@ public class BacnetObject extends BacnetProperty {
 			vt = ValueType.STRING;
 			v = new Value(value.toString());
 		}
-		
-		
+
 		node.setValueType(vt);
 		node.setValue(v);
 	}
-	
+
 	public void updateProperty(Encodable value, PropertyIdentifier propid) {
 		if (value == null || value instanceof BACnetError || value instanceof BaseError) {
 			return;
 		}
 		if (PropertyIdentifier.objectName.equals(propid)) {
 			node.setDisplayName(value.toString());
-		} else if (PropertyIdentifier.stateText.equals(propid)) {
+		} else if (PropertyIdentifier.stateText.equals(propid) || PropertyIdentifier.actionText.equals(propid)) {
 			SequenceOf<CharacterString> states = (SequenceOf<CharacterString>) value;
 			ArrayList<String> newstates = new ArrayList<String>();
 			for (CharacterString state : states) {
@@ -511,21 +518,21 @@ public class BacnetObject extends BacnetProperty {
 			stateText.set(0, value.toString());
 		}
 	}
-	
+
 	public DataType getDataType() {
 		if (dataType == null) {
 			dataType = Utils.getDataType(oid.getObjectType());
 		}
 		return dataType;
 	}
-	
+
 	void addCovSub() {
 		if (covSubCount == 0) {
 			device.subscribeObjectCov(this);
 		}
 		covSubCount += 1;
 	}
-	
+
 	void removeCovSub() {
 		if (covSubCount <= 0) {
 			covSubCount = 0;
@@ -537,9 +544,9 @@ public class BacnetObject extends BacnetProperty {
 			device.unsubscribeObjectCov(this);
 		}
 	}
-	
+
 	public void covNotificationReceived(UnsignedInteger timeRemaining, SequenceOf<PropertyValue> listOfValues) {
-		for (BacnetProperty prop: properties) {
+		for (BacnetProperty prop : properties) {
 			int index = findPropertyInSequence(listOfValues, prop.pid);
 			if (index >= 0) {
 				PropertyValue propval = listOfValues.get(index);
@@ -547,10 +554,10 @@ public class BacnetObject extends BacnetProperty {
 			}
 		}
 	}
-	
+
 	private static int findPropertyInSequence(SequenceOf<PropertyValue> seq, PropertyIdentifier prop) {
 		int i = 0;
-		for (PropertyValue propval: seq) {
+		for (PropertyValue propval : seq) {
 			if (propval.getPropertyIdentifier().equals(prop)) {
 				return i;
 			}
