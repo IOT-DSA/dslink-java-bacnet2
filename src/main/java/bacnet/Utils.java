@@ -1,5 +1,6 @@
 package bacnet;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -14,24 +15,28 @@ import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.node.value.ValueUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.serotonin.bacnet4j.RemoteDevice;
-import com.serotonin.bacnet4j.obj.ObjectProperties;
+import com.serotonin.bacnet4j.ServiceFuture;
+import com.serotonin.bacnet4j.exception.BACnetException;
+import com.serotonin.bacnet4j.service.confirmed.ConfirmedRequestService;
 import com.serotonin.bacnet4j.type.Encodable;
-import com.serotonin.bacnet4j.type.enumerated.BinaryPV;
-import com.serotonin.bacnet4j.type.enumerated.LifeSafetyState;
+import com.serotonin.bacnet4j.type.constructed.LogRecord;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.Enumerated;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
-import com.serotonin.bacnet4j.type.primitive.Real;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
+import com.serotonin.bacnet4j.util.RequestUtils;
 
 import jssc.SerialNativeInterface;
 import jssc.SerialPortList;
 
 public class Utils {
 
-//	private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
 
 	private static final Map<Class<? extends Enumerated>, List<String>> stateLists = new HashMap<Class<? extends Enumerated>, List<String>>();
 
@@ -39,27 +44,75 @@ public class Utils {
 		getObjectTypeList();
 		getPropertyList();
 	}
+
+	// private static final List<String> objectTypeList;
+	// static {
+	// objectTypeList = new ArrayList<String>();
+	// for (int i = 0; i < ObjectType.size(); i++) {
+	// String s = ObjectType.nameForId(i);
+	// if (s != null) {
+	// objectTypeList.add(s);
+	// }
+	// }
+	// }
+	// private static final List<String> propertyList;
+	// static {
+	// propertyList = new ArrayList<String>();
+	// for (int i = 0; i < PropertyIdentifier.size(); i++) {
+	// String s = PropertyIdentifier.nameForId(i);
+	// if (s != null) {
+	// propertyList.add(s);
+	// }
+	// }
+	// }
+
+	public static ServiceFuture sendConfirmedRequest(BacnetConn conn, BacnetDevice device, ConfirmedRequestService request) {
+		ServiceFuture sf = null;
+		try {
+			device.monitor.checkInReader();
+			if (device.remoteDevice != null) {
+				try {
+					conn.monitor.checkInReader();
+					if (conn.localDevice != null) {
+						sf = conn.localDevice.send(device.remoteDevice, request);
+					}
+					conn.monitor.checkOutReader();
+				} catch (InterruptedException e) {
+
+				}
+			}
+			device.monitor.checkOutReader();
+		} catch (InterruptedException e) {
+
+		}
+		return sf;
+	}
 	
-//	private static final List<String> objectTypeList;
-//	static {
-//		objectTypeList = new ArrayList<String>();
-//		for (int i = 0; i < ObjectType.size(); i++) {
-//			String s = ObjectType.nameForId(i);
-//			if (s != null) {
-//				objectTypeList.add(s);
-//			}
-//		}
-//	}
-//	private static final List<String> propertyList;
-//	static {
-//		propertyList = new ArrayList<String>();
-//		for (int i = 0; i < PropertyIdentifier.size(); i++) {
-//			String s = PropertyIdentifier.nameForId(i);
-//			if (s != null) {
-//				propertyList.add(s);
-//			}
-//		}
-//	}
+	public static Encodable readProperty(BacnetConn conn, BacnetDevice device, ObjectIdentifier oid, PropertyIdentifier pid, UnsignedInteger propertyArrayIndex) {
+		Encodable enc = null;
+		try {
+			device.monitor.checkInReader();
+			if (device.remoteDevice != null) {
+				try {
+					conn.monitor.checkInReader();
+					if (conn.localDevice != null) {
+						try {
+							enc = RequestUtils.readProperty(conn.localDevice, device.remoteDevice, oid, pid, propertyArrayIndex);
+						} catch (BACnetException e) {
+							LOGGER.debug("", e);
+						}
+					}
+					conn.monitor.checkOutReader();
+				} catch (InterruptedException e) {
+
+				}
+			}
+			device.monitor.checkOutReader();
+		} catch (InterruptedException e) {
+
+		}
+		return enc;
+	}
 
 	public static String[] getCommPorts() {
 		String[] portNames;
@@ -179,81 +232,90 @@ public class Utils {
 		return isOneOf(objectType.intValue(), types);
 	}
 
-//	public static Encodable booleanToEncodable(Boolean b, ObjectIdentifier oid, PropertyIdentifier pid) {
-//		Class<? extends Encodable> clazz = ObjectProperties.getObjectPropertyTypeDefinition(oid.getObjectType(), pid)
-//				.getPropertyTypeDefinition().getClazz();
-//
-//		if (clazz == BinaryPV.class) {
-//			if (b) {
-//				return BinaryPV.active;
-//			}
-//			return BinaryPV.inactive;
-//		}
-//
-//		if (clazz == UnsignedInteger.class) {
-//			return new UnsignedInteger(b ? 1 : 0);
-//		}
-//
-//		if (clazz == LifeSafetyState.class) {
-//			return LifeSafetyState.forId(b ? 1 : 0);
-//		}
-//
-//		if (clazz == Real.class) {
-//			return new Real(b ? 1 : 0);
-//		}
-//		return BinaryPV.inactive;
-//	}
-//
-//	public static Encodable multistateToEncodable(int i, ObjectIdentifier oid, PropertyIdentifier pid) {
-//		if (i == -1) {
-//			return null;
-//		}
-//		Class<? extends Encodable> clazz = ObjectProperties.getObjectPropertyTypeDefinition(oid.getObjectType(), pid)
-//				.getPropertyTypeDefinition().getClazz();
-//
-//		if (clazz == BinaryPV.class) {
-//			if (i != 0) {
-//				return BinaryPV.active;
-//			}
-//			return BinaryPV.inactive;
-//		}
-//
-//		if (clazz == UnsignedInteger.class) {
-//			return new UnsignedInteger(i);
-//		}
-//
-//		if (clazz == LifeSafetyState.class) {
-//			return LifeSafetyState.forId(i);
-//		}
-//
-//		if (clazz == Real.class) {
-//			return new Real(i);
-//		}
-//		return new UnsignedInteger(i);
-//	}
-//
-//	public static Encodable numberToEncodable(Number n, ObjectIdentifier oid, PropertyIdentifier pid) {
-//		double d = n.doubleValue();
-//		Class<? extends Encodable> clazz = ObjectProperties.getObjectPropertyTypeDefinition(oid.getObjectType(), pid)
-//				.getPropertyTypeDefinition().getClazz();
-//
-//		if (clazz == BinaryPV.class) {
-//			if (d != 0) {
-//				return BinaryPV.active;
-//			}
-//			return BinaryPV.inactive;
-//		}
-//
-//		if (clazz == UnsignedInteger.class) {
-//			return new UnsignedInteger((int) d);
-//		}
-//
-//		if (clazz == LifeSafetyState.class) {
-//			return LifeSafetyState.forId((int) d);
-//		}
-//
-//		return new Real((float) d);
-//	}
+	// public static Encodable booleanToEncodable(Boolean b, ObjectIdentifier
+	// oid, PropertyIdentifier pid) {
+	// Class<? extends Encodable> clazz =
+	// ObjectProperties.getObjectPropertyTypeDefinition(oid.getObjectType(),
+	// pid)
+	// .getPropertyTypeDefinition().getClazz();
+	//
+	// if (clazz == BinaryPV.class) {
+	// if (b) {
+	// return BinaryPV.active;
+	// }
+	// return BinaryPV.inactive;
+	// }
+	//
+	// if (clazz == UnsignedInteger.class) {
+	// return new UnsignedInteger(b ? 1 : 0);
+	// }
+	//
+	// if (clazz == LifeSafetyState.class) {
+	// return LifeSafetyState.forId(b ? 1 : 0);
+	// }
+	//
+	// if (clazz == Real.class) {
+	// return new Real(b ? 1 : 0);
+	// }
+	// return BinaryPV.inactive;
+	// }
+	//
+	// public static Encodable multistateToEncodable(int i, ObjectIdentifier
+	// oid, PropertyIdentifier pid) {
+	// if (i == -1) {
+	// return null;
+	// }
+	// Class<? extends Encodable> clazz =
+	// ObjectProperties.getObjectPropertyTypeDefinition(oid.getObjectType(),
+	// pid)
+	// .getPropertyTypeDefinition().getClazz();
+	//
+	// if (clazz == BinaryPV.class) {
+	// if (i != 0) {
+	// return BinaryPV.active;
+	// }
+	// return BinaryPV.inactive;
+	// }
+	//
+	// if (clazz == UnsignedInteger.class) {
+	// return new UnsignedInteger(i);
+	// }
+	//
+	// if (clazz == LifeSafetyState.class) {
+	// return LifeSafetyState.forId(i);
+	// }
+	//
+	// if (clazz == Real.class) {
+	// return new Real(i);
+	// }
+	// return new UnsignedInteger(i);
+	// }
+	//
+	// public static Encodable numberToEncodable(Number n, ObjectIdentifier oid,
+	// PropertyIdentifier pid) {
+	// double d = n.doubleValue();
+	// Class<? extends Encodable> clazz =
+	// ObjectProperties.getObjectPropertyTypeDefinition(oid.getObjectType(),
+	// pid)
+	// .getPropertyTypeDefinition().getClazz();
+	//
+	// if (clazz == BinaryPV.class) {
+	// if (d != 0) {
+	// return BinaryPV.active;
+	// }
+	// return BinaryPV.inactive;
+	// }
+	//
+	// if (clazz == UnsignedInteger.class) {
+	// return new UnsignedInteger((int) d);
+	// }
+	//
+	// if (clazz == LifeSafetyState.class) {
+	// return LifeSafetyState.forId((int) d);
+	// }
+	//
+	// return new Real((float) d);
+	// }
 
 	public static DataType getDataType(ObjectType objectType) {
 		if (isOneOf(objectType, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
@@ -261,9 +323,11 @@ public class Utils {
 		} else if (isOneOf(objectType, ObjectType.multiStateInput, ObjectType.multiStateOutput,
 				ObjectType.multiStateValue, ObjectType.command)) {
 			return DataType.MULTISTATE;
-//		} else if (isOneOf(objectType, ObjectType.analogInput, ObjectType.analogOutput, ObjectType.analogValue,
-//				ObjectType.largeAnalogValue, ObjectType.integerValue, ObjectType.positiveIntegerValue)) {
-//			return DataType.NUMERIC;
+			// } else if (isOneOf(objectType, ObjectType.analogInput,
+			// ObjectType.analogOutput, ObjectType.analogValue,
+			// ObjectType.largeAnalogValue, ObjectType.integerValue,
+			// ObjectType.positiveIntegerValue)) {
+			// return DataType.NUMERIC;
 		} else {
 			return DataType.OTHER;
 		}
@@ -282,13 +346,13 @@ public class Utils {
 			List<String> lst = new ArrayList<String>();
 			try {
 				int size = (int) clazz.getMethod("size").invoke(null);
-				for (int i=0; i<size; i++) {
+				for (int i = 0; i < size; i++) {
 					String s = (String) clazz.getMethod("nameForId", int.class).invoke(null, i);
 					if (s != null) {
 						lst.add(s);
 					}
 				}
-			} catch (Exception e) {
+			} catch (ClassCastException | NullPointerException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchMethodException | SecurityException e) {
 				lst = null;
 			}
 			stateLists.put(clazz, lst);
@@ -296,4 +360,31 @@ public class Utils {
 		return stateLists.get(clazz);
 	}
 
+	public static String getChoiceNameFromLogRecord(LogRecord record) {
+		if (record.isLogStatus()) {
+			return "LogStatus";
+		} else if (record.isBoolean()) {
+			return "Boolean";
+		} else if (record.isReal()) {
+			return "Real";
+		} else if (record.isEnumerated()) {
+			return "Enumerated";
+		} else if (record.isUnsignedInteger()) {
+			return "UnsignedInteger";
+		} else if (record.isSignedInteger()) {
+			return "SignedInteger";
+		} else if (record.isBitString()) {
+			return "BitString";
+		} else if (record.isNull()) {
+			return "Null";
+		} else if (record.isBACnetError()) {
+			return "BACnetError";
+		} else if (record.isTimeChange()) {
+			return "TimeChange";
+		} else if (record.isAny()) {
+			return "Any";
+		} 
+		return "Any";
+	}
+	
 }

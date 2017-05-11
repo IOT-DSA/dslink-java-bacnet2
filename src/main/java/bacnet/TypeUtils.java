@@ -153,7 +153,7 @@ public class TypeUtils {
 						return (ChannelValue) constr.newInstance(formatEncodable(clz, v));
 					}
 				}
-			} catch (Exception e) {
+			} catch (InstantiationException | IllegalAccessException | InvocationTargetException | ClassNotFoundException | ClassCastException | NullPointerException e) {
 			}
 			return null;
 		} else if (PriorityValue.class.isAssignableFrom(clazz)) {
@@ -233,7 +233,7 @@ public class TypeUtils {
 		} else if (UnsignedInteger.class.isAssignableFrom(clazz)) {
 			try {
 				return clazz.getConstructor(int.class).newInstance(val.getNumber().intValue());
-			} catch (Exception e) {
+			} catch (NullPointerException | InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchMethodException | SecurityException e) {
 				return null;
 			}
 		} else {
@@ -505,7 +505,7 @@ public class TypeUtils {
 		if (Encodable.class.isAssignableFrom(clazz)) {
 			return formatEncodable((Class<? extends Encodable>) clazz, val);
 		} else if (clazz.equals(boolean.class) || clazz.equals(Boolean.class)) {
-			return b != null ? b.booleanValue() : null;
+			return b;
 		} else if (clazz.equals(byte.class) || clazz.equals(Byte.class)) {
 			return n != null ? n.byteValue() : null;
 		} else if (clazz.equals(short.class) || clazz.equals(Short.class)) {
@@ -695,7 +695,7 @@ public class TypeUtils {
 				if (Modifier.isStatic(meth.getModifiers()) && clazz.equals(meth.getReturnType())) {
 					return (Enumerated) meth.invoke(null, n.intValue());
 				}
-			} catch (Exception e) {
+			} catch (ClassCastException | NullPointerException | NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
 			}
 		} else if (s != null) {
 			try {
@@ -703,7 +703,7 @@ public class TypeUtils {
 				if (Modifier.isStatic(meth.getModifiers()) && clazz.equals(meth.getReturnType())) {
 					return (Enumerated) meth.invoke(null, s);
 				}
-			} catch (Exception e) {
+			} catch (ClassCastException | NullPointerException | NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
 			}
 		}
 		return new Enumerated(val.getNumber().intValue());
@@ -802,6 +802,7 @@ public class TypeUtils {
 			try {
 				clazz.getMethod("set" + label, boolean.class).invoke(obj, jobj.get(label, false));
 			} catch (Exception e) {
+				LOGGER.debug("", e);
 			}
 		}
 		return obj;

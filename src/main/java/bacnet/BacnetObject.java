@@ -1,5 +1,6 @@
 package bacnet;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -8,38 +9,44 @@ import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
-import org.dsa.iot.dslink.node.Writable;
 import org.dsa.iot.dslink.node.actions.Action;
 import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
-import org.dsa.iot.dslink.node.value.ValuePair;
 import org.dsa.iot.dslink.node.value.ValueType;
+import org.dsa.iot.dslink.util.handler.CompleteHandler;
 import org.dsa.iot.dslink.util.handler.Handler;
+import org.dsa.iot.dslink.util.json.JsonObject;
+import org.dsa.iot.historian.database.Database;
+import org.dsa.iot.historian.stats.GetHistory;
+import org.dsa.iot.historian.utils.QueryData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.serotonin.bacnet4j.ServiceFuture;
 import com.serotonin.bacnet4j.exception.BACnetException;
+import com.serotonin.bacnet4j.service.acknowledgement.ReadRangeAck;
+import com.serotonin.bacnet4j.service.confirmed.ReadRangeRequest;
+import com.serotonin.bacnet4j.service.confirmed.ReadRangeRequest.BySequenceNumber;
+import com.serotonin.bacnet4j.service.confirmed.ReadRangeRequest.ByTime;
 import com.serotonin.bacnet4j.service.confirmed.WritePropertyRequest;
 import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.constructed.DateTime;
+import com.serotonin.bacnet4j.type.constructed.EventLogRecord;
+import com.serotonin.bacnet4j.type.constructed.LogMultipleRecord;
+import com.serotonin.bacnet4j.type.constructed.LogRecord;
 import com.serotonin.bacnet4j.type.constructed.PropertyValue;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
-import com.serotonin.bacnet4j.type.enumerated.BinaryLightingPV;
-import com.serotonin.bacnet4j.type.enumerated.BinaryPV;
-import com.serotonin.bacnet4j.type.enumerated.DoorValue;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.error.BACnetError;
 import com.serotonin.bacnet4j.type.error.BaseError;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.Enumerated;
-import com.serotonin.bacnet4j.type.primitive.Null;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
-import com.serotonin.bacnet4j.type.primitive.Real;
-import com.serotonin.bacnet4j.type.primitive.SignedInteger;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.RequestUtils;
+
 
 public class BacnetObject extends BacnetProperty {
 	private static final Logger LOGGER = LoggerFactory.getLogger(BacnetObject.class);
@@ -105,6 +112,7 @@ public class BacnetObject extends BacnetProperty {
 		makeDiscoverAction();
 		makeAddPropertyAction();
 		makeEditAction();
+		initHistory();
 	}
 
 	private void addProperties() {
@@ -133,6 +141,7 @@ public class BacnetObject extends BacnetProperty {
 		bp.setup();
 	}
 
+	@SuppressWarnings("unchecked")
 	private SequenceOf<PropertyIdentifier> getPropertyList() {
 		try {
 			device.monitor.checkInReader();
@@ -157,6 +166,12 @@ public class BacnetObject extends BacnetProperty {
 
 		}
 		return null;
+	}
+	
+	private void initHistory() {
+		if (Utils.isOneOf(oid.getObjectType(), ObjectType.trendLog, ObjectType.trendLogMultiple, ObjectType.eventLog)) {
+			GetHistory.initAction(node, new Db());
+		}
 	}
 
 	private void makeRelinquishAction() {
@@ -249,29 +264,7 @@ public class BacnetObject extends BacnetProperty {
 			}
 		}
 
-		enc = null;
-		try {
-			device.monitor.checkInReader();
-			if (device.remoteDevice != null) {
-				try {
-					device.conn.monitor.checkInReader();
-					if (device.conn.localDevice != null) {
-						try {
-							enc = RequestUtils.readProperty(device.conn.localDevice, device.remoteDevice, oid, pid,
-									null);
-						} catch (BACnetException e) {
-							LOGGER.debug("", e);
-						}
-					}
-					device.conn.monitor.checkOutReader();
-				} catch (InterruptedException e) {
-
-				}
-			}
-			device.monitor.checkOutReader();
-		} catch (InterruptedException e) {
-
-		}
+		enc = Utils.readProperty(device.conn, device, oid, pid, null);
 
 		if (enc != null) {
 			updateValue(enc);
@@ -504,6 +497,7 @@ public class BacnetObject extends BacnetProperty {
 		if (PropertyIdentifier.objectName.equals(propid)) {
 			node.setDisplayName(value.toString());
 		} else if (PropertyIdentifier.stateText.equals(propid) || PropertyIdentifier.actionText.equals(propid)) {
+			@SuppressWarnings("unchecked")
 			SequenceOf<CharacterString> states = (SequenceOf<CharacterString>) value;
 			ArrayList<String> newstates = new ArrayList<String>();
 			for (CharacterString state : states) {
@@ -565,4 +559,148 @@ public class BacnetObject extends BacnetProperty {
 		}
 		return -1;
 	}
+	
+	private ServiceFuture sendReadRange(ReadRangeRequest request) {
+		return Utils.sendConfirmedRequest(device.conn, device, request);
+	}
+	
+	private class Db extends Database {
+		
+		public Db() {
+			super(node.getName(), null);
+		}
+
+		@Override
+		public void write(String path, Value value, long ts) {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void query(String path, long from, long to, CompleteHandler<QueryData> handler) {
+			Encodable enc = Utils.readProperty(device.conn, device, oid, PropertyIdentifier.recordCount, null);
+			if (!(enc instanceof UnsignedInteger)) {
+				return;
+			}
+			int count = ((UnsignedInteger) enc).intValue();
+			
+			DateTime start = new DateTime(from);
+			ByTime byTime = new ByTime(start, count);
+			ReadRangeRequest request = new ReadRangeRequest(oid, PropertyIdentifier.logBuffer, null, byTime);
+			while (request != null) {
+				ReadRangeRequest currentRequest = request;
+				request = null;
+				try {
+					ServiceFuture sf = sendReadRange(currentRequest);
+					if (sf != null) {
+						ReadRangeAck ack = sf.get();
+						request = processReadRangeAck(to, count, ack, handler);
+					}
+				} catch (BACnetException e) {
+					LOGGER.debug("", e);
+				}
+			}
+			
+			handler.complete();
+		}
+		
+		private ReadRangeRequest processReadRangeAck(long to, int recordCount, ReadRangeAck ack, CompleteHandler<QueryData> handler) {
+			for (Encodable record: ack.getItemData()) {
+				long ts = getTimestampFromRecord(record);
+				if (ts > to || ts < 0) {
+					if (ts > to + 5000) {
+						return null;
+					}
+					continue;
+				}
+				Value v = getValueFromRecord(record);
+				if (v == null) {
+					continue;
+				}
+				QueryData qd = new QueryData(v, ts);
+				handler.handle(qd);
+			}
+			if (ack.getResultFlags().isMoreItems()) {
+				int itemCount = ack.getItemCount().intValue();
+				BySequenceNumber bySeq = new BySequenceNumber(ack.getFirstSequenceNumber().longValue() + itemCount, recordCount - itemCount);
+				return new ReadRangeRequest(oid, PropertyIdentifier.logBuffer, null, bySeq);
+			} else {
+				return null;
+			}
+ 		}
+		
+		private long getTimestampFromRecord(Encodable record) {
+			if (record instanceof LogRecord) {
+				return ((LogRecord) record).getTimestamp().getGC().getTimeInMillis();
+			} else if (record instanceof LogMultipleRecord) {
+				return ((LogMultipleRecord) record).getTimestamp().getGC().getTimeInMillis();
+			} else if (record instanceof EventLogRecord) {
+				return ((EventLogRecord) record).getTimestamp().getGC().getTimeInMillis();
+			} else {
+				try {
+					DateTime dt = (DateTime) record.getClass().getMethod("getTimestamp").invoke(record);
+					return dt.getGC().getTimeInMillis();
+				} catch (ClassCastException | NullPointerException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchMethodException | SecurityException e) {
+				}
+			}
+			return -1;
+		}
+		
+		private Value getValueFromRecord(Encodable record) {
+			Value val = TypeUtils.parseEncodable(record).getRight();
+			if (val == null) {
+				return null;
+			}
+			JsonObject jo = val.getMap();
+			if (jo == null) {
+				return null;
+			}
+			if (record instanceof LogRecord) {
+				String choiceName = Utils.getChoiceNameFromLogRecord((LogRecord) record);
+				jo.put(choiceName, jo.get("Choice"));
+				jo.remove("Choice");
+			} else if (record instanceof LogMultipleRecord) {
+				JsonObject jo2 = jo.get("LogData");
+				if (jo2 != null) {
+					jo2.remove("Datum");
+				}
+				jo.put("LogData", jo2);
+			} else if (record instanceof EventLogRecord) {
+				jo.remove("Choice");
+			}
+			
+			return new Value(jo);
+		}
+
+		@Override
+		public QueryData queryFirst(String path) {
+			// TODO Auto-generated method stub
+			return null;
+		}
+
+		@Override
+		public QueryData queryLast(String path) {
+			// TODO Auto-generated method stub
+			return null;
+		}
+
+		@Override
+		public void close() throws Exception {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		protected void performConnect() throws Exception {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void initExtensions(Node node) {
+			// TODO Auto-generated method stub
+			
+		}
+	}
+
 }

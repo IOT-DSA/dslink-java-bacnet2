@@ -8,26 +8,9 @@ import org.dsa.iot.dslink.node.NodeBuilder;
 import org.dsa.iot.dslink.node.NodeManager;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
-import org.dsa.iot.dslink.serializer.Deserializer;
-import org.dsa.iot.dslink.serializer.Serializer;
 import org.dsa.iot.historian.stats.GetHistory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.serotonin.bacnet4j.LocalDevice;
-import com.serotonin.bacnet4j.RemoteDevice;
-import com.serotonin.bacnet4j.RemoteObject;
-import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
-import com.serotonin.bacnet4j.npdu.ip.IpNetworkBuilder;
-import com.serotonin.bacnet4j.service.confirmed.ReadPropertyMultipleRequest;
-import com.serotonin.bacnet4j.service.confirmed.ReadPropertyRequest;
-import com.serotonin.bacnet4j.service.unconfirmed.WhoIsRequest;
-import com.serotonin.bacnet4j.transport.DefaultTransport;
-import com.serotonin.bacnet4j.transport.Transport;
-import com.serotonin.bacnet4j.type.Encodable;
-import com.serotonin.bacnet4j.type.enumerated.ObjectType;
-import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
-import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 
 public class Main extends DSLinkHandler {
 
@@ -35,6 +18,24 @@ public class Main extends DSLinkHandler {
 
 	public static void main(String[] args) {
 		DSLinkFactory.start(args, new Main());
+		
+//		Reflections reflections = new Reflections("com.serotonin.bacnet4j");
+//		Set<Class<? extends BaseType>> constructedTypes = reflections.getSubTypesOf(BaseType.class);
+//		Set<Class<?>> params = new HashSet<Class<?>>();
+//		for (Class<? extends BaseType> clazz: constructedTypes) {
+//			for (Constructor<?> constr: clazz.getConstructors()) {
+//				for (Class<?> cz: constr.getParameterTypes()) {
+//					if (!Encodable.class.isAssignableFrom(cz) && !cz.isPrimitive() && 
+//							!cz.equals(ByteQueue.class) && !cz.equals(ChoiceOptions.class) && !cz.equals(String.class)) {
+//						System.out.println(cz.toString() + "\t" + clazz.toString());
+//					}
+//				}
+//			}
+//		}
+//		for (Class<?> cz: params) {
+//			System.out.println(cz.toString());
+//		}
+		
 	}
 
 	@Override
@@ -44,34 +45,25 @@ public class Main extends DSLinkHandler {
 
 	@Override
 	public void onResponderInitialized(DSLink link) {
-		LOGGER.info("Initialized");
-		NodeManager manager = link.getNodeManager();
-		Node superRoot = manager.getNode("/").getNode();
-		BacnetLink.start(superRoot);
+			LOGGER.info("Initialized");
+			NodeManager manager = link.getNodeManager();
+			Node superRoot = manager.getNode("/").getNode();
+			
+			NodeBuilder b = superRoot.createChild("defs", true);
+			b.setSerializable(false);
+			b.setHidden(true);
+			Node node = b.build();
 
-//		IpNetwork network = new IpNetworkBuilder().build();
-//        Transport transport = new DefaultTransport(network);
-//        //        transport.setTimeout(15000);
-//        //        transport.setSegTimeout(15000);
-//        LocalDevice localDevice = new LocalDevice(1234, transport);
-//        //localDevice.getEventHandler().addListener(new BacnetListener(localDevice));
-//        
-//        try {
-//			localDevice.initialize();
-//			localDevice.sendGlobalBroadcast(new WhoIsRequest());
-//			
-//			RemoteDevice d = localDevice.getRemoteDeviceBlocking(1195);
-//			localDevice.send(d, new ReadPropertyMultipleRequest())
-//			RemoteObject ro = d.getObject(new ObjectIdentifier(ObjectType.analogInput, 100502));
-//			String name = ro.getObjectName();
-//			Encodable en = ro.getProperty(PropertyIdentifier.presentValue);
-//			LOGGER.info(name + " : " + en.toString());
-//			
-//		} catch (Exception e) {
-//			LOGGER.error("", e);
-//		}
-        
-        
+			b = node.createChild("profile", true);
+			node = b.build();
+
+			b = node.createChild("getHistory_", true);
+			Action act = new Action(Permission.READ, null);
+			GetHistory.initProfile(act);
+			b.setAction(act);
+			b.build();
+			
+			BacnetLink.start(superRoot);
 	}
 
 	@Override

@@ -176,25 +176,7 @@ public class BacnetProperty {
 	}
 
 	protected ServiceFuture sendWriteRequest(WritePropertyRequest request) {
-		ServiceFuture sf = null;
-		try {
-			device.monitor.checkInReader();
-			if (device.remoteDevice != null) {
-				try {
-					device.conn.monitor.checkInReader();
-					if (device.conn.localDevice != null) {
-						sf = device.conn.localDevice.send(device.remoteDevice, request);
-					}
-					device.conn.monitor.checkOutReader();
-				} catch (InterruptedException e) {
-
-				}
-			}
-			device.monitor.checkOutReader();
-		} catch (InterruptedException e) {
-
-		}
-		return sf;
+		return Utils.sendConfirmedRequest(device.conn, device, request);
 	}
 	
 	protected Encodable encodableFromValue(Value val) {
