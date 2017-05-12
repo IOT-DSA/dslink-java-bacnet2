@@ -36,6 +36,7 @@ import com.serotonin.bacnet4j.type.EncodedValue;
 import com.serotonin.bacnet4j.type.constructed.BACnetArray;
 import com.serotonin.bacnet4j.type.constructed.BaseType;
 import com.serotonin.bacnet4j.type.constructed.ChannelValue;
+import com.serotonin.bacnet4j.type.constructed.Choice;
 import com.serotonin.bacnet4j.type.constructed.DaysOfWeek;
 import com.serotonin.bacnet4j.type.constructed.EventTransitionBits;
 import com.serotonin.bacnet4j.type.constructed.LimitEnable;
@@ -130,6 +131,8 @@ public class TypeUtils {
 			return Pair.of(ValueType.MAP, new Value(jo));
 		} else if (enc instanceof PriorityValue) {
 			return parseEncodable(((PriorityValue) enc).getValue());
+		} else if (enc instanceof Choice) {
+			return parseEncodable(((Choice) enc).getDatum(), maxDepth);
 		} else {
 			return Pair.of(ValueType.MAP, new Value(parseNonSequenceConstructed(enc, maxDepth)));
 		}

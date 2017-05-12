@@ -636,8 +636,14 @@ public abstract class BacnetConn implements DeviceEventListener {
 			UnsignedInteger notificationClass, UnsignedInteger priority, EventType eventType,
 			CharacterString messageText, NotifyType notifyType, Boolean ackRequired, EventState fromState,
 			EventState toState, NotificationParameters eventValues) {
-		// TODO Auto-generated method stub
-		
+		for (BacnetDevice dev : devices) {
+			if (initiatingDeviceIdentifier.getInstanceNumber() == dev.instanceNumber) {
+				dev.eventNotificationReceived(processIdentifier, eventObjectIdentifier, timeStamp, notificationClass,
+						priority, eventType, messageText, notifyType, ackRequired, fromState, toState, eventValues);
+
+			}
+		}
+
 	}
 
 	@Override

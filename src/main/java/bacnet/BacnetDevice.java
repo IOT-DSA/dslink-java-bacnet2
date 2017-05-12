@@ -1,6 +1,11 @@
 package bacnet;
 
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.ParsePosition;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -17,29 +22,50 @@ import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
 import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
+import org.dsa.iot.dslink.node.actions.ResultType;
+import org.dsa.iot.dslink.node.actions.table.Row;
+import org.dsa.iot.dslink.node.actions.table.Table;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.util.handler.Handler;
+import org.dsa.iot.dslink.util.json.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.serotonin.bacnet4j.RemoteDevice;
+import com.serotonin.bacnet4j.ServiceFuture;
 import com.serotonin.bacnet4j.exception.BACnetException;
+import com.serotonin.bacnet4j.service.acknowledgement.GetEventInformationAck;
+import com.serotonin.bacnet4j.service.acknowledgement.GetEventInformationAck.EventSummary;
+import com.serotonin.bacnet4j.service.confirmed.AcknowledgeAlarmRequest;
+import com.serotonin.bacnet4j.service.confirmed.GetEventInformationRequest;
 import com.serotonin.bacnet4j.service.confirmed.SubscribeCOVRequest;
 import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.constructed.BACnetArray;
+import com.serotonin.bacnet4j.type.constructed.DateTime;
+import com.serotonin.bacnet4j.type.constructed.EventTransitionBits;
 import com.serotonin.bacnet4j.type.constructed.ObjectPropertyReference;
 import com.serotonin.bacnet4j.type.constructed.PropertyValue;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
+import com.serotonin.bacnet4j.type.constructed.TimeStamp;
+import com.serotonin.bacnet4j.type.enumerated.EventState;
+import com.serotonin.bacnet4j.type.enumerated.EventType;
+import com.serotonin.bacnet4j.type.enumerated.NotifyType;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
+import com.serotonin.bacnet4j.type.notificationParameters.NotificationParameters;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
+import com.serotonin.bacnet4j.type.primitive.Time;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.type.primitive.Boolean;
+import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.util.RequestUtils;
+
 
 public class BacnetDevice {
 	private static final Logger LOGGER = LoggerFactory.getLogger(BacnetDevice.class);
 
 	static final String NODE_STATUS = "STATUS";
+	static final String NODE_EVENTS = "EVENTS";
 	static final String ACTION_REMOVE = "remove";
 	static final String ACTION_EDIT = "edit";
 	static final String ACTION_ADD_FOLDER = "add folder";
@@ -47,10 +73,17 @@ public class BacnetDevice {
 	static final String ACTION_ADD_OBJECT = "add object";
 	static final String ACTION_STOP = "stop";
 	static final String ACTION_RESTART = "restart";
+	static final String ACTION_CLEAR = "clear";
+	static final String ACTION_GET_EVENTS = "get event information";
+	static final String ACTION_ACKNOWLEDGE_ALARM = "acknowledge alarm";
+	static final String EVENT_ACTION_ACKNOWLEDGE = "acknowledge";
+	static final String EVENT_ACTION_DISMISS = "dismiss";
 
 	BacnetConn conn;
 	private Node node;
 	private final Node statnode;
+	private final Node eventsnode;
+	private int eventCount = 0;
 
 	RemoteDevice remoteDevice;
 	ReadWriteMonitor monitor = new ReadWriteMonitor();
@@ -85,6 +118,9 @@ public class BacnetDevice {
 		this.statnode = node.createChild(NODE_STATUS, true).setValueType(ValueType.STRING).setValue(new Value(""))
 				.build();
 		this.statnode.setSerializable(false);
+		
+		this.eventsnode = node.createChild(NODE_EVENTS, true).build();
+		this.eventsnode.setSerializable(false);
 
 		conn.devices.add(this);
 	}
@@ -120,7 +156,7 @@ public class BacnetDevice {
 				} else {
 					child.delete(false);
 				}
-			} else if (child.getAction() == null && !child.getName().equals(NODE_STATUS)) {
+			} else if (child.getAction() == null && !child.getName().equals(NODE_STATUS) && !child.getName().equals(NODE_EVENTS)) {
 				child.delete(false);
 			}
 		}
@@ -160,6 +196,7 @@ public class BacnetDevice {
 		makeEditAction();
 		makeStopAction();
 		makeRestartAction();
+		makeEventsNodeActions();
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////////////
@@ -515,7 +552,6 @@ public class BacnetDevice {
 		});
 		act.addParameter(new Parameter("Instance Number", ValueType.NUMBER, new Value(instanceNumber)));
 		act.addParameter(new Parameter("Polling Interval", ValueType.NUMBER, new Value(pollingIntervalSeconds)));
-		// TODO headless polling?
 		act.addParameter(new Parameter("Get Confirmed COV Notifications", ValueType.BOOL, new Value(covConfirmed)));
 		act.addParameter(new Parameter("COV Lifetime", ValueType.NUMBER, new Value(covLifetime)));
 		Node anode = node.getChild(ACTION_EDIT, true);
@@ -552,5 +588,267 @@ public class BacnetDevice {
 
 		}
 	}
+	
+	private void makeEventsNodeActions() {
+		makeGetEventInfoAction();
+		makeAcknowledgeAction();
+		makeClearEventsAction();
+	}
+	
+	private void makeGetEventInfoAction() {
+		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
+			@Override
+			public void handle(ActionResult event) {
+				getEventInfo(event);
+			}
+		});
+		act.addResult(new Parameter("Object Identifier", ValueType.STRING));
+		act.addResult(new Parameter("Event State", ValueType.STRING));
+		act.addResult(new Parameter("Notify Type", ValueType.STRING));
+		act.addResult(new Parameter("Acknowledged Transitions: To-Offnormal", ValueType.BOOL));
+		act.addResult(new Parameter("Acknowledged Transitions: To-Fault", ValueType.BOOL));
+		act.addResult(new Parameter("Acknowledged Transitions: To-Normal", ValueType.BOOL));
+		act.addResult(new Parameter("Event Timestamps: To-Offnormal", ValueType.STRING));
+		act.addResult(new Parameter("Event Timestamps: To-Fault", ValueType.STRING));
+		act.addResult(new Parameter("Event Timestamps: To-Normal", ValueType.STRING));
+		act.addResult(new Parameter("Event Enable: To-Offnormal", ValueType.BOOL));
+		act.addResult(new Parameter("Event Enable: To-Fault", ValueType.BOOL));
+		act.addResult(new Parameter("Event Enable: To-Normal", ValueType.BOOL));
+		act.addResult(new Parameter("Event Priorities: To-Offnormal", ValueType.NUMBER));
+		act.addResult(new Parameter("Event Priorities: To-Fault", ValueType.NUMBER));
+		act.addResult(new Parameter("Event Priorities: To-Normal", ValueType.NUMBER));
+		act.setResultType(ResultType.TABLE);
+		eventsnode.createChild(ACTION_GET_EVENTS, true).setAction(act).build().setSerializable(false);
+	}
+	
+	private void getEventInfo(ActionResult event) {
+		boolean moreEvents = true;
+		ObjectIdentifier lastRecieved = null;
+		Table table = event.getTable();
+		while (moreEvents) {
+			moreEvents = false;
+			GetEventInformationRequest request = new GetEventInformationRequest(lastRecieved);
+			ServiceFuture sf = Utils.sendConfirmedRequest(conn, this, request);
+			try {
+				GetEventInformationAck ack = sf.get();
+				for (EventSummary es : ack.getListOfEventSummaries()) {
+					lastRecieved = es.getObjectIdentifier();
+					String oid = lastRecieved.toString();
+					String eventState = es.getEventState().toString();
+					String notifyType = es.getNotifyType().toString();
+					EventTransitionBits ackTrans = es.getAcknowledgedTransitions();
+					boolean ackTransOffnormal = ackTrans.isToOffnormal();
+					boolean ackTransFault = ackTrans.isToFault();
+					boolean ackTransNormal = ackTrans.isToNormal();
+					BACnetArray<TimeStamp> timestamps = es.getEventTimeStamps();
+					String tsOffnormal = timestampToString(timestamps.getBase1(1));
+					String tsFault = timestampToString(timestamps.getBase1(2));
+					String tsNormal = timestampToString(timestamps.getBase1(3));
+					EventTransitionBits evEnable = es.getEventEnable();
+					boolean evEnableOffnormal = evEnable.isToOffnormal();
+					boolean evEnableFault = evEnable.isToFault();
+					boolean evEnableNormal = evEnable.isToNormal();
+					BACnetArray<UnsignedInteger> priorities = es.getEventPriorities();
+					int prioOffnormal = priorities.getBase1(1).intValue();
+					int prioFault = priorities.getBase1(2).intValue();
+					int prioNormal = priorities.getBase1(3).intValue();
 
+					Row row = Row.make(new Value(oid), new Value(eventState), new Value(notifyType),
+							new Value(ackTransOffnormal), new Value(ackTransFault), new Value(ackTransNormal),
+							new Value(tsOffnormal), new Value(tsFault), new Value(tsNormal),
+							new Value(evEnableOffnormal), new Value(evEnableFault), new Value(evEnableNormal),
+							new Value(prioOffnormal), new Value(prioFault), new Value(prioNormal));
+					table.addRow(row);
+				}
+				moreEvents = ack.getMoreEvents().booleanValue();
+			} catch (BACnetException e) {
+				LOGGER.debug("", e);
+			}
+		}
+	}
+	
+	private void makeAcknowledgeAction() {
+		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
+			@Override
+			public void handle(ActionResult event) {
+				acknowledge(event);
+			}
+		});
+		act.addParameter(new Parameter("Acknowledging Process Identifier", ValueType.NUMBER));
+		act.addParameter(new Parameter("Event Object Type", ValueType.makeEnum(Utils.getObjectTypeList())));
+		act.addParameter(new Parameter("Event Object Instance", ValueType.NUMBER));
+		act.addParameter(new Parameter("Event State Acknowledged", ValueType.makeEnum(Utils.getEnumeratedStateList(EventState.class))));
+		act.addParameter(new Parameter("Timestamp", ValueType.STRING));
+		act.addParameter(new Parameter("Acknowledgement Source", ValueType.STRING));
+		eventsnode.createChild(ACTION_ACKNOWLEDGE_ALARM, true).setAction(act).build().setSerializable(false);
+	}
+	
+	private void acknowledge(ActionResult event) {
+		UnsignedInteger acknowledgingProcessIdentifier = new UnsignedInteger(event.getParameter("Acknowledging Process Identifier", ValueType.NUMBER).getNumber().intValue());
+		ObjectType ot = ObjectType.forName(event.getParameter("Event Object Type").getString());
+		int inst = event.getParameter("Event Object Instance", ValueType.NUMBER).getNumber().intValue();
+		ObjectIdentifier eventObjectIdentifier = new ObjectIdentifier(ot, inst);
+		EventState eventStateAcknowledged = EventState.forName(event.getParameter("Event State Acknowledged").getString());
+		String tsstr = event.getParameter("Timestamp", ValueType.STRING).getString();
+		TimeStamp timeStamp = null;
+		try {
+			int i = Integer.parseUnsignedInt(tsstr);
+			timeStamp = new TimeStamp(new UnsignedInteger(i));
+		} catch (NumberFormatException e) {
+		}
+		if (timeStamp == null) {
+			DateFormat dateFormat = new W3CDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
+			try {
+				Date d = dateFormat.parse(tsstr);
+				timeStamp = new TimeStamp(new DateTime(d.getTime()));
+			} catch (ParseException e) {
+			}
+		}
+		if (timeStamp == null) {
+			Time t = TypeUtils.formatTime(new Value(tsstr));
+			timeStamp = new TimeStamp(t);
+		}
+		
+		CharacterString acknowledgmentSource = new CharacterString(event.getParameter("Acknowledgement Source", new Value("")).getString());
+		TimeStamp timeOfAcknowledgment = new TimeStamp(new DateTime(new Date().getTime()));
+		AcknowledgeAlarmRequest request =  new AcknowledgeAlarmRequest(acknowledgingProcessIdentifier, eventObjectIdentifier, eventStateAcknowledged , timeStamp, acknowledgmentSource, timeOfAcknowledgment);
+		Utils.sendConfirmedRequest(conn, this, request);
+	}
+	
+	private void makeClearEventsAction() {
+		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
+			@Override
+			public void handle(ActionResult event) {
+				clearEvents();
+			}		
+		});
+		eventsnode.createChild(ACTION_CLEAR, true).setAction(act).build().setSerializable(false);
+	}
+	
+	private void clearEvents() {
+		synchronized (eventsnode) {
+			if (eventsnode.getChildren() == null) {
+				return;
+			}
+			for (Node child: eventsnode.getChildren().values()) {
+				if (child.getAction() == null) {
+					child.delete(false);
+				}
+			}
+			eventCount = 0;
+		}
+	}
+	
+	private void makeEventActions(Node enode) {
+		makeAcknowledgeAction(enode);
+		makeDismissAction(enode);
+	}
+	
+	private void makeAcknowledgeAction(final Node enode) {
+		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
+			@Override
+			public void handle(ActionResult event) {
+				acknowledge(enode, event);
+			}
+		});
+		act.addParameter(new Parameter("Acknowledging Process Identifier", ValueType.NUMBER));
+		act.addParameter(new Parameter("Acknowledgement Source", ValueType.STRING));
+		enode.createChild(EVENT_ACTION_ACKNOWLEDGE, true).setAction(act).build().setSerializable(false);
+	}
+	
+	private void acknowledge(Node enode, ActionResult event) {
+		JsonObject jo = enode.getValue().getMap();
+		if (event.getParameter("Acknowledging Process Identifier") == null) {
+			event.getParameters().put("Acknowledging Process Identifier", jo.get("Process Identifier"));
+		}
+		String[] arr = ((String) jo.get("Event Object Identifier")).split(" ");
+		int instnum = Integer.parseInt(arr[arr.length - 1]);
+		String type = arr[0];
+		event.getParameters().put("Event Object Type", type);
+		event.getParameters().put("Event Object Instance", instnum);
+		event.getParameters().put("Event State Acknowledged", jo.get("To State"));
+		event.getParameters().put("Timestamp", jo.get("Timestamp"));
+		acknowledge(event);
+	}
+	
+	private void makeDismissAction(final Node enode) {
+		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
+			@Override
+			public void handle(ActionResult event) {
+				dismissEvent(enode);
+			}
+		});
+		enode.createChild(EVENT_ACTION_DISMISS, true).setAction(act).build().setSerializable(false);
+	}
+	
+	private void dismissEvent(Node enode) {
+		node.delete(false);
+	}
+	
+	
+	/////////////////////////////////////////////////////////////////////////////////////////
+	// Event Handling
+	/////////////////////////////////////////////////////////////////////////////////////////
+
+	
+	public void eventNotificationReceived(UnsignedInteger processIdentifier, ObjectIdentifier eventObjectIdentifier, 
+			TimeStamp timeStamp, UnsignedInteger notificationClass, UnsignedInteger priority, EventType eventType,
+			CharacterString messageText, NotifyType notifyType, Boolean ackRequired, EventState fromState,
+			EventState toState, NotificationParameters eventValues) {
+		JsonObject jo = new JsonObject();
+		jo.put("Process Identifier", processIdentifier.intValue());
+		jo.put("Event Object Identifier", eventObjectIdentifier.toString());
+		jo.put("Timestamp", timestampToString(timeStamp));
+		jo.put("Notification Class", notificationClass.intValue());
+		jo.put("Priority", priority.intValue());
+		jo.put("Event Type", eventType.toString());
+		if (messageText != null) {
+			jo.put("Message Text", messageText.toString());
+		}
+		jo.put("Notify Type", notifyType.toString());
+		if (ackRequired != null) {
+			jo.put("Ack Required", ackRequired.booleanValue());
+		}
+		if (fromState != null) {
+			jo.put("From State", fromState.toString());
+		}
+		jo.put("To State", toState.toString());
+		if (eventValues != null) {
+			jo.put("Event State", eventValues.toString());
+		}
+		Value val = new Value(jo);
+		Node enode;
+		synchronized (eventsnode) {
+			eventCount += 1;
+			enode = eventsnode.createChild(Integer.toString(eventCount), true).setValueType(ValueType.MAP).setValue(val).build();
+		}
+		if (enode != null) {
+			makeEventActions(enode);
+		}
+	}
+	
+	private String timestampToString(TimeStamp ts) {
+		if (ts.isSequenceNumber()) {
+			return ts.getSequenceNumber().bigIntegerValue().toString();
+		} else if (ts.isTime()) {
+			return TypeUtils.parseTime(ts.getTime());
+		} else if (ts.isDateTime()) {
+			DateFormat dateFormat = new W3CDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
+			return dateFormat.format(ts.getDateTime().getGC().getTime());
+		}
+		return null;
+	}
+	
+	private static class W3CDateFormat extends SimpleDateFormat {
+		private static final long serialVersionUID = 1L;
+
+		public W3CDateFormat(String string) {
+			super(string);
+		}
+
+		public Date parse(String source, ParsePosition pos) {    
+	        return super.parse(source.replaceFirst(":(?=[0-9]{2}$)",""),pos);
+	    }
+	}
+	
 }
