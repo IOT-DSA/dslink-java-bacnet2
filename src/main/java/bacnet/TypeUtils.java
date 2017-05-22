@@ -44,6 +44,10 @@ import com.serotonin.bacnet4j.type.constructed.LogData;
 import com.serotonin.bacnet4j.type.constructed.LogData.LogDataElement;
 import com.serotonin.bacnet4j.type.constructed.LogStatus;
 import com.serotonin.bacnet4j.type.constructed.ObjectTypesSupported;
+import com.serotonin.bacnet4j.type.constructed.OptionalBinaryPV;
+import com.serotonin.bacnet4j.type.constructed.OptionalCharacterString;
+import com.serotonin.bacnet4j.type.constructed.OptionalReal;
+import com.serotonin.bacnet4j.type.constructed.OptionalUnsigned;
 import com.serotonin.bacnet4j.type.constructed.PriorityArray;
 import com.serotonin.bacnet4j.type.constructed.PriorityValue;
 import com.serotonin.bacnet4j.type.constructed.ResultFlags;
@@ -52,6 +56,7 @@ import com.serotonin.bacnet4j.type.constructed.ServicesSupported;
 import com.serotonin.bacnet4j.type.constructed.StatusFlags;
 import com.serotonin.bacnet4j.type.constructed.WeekNDay;
 import com.serotonin.bacnet4j.type.constructed.WeekNDay.WeekOfMonth;
+import com.serotonin.bacnet4j.type.enumerated.BinaryPV;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.BitString;
@@ -99,7 +104,16 @@ public class TypeUtils {
 	
 	@SuppressWarnings("unchecked")
 	public static Encodable formatEncodable(Class<? extends Encodable> clazz, Value val, ObjectType ot, PropertyIdentifier pid) {
-		if (val.getArray() != null && (!clazz.equals(BitString.class) || PropertyIdentifier.alarmValues.equals(pid))) {
+		boolean isSeq = false;
+		if (clazz.equals(PriorityArray.class)) {
+			isSeq = true;
+		} else if (ot != null && pid != null) {
+			PropertyTypeDefinition info = ObjectProperties.getObjectPropertyTypeDefinition(ot, pid).getPropertyTypeDefinition();
+			isSeq = info.isCollection();
+		} else if (val != null && val.getArray() != null) {
+			isSeq = (!clazz.equals(BitString.class));
+		}
+		if (isSeq) {
 			return formatSequenceOf(clazz, val, ot, pid);
 		} else if (BaseType.class.isAssignableFrom(clazz)) {
 			return formatBaseType((Class<? extends BaseType>) clazz, val, ot, pid);
@@ -133,6 +147,8 @@ public class TypeUtils {
 			return parseEncodable(((PriorityValue) enc).getValue());
 		} else if (enc instanceof Choice) {
 			return parseEncodable(((Choice) enc).getDatum(), maxDepth);
+		} else if (enc.getClass().getSimpleName().startsWith("Optional")) {
+			return parseOptional(enc);
 		} else {
 			return Pair.of(ValueType.MAP, new Value(parseNonSequenceConstructed(enc, maxDepth)));
 		}
@@ -145,7 +161,11 @@ public class TypeUtils {
 		} else if (ChannelValue.class.isAssignableFrom(clazz)) {
 			JsonObject jo = val.getMap();
 			if (jo == null) {
-				return null;
+				try {
+					jo = new JsonObject(val.getString());
+				} catch (Exception e) {
+					return null;
+				}
 			}
 			Value v = ValueUtils.toValue(jo.get("Value"));
 			try {
@@ -165,6 +185,8 @@ public class TypeUtils {
 			}
 			Class<? extends Encodable> clz = ObjectProperties.getObjectPropertyTypeDefinition(ot, PropertyIdentifier.presentValue).getPropertyTypeDefinition().getClazz();
 			return new PriorityValue(formatEncodable(clz, val));
+		} else if (clazz.getSimpleName().startsWith("Optional")) {
+			return formatOptional(clazz, val);
 		} else {
 			return formatNonSequenceConstructed(clazz, val, ot);
 		}
@@ -276,6 +298,13 @@ public class TypeUtils {
 			if (PriorityArray.class.isAssignableFrom(clazz)) {
 				PriorityArray pa = new PriorityArray();
 				JsonArray ja = val.getArray();
+				if (ja == null) {
+					try {
+						ja = new JsonArray(val.getString());
+					} catch (Exception e) {
+						ja = null;
+					}
+				}
 				if (ja != null) {
 					for (int i=0; i<16; i++) {
 						if (ja.size() > i && ja.get(i) != null) {
@@ -288,9 +317,16 @@ public class TypeUtils {
 				return null;
 			}
 		} else {
-			PropertyTypeDefinition info = ObjectProperties.getObjectPropertyTypeDefinition(ot, PropertyIdentifier.presentValue).getPropertyTypeDefinition();
+			PropertyTypeDefinition info = ObjectProperties.getObjectPropertyTypeDefinition(ot, pid).getPropertyTypeDefinition();
 			if (info.isArray()) {
 				JsonArray ja = val.getArray();
+				if (ja == null) {
+					try {
+						ja = new JsonArray(val.getString());
+					} catch (Exception e) {
+						ja = null;
+					}
+				}
 				if (ja != null) {
 					int size = ja.size();
 					BACnetArray<Encodable> arr = new BACnetArray<Encodable>(size, null);
@@ -312,12 +348,92 @@ public class TypeUtils {
 	private static SequenceOf<? extends Encodable> formatList(Class<? extends Encodable> clazz, Value val) {
 		SequenceOf<Encodable> seq = new SequenceOf<Encodable>();
 		JsonArray ja = val.getArray();
+		if (ja == null) {
+			try {
+				ja = new JsonArray(val.getString());
+			} catch (Exception e) {
+				ja = null;
+			}
+		}
 		if (ja != null) {
 			for (Object o: ja) {
 				seq.add(formatEncodable(clazz, ValueUtils.toValue(o)));
 			}
 		}
 		return seq;
+	}
+	
+	public static Pair<ValueType, Value> parseOptional(BaseType enc) {
+		if (enc instanceof OptionalBinaryPV) {
+			try {
+				BinaryPV bpv = ((OptionalBinaryPV) enc).getBinaryPVValue();
+				return parsePrimitive(bpv);
+			} catch (Exception e) {
+				return Pair.of(ValueType.STRING, null);
+			}
+		} else if (enc instanceof OptionalCharacterString) {
+			try {
+				CharacterString cs = ((OptionalCharacterString) enc).getCharacterStringValue();
+				return parsePrimitive(cs);
+			} catch (Exception e) {
+				return Pair.of(ValueType.STRING, null);
+			}
+		} else if (enc instanceof OptionalReal) {
+			try {
+				Real r = ((OptionalReal) enc).getRealValue();
+				return parsePrimitive(r);
+			} catch (Exception e) {
+				return Pair.of(ValueType.NUMBER, null);
+			}
+		} else if (enc instanceof OptionalUnsigned) {
+			try {
+				UnsignedInteger u = ((OptionalUnsigned) enc).getUnsignedIntegerValue();
+				return parsePrimitive(u);
+			} catch (Exception e) {
+				return Pair.of(ValueType.NUMBER, null);
+			}
+		}
+		return Pair.of(ValueType.STRING, null);
+	}
+	
+	public static BaseType formatOptional(Class<? extends BaseType> clazz, Value val) {
+		String s = null;
+		Boolean b = null;
+		Number n = null;
+		if (val != null) {
+			s = val.getString();
+			b = val.getBool();
+			n = val.getNumber();
+		}
+		if (clazz.equals(OptionalBinaryPV.class)) {
+			if (s != null) {
+				try {
+					return new OptionalBinaryPV(BinaryPV.forName(s));
+				} catch (Exception e) {
+					
+				}
+			} else if (b != null) {
+				return new OptionalBinaryPV(b.booleanValue() ? BinaryPV.active : BinaryPV.inactive);
+			}
+			return new OptionalBinaryPV();
+		} else if (clazz.equals(OptionalCharacterString.class)) {
+			if (s != null) {
+				return new OptionalCharacterString(new CharacterString(s));
+			}
+			return new OptionalCharacterString();
+		} else if (clazz.equals(OptionalReal.class)) {
+			if (n != null) {
+				return new OptionalReal(n.floatValue());
+			}
+			return new OptionalReal();
+		} else if (clazz.equals(OptionalUnsigned.class)) {
+			if (n != null && n.intValue() >= 0) {
+				return new OptionalUnsigned(n.intValue());
+			}
+			return new OptionalUnsigned();
+		} else {
+			return null;
+		}
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -397,7 +513,11 @@ public class TypeUtils {
 	public static BaseType formatNonSequenceConstructed(Class<? extends BaseType> clazz, Value val, ObjectType ot) {
 		JsonObject jobj = val.getMap();
 		if (jobj == null) {
-			return null;
+			try {
+				jobj = new JsonObject(val.getString());
+			} catch (Exception e) {
+				return null;
+			}
 		}
 		if (LogData.class.equals(clazz)) {
 			Object o = jobj.get("Datum");
@@ -575,6 +695,13 @@ public class TypeUtils {
 	public static BitString formatBitString(Class<? extends BitString> clazz, Value val) {
 		if (clazz.equals(BitString.class)) {
 			JsonArray jarr = val.getArray();
+			if (jarr == null) {
+				try {
+					jarr = new JsonArray(val.getString());
+				} catch (Exception e) {
+					return null;
+				}
+			}
 			boolean[] params = new boolean[jarr.size()];
 			for (int i = 0; i < params.length; i++) {
 				params[i] = jarr.get(i);
@@ -592,6 +719,19 @@ public class TypeUtils {
 			Boolean[] params = new Boolean[labels.size()];
 			JsonObject jobj = val.getMap();
 			JsonArray jarr = val.getArray();
+			if (jobj == null && jarr == null) {
+				String s = val.getString();
+				try {
+					jobj = new JsonObject(s);
+				} catch (Exception e) {
+					jobj = null;
+				}
+				try {
+					jarr = new JsonArray(s);
+				} catch (Exception e) {
+					jarr = null;
+				}
+			}
 			for (int i = 0; i < parameterTypes.length; i++) {
 				parameterTypes[i] = boolean.class;
 				if (jobj != null) {
@@ -661,7 +801,11 @@ public class TypeUtils {
 	public static Date formatDate(Value val) {
 		JsonObject jobj = val.getMap();
 		if (jobj == null) {
-			return Date.UNSPECIFIED;
+			try {
+				jobj = new JsonObject(val.getString());
+			} catch (Exception e) {
+				return Date.UNSPECIFIED;
+			}
 		}
 		int yr = jobj.get("Year", -1);
 		Month mn = Month.valueOf(jobj.get("Month", Month.UNSPECIFIED.toString()));
@@ -799,6 +943,13 @@ public class TypeUtils {
 	
 	private static BitString formatDowOrSs(Value val, Class<? extends BitString> clazz) throws InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, NoSuchMethodException, SecurityException {
 		JsonObject jobj = val.getMap();
+		if (jobj == null) {
+			try {
+				jobj = new JsonObject(val.getString());
+			} catch (Exception e) {
+				return null;
+			}
+		}
 		List<String> labels = getBitStringLabels(clazz);
 		BitString obj = clazz.getConstructor().newInstance();
 		for (String label: labels) {
@@ -814,7 +965,11 @@ public class TypeUtils {
 	public static ObjectTypesSupported formatObjectTypesSupported(Value val) {
 		JsonObject jobj = val.getMap();
 		if (jobj == null) {
-			return new ObjectTypesSupported();
+			try {
+				jobj = new JsonObject(val.getString());
+			} catch (Exception e) {
+				return new ObjectTypesSupported();
+			}
 		}
 		List<String> labels = getBitStringLabels(ObjectTypesSupported.class);
 		ObjectTypesSupported ots = new ObjectTypesSupported();
@@ -846,7 +1001,11 @@ public class TypeUtils {
 	public static WeekNDay formatWeekNDay(Value val) {
 		JsonObject jobj = val.getMap();
 		if (jobj == null) {
-			return new WeekNDay(Month.UNSPECIFIED, WeekOfMonth.any, DayOfWeek.UNSPECIFIED);
+			try {
+				jobj = new JsonObject(val.getString());
+			} catch (Exception e) {
+				return new WeekNDay(Month.UNSPECIFIED, WeekOfMonth.any, DayOfWeek.UNSPECIFIED);
+			}
 		}
 		Month mn = Month.valueOf(jobj.get("Month", Month.UNSPECIFIED.toString()));
 		WeekOfMonth wk = WeekOfMonth.valueOf(jobj.get("Week of Month", WeekOfMonth.any.byteValue()));

@@ -32,7 +32,6 @@ import com.serotonin.bacnet4j.npdu.Network;
 import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
 import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.service.Service;
-import com.serotonin.bacnet4j.service.confirmed.ReinitializeDeviceRequest.ReinitializedStateOfDevice;
 import com.serotonin.bacnet4j.service.unconfirmed.WhoIsRequest;
 import com.serotonin.bacnet4j.transport.DefaultTransport;
 import com.serotonin.bacnet4j.transport.Transport;
@@ -69,6 +68,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 	static final String ACTION_ADD_CUSTOM_DEVICE = "add custom device";
 	static final String ACTION_ADD_ALL = "add all discovered devices";
 	
+	static final String NODE_LOCAL = "LOCAL";
 	static final String NODE_STATUS = "STATUS";
 	static final String NODE_STATUS_SETTING_UP_CONNECTION = "Setting up connection";
 	static final String NODE_STATUS_CONNECTED = "Connected";
@@ -77,6 +77,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 	protected Node node;
 	protected BacnetLink link;
 	private final Node statnode;
+	private final BacnetLocalDevice localController;
 	private final ScheduledThreadPoolExecutor stpe = Objects.createDaemonThreadPool();
 	
 	private final Map<Integer, RemoteDevice> discovered = new ConcurrentHashMap<Integer, RemoteDevice>();
@@ -114,6 +115,9 @@ public abstract class BacnetConn implements DeviceEventListener {
 		this.statnode = node.createChild(NODE_STATUS, true).setValueType(ValueType.STRING).setValue(new Value(""))
 				.build();
 		this.statnode.setSerializable(false);
+		Node localNode = node.getChild(NODE_LOCAL, true);
+		if (localNode == null) localNode = node.createChild(NODE_LOCAL, true).build();
+		this.localController = new BacnetLocalDevice(this, localNode);
 	}
 	
 	public static BacnetConn buildConn(BacnetLink link, Node node) {
@@ -219,6 +223,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 				localDevice.getEventHandler().addListener(this);
 				localDevice.initialize();
 				localDevice.sendGlobalBroadcast(localDevice.getIAm());
+				LOGGER.info("sent IAm - " + localDevice.getInstanceNumber());
 //				localDevice.sendGlobalBroadcast(new WhoIsRequest());
 			} catch (Exception e) {
 				LOGGER.debug("", e);
@@ -244,6 +249,8 @@ public abstract class BacnetConn implements DeviceEventListener {
 			makeAddAllAction();
 		}
 		
+		localController.init();
+		
 	}
 	
 	abstract void registerAsForeignDevice(Transport transport);
@@ -257,7 +264,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 		}
 
 		for (Node child : node.getChildren().values()) {
-			if (child.getAction() == null && !child.getName().equals(NODE_STATUS)) {
+			if (child.getAction() == null && !child.getName().equals(NODE_STATUS) && !child.getName().equals(NODE_LOCAL)) {
 				BacnetDevice bd = new BacnetDevice(this, child, null);
 				bd.restoreLastSession();
 			}
@@ -551,7 +558,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 
 	@Override
 	public void iAmReceived(final RemoteDevice d) {
-		LOGGER.info("iAm recieved: " + d);
+		LOGGER.debug("iAm recieved: " + d);
 		discovered.put(d.getInstanceNumber(), d);
 		Objects.getDaemonThreadPool().schedule(new Runnable() {
 			@Override
@@ -580,7 +587,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 			d.setDeviceProperty(PropertyIdentifier.objectName, enc);
 		}
 		makeAddDiscoveredDeviceAction();
-		LOGGER.info("iAm processed: " + d);
+		LOGGER.debug("iAm processed: " + d);
 //		if (discoveryLock.tryLock()) {
 //			try {
 //				Thread.sleep(500);

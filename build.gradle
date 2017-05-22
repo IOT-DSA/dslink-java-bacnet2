@@ -5,7 +5,7 @@ apply plugin: 'java'
 mainClassName = 'bacnet.Main'
 sourceCompatibility = 1.7
 targetCompatibility = 1.7
-version = '2.0.7-SNAPSHOT'
+version = '2.0.8-SNAPSHOT'
 
 repositories {
     mavenCentral()
