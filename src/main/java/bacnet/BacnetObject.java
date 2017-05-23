@@ -37,6 +37,7 @@ import com.serotonin.bacnet4j.type.constructed.LogMultipleRecord;
 import com.serotonin.bacnet4j.type.constructed.LogRecord;
 import com.serotonin.bacnet4j.type.constructed.PropertyValue;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
+import com.serotonin.bacnet4j.type.enumerated.BinaryPV;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.error.BACnetError;
@@ -86,8 +87,10 @@ public class BacnetObject extends BacnetProperty {
 		this.hiddenActiveTextProp = new HiddenProperty(device, this, oid, PropertyIdentifier.activeText);
 		this.hiddenInactiveTextProp = new HiddenProperty(device, this, oid, PropertyIdentifier.inactiveText);
 		this.hiddenActionTextProp = new HiddenProperty(device, this, oid, PropertyIdentifier.actionText);
-		stateText.add("inactive");
-		stateText.add("active");
+		if (Utils.isOneOf(oid.getObjectType(), ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
+			stateText.add("inactive");
+			stateText.add("active");
+		}
 	}
 
 	void restoreLastSession() {
@@ -213,40 +216,27 @@ public class BacnetObject extends BacnetProperty {
 	}
 
 	private void write(Value newval, int priority) {
-		Encodable enc = encodableFromValue(newval);
-//		ObjectType ot = oid.getObjectType();
-//		if (newval == null) {
-//			enc = Null.instance;
-//		} else if (Utils.isOneOf(ot, ObjectType.binaryOutput, ObjectType.binaryValue)) {
-//			enc = newval.getBool() ? BinaryPV.active : BinaryPV.inactive;
-//		} else if (Utils.isOneOf(ot, ObjectType.multiStateOutput, ObjectType.multiStateValue, ObjectType.command)) {
-//			int i = stateText.indexOf(newval.getString());
-//			enc = new UnsignedInteger(i);
-//		} else if (Utils.isOneOf(ot, ObjectType.analogOutput, ObjectType.analogValue, ObjectType.lightingOutput)) {
-//			enc = new Real(newval.getNumber().floatValue());
-//		} else if (Utils.isOneOf(ot, ObjectType.accessDoor)) {
-//			enc = DoorValue.forName(newval.getString());
-//		} else if (Utils.isOneOf(ot, ObjectType.characterstringValue)) {
-//			enc = new CharacterString(newval.getString());
-//		} else if (Utils.isOneOf(ot, ObjectType.datetimeValue)) {
-//			//TODO
-//		} else if (Utils.isOneOf(ot, ObjectType.largeAnalogValue)) {
-//			enc = new com.serotonin.bacnet4j.type.primitive.Double(newval.getNumber().doubleValue());
-//		} else if (Utils.isOneOf(ot, ObjectType.timeValue)) {
-//			//TODO
-//		} else if (Utils.isOneOf(ot, ObjectType.integerValue)) {
-//			enc = new SignedInteger(newval.getNumber().intValue());
-//		} else if (Utils.isOneOf(ot, ObjectType.positiveIntegerValue, ObjectType.timer, ObjectType.accumulator)) {
-//			enc = new UnsignedInteger(newval.getNumber().intValue());
-//		} else if (Utils.isOneOf(ot, ObjectType.dateValue)) {
-//			//TODO
-//		} else if (Utils.isOneOf(ot, ObjectType.datetimePatternValue, ObjectType.timePatternValue, ObjectType.datePatternValue)) {
-//			//TODO
-//		} else if (Utils.isOneOf(ot, ObjectType.channel)) {
-//			//TODO
-//		} else if (Utils.isOneOf(ot, ObjectType.binaryLightingOutput)) {
-//			enc = BinaryLightingPV.forName(newval.getString());
-//		}
+		Encodable enc = null;
+		DataType type = getDataType();
+		switch (type) {
+		case BINARY: {
+			enc = (newval.getBool() != null && newval.getBool()) ? BinaryPV.active : BinaryPV.inactive;
+			break;
+		}
+		case MULTISTATE: {
+			if (newval.getNumber() != null) {
+				enc = new UnsignedInteger(newval.getNumber().intValue());
+			} else if (newval.getString() != null) {
+				int i = stateText.indexOf(newval.getString());
+				enc = new UnsignedInteger(i);
+			}
+			break;
+		}
+		case OTHER:
+			enc = encodableFromValue(newval);
+			break;
+		}
+		
 		if (enc == null) {
 			return;
 		}
@@ -464,14 +454,21 @@ public class BacnetObject extends BacnetProperty {
 //			break;
 //		}
 		case MULTISTATE: {
-			vt = ValueType.makeEnum(stateText);
+			int i = -1;
 			if (value instanceof Enumerated) {
-				int i = ((Enumerated) value).intValue();
-				v = new Value(stateText.get(i));
+				i = ((Enumerated) value).intValue();
 			} else if (value instanceof UnsignedInteger) {
-				int i = ((UnsignedInteger) value).intValue();
-				v = new Value(stateText.get(i));
+				i = ((UnsignedInteger) value).intValue();
 			}
+			if (i >= 0) {
+				if (stateText.size() > 0) {
+					vt = ValueType.makeEnum(stateText);
+					v = new Value(stateText.get(i));
+				} else {
+					vt = ValueType.NUMBER;
+					v = new Value(i);
+				}
+			} 
 			break;
 		}
 		case OTHER: {
