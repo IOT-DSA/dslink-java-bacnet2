@@ -27,6 +27,7 @@ import org.dsa.iot.dslink.node.actions.table.Row;
 import org.dsa.iot.dslink.node.actions.table.Table;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
+import org.dsa.iot.dslink.util.Objects;
 import org.dsa.iot.dslink.util.handler.Handler;
 import org.dsa.iot.dslink.util.json.JsonObject;
 import org.slf4j.Logger;
@@ -163,35 +164,40 @@ public class BacnetDevice {
 	}
 
 	public void init() {
-		try {
-			monitor.checkInWriter();
-			if (remoteDevice == null) {
-				statnode.setValue(new Value("Connecting"));
+		Objects.getDaemonThreadPool().schedule(new Runnable() {
+			@Override
+			public void run() {
 				try {
-					conn.monitor.checkInReader();
-					if (conn.localDevice != null) {
+					monitor.checkInWriter();
+					if (remoteDevice == null) {
+						statnode.setValue(new Value("Connecting"));
 						try {
-							remoteDevice = conn.localDevice.getRemoteDeviceBlocking(instanceNumber);
-						} catch (BACnetException e) {
-							statnode.setValue(new Value("Failed to Connect"));
-							LOGGER.debug("", e);
+							conn.monitor.checkInReader();
+							if (conn.localDevice != null) {
+								try {
+									remoteDevice = conn.localDevice.getRemoteDeviceBlocking(instanceNumber);
+								} catch (BACnetException e) {
+									statnode.setValue(new Value("Failed to Connect"));
+									LOGGER.debug("", e);
+								}
+							} else {
+								statnode.setValue(new Value("Connection Down"));
+							}
+							conn.monitor.checkOutReader();
+						} catch (InterruptedException e) {
+
 						}
-					} else {
-						statnode.setValue(new Value("Connection Down"));
 					}
-					conn.monitor.checkOutReader();
+					if (remoteDevice != null) {
+						statnode.setValue(new Value("Ready"));
+					}
+					monitor.checkOutWriter();
 				} catch (InterruptedException e) {
 
 				}
 			}
-			if (remoteDevice != null) {
-				statnode.setValue(new Value("Ready"));
-			}
-			monitor.checkOutWriter();
-		} catch (InterruptedException e) {
-
-		}
-
+		}, 0, TimeUnit.MILLISECONDS);
+		
 		makeFolderActions(node);
 		makeEditAction();
 		makeStopAction();
