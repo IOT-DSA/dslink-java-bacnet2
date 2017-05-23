@@ -558,7 +558,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 
 	@Override
 	public void iAmReceived(final RemoteDevice d) {
-		LOGGER.info("iAm recieved: " + d);
+		LOGGER.trace("iAm recieved: " + d);
 		discovered.put(d.getInstanceNumber(), d);
 		Objects.getDaemonThreadPool().schedule(new Runnable() {
 			@Override
@@ -587,7 +587,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 			d.setDeviceProperty(PropertyIdentifier.objectName, enc);
 		}
 		makeAddDiscoveredDeviceAction();
-		LOGGER.info("iAm processed: " + d);
+		LOGGER.trace("iAm processed: " + d);
 //		if (discoveryLock.tryLock()) {
 //			try {
 //				Thread.sleep(500);

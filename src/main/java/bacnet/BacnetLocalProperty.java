@@ -100,7 +100,7 @@ public class BacnetLocalProperty {
 				PropertyTypeDefinition ptd = ObjectProperties.getObjectPropertyTypeDefinition(object.oid.getObjectType(), pid).getPropertyTypeDefinition();
 				Class<? extends Encodable> clazz = ptd.getClazz();
 				ValueSource valueSource = new ValueSource();
-				LOGGER.info("writing " + pid.toString());
+				LOGGER.trace("writing " + pid.toString());
 				Encodable enc = TypeUtils.formatEncodable(clazz, value, object.oid.getObjectType(), pid);
 				if (enc == null) {
 					enc = Null.instance;
