@@ -123,7 +123,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 	public static BacnetConn buildConn(BacnetLink link, Node node) {
 		Value subnetMask = node.getRoConfig("Subnet Mask");
 		if (subnetMask == null) {
-			subnetMask = new Value(IpNetwork.DEFAULT_SUBNET_MASK);
+			subnetMask = new Value("0.0.0.0");
 			node.setRoConfig("Subnet Mask", subnetMask);
 		}
 		Value port = node.getRoConfig("Port");

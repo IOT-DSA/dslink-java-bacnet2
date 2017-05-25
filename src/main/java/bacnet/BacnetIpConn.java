@@ -25,6 +25,7 @@ import com.serotonin.bacnet4j.npdu.ip.IpNetworkBuilder;
 import com.serotonin.bacnet4j.npdu.ip.IpNetworkUtils;
 import com.serotonin.bacnet4j.transport.Transport;
 import com.serotonin.bacnet4j.type.primitive.OctetString;
+import com.serotonin.bacnet4j.util.BACnetUtils;
 
 public class BacnetIpConn extends BacnetConn {
 	
@@ -42,7 +43,26 @@ public class BacnetIpConn extends BacnetConn {
 
 	@Override
 	Network getNetwork() {
-		return new IpNetworkBuilder().withSubnetMask(subnetMask).withPort(port).withLocalBindAddress(localBindAddress).withLocalNetworkNumber(localNetworkNumber).build();
+		String subnetAddr = localBindAddress;
+		if (subnetAddr.equals(IpNetwork.DEFAULT_BIND_IP)) {
+			try {
+				subnetAddr = InetAddress.getLocalHost().getHostAddress();
+			} catch (UnknownHostException e) {
+			}
+		}
+		return new IpNetworkBuilder().withSubnet(subnetAddr, getNetworkPrefixLength(subnetMask)).withPort(port).withLocalBindAddress(localBindAddress).withLocalNetworkNumber(localNetworkNumber).build();
+	}
+	
+	int getNetworkPrefixLength(String subnetMask) {
+		long addr = IpNetworkUtils.bytesToLong(BACnetUtils.dottedStringToBytes(subnetMask));
+		int shift = 32;
+		for (int i = 0; i < 32 ; i++) {
+			shift--;
+			if ((addr & (1L << shift)) == 0) {
+				return i;
+			}
+		}
+		return 32;
 	}
 	
 	void parseBroadcastManagementDevice() {

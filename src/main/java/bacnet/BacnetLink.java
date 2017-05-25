@@ -70,7 +70,7 @@ public class BacnetLink {
 			}
 		});
 		act.addParameter(new Parameter("Name", ValueType.STRING));
-		act.addParameter(new Parameter("Subnet Mask", ValueType.STRING, new Value(IpNetwork.DEFAULT_SUBNET_MASK)));
+		act.addParameter(new Parameter("Subnet Mask", ValueType.STRING, new Value("0.0.0.0")));
 		act.addParameter(new Parameter("Port", ValueType.NUMBER, new Value(IpNetwork.DEFAULT_PORT)));
 		act.addParameter(new Parameter("Local Bind Address", ValueType.STRING, new Value(IpNetwork.DEFAULT_BIND_IP)));
 		act.addParameter(new Parameter("Local Network Number", ValueType.NUMBER, new Value(0)));
