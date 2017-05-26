@@ -97,7 +97,7 @@ public class Utils {
 					conn.monitor.checkInReader();
 					if (conn.localDevice != null) {
 						try {
-							enc = RequestUtils.readProperty(conn.localDevice, device.remoteDevice, oid, pid, propertyArrayIndex);
+							enc = RequestUtils.sendReadPropertyAllowNull(conn.localDevice, device.remoteDevice, oid, pid, propertyArrayIndex, null);
 						} catch (BACnetException e) {
 							LOGGER.debug("", e);
 						}

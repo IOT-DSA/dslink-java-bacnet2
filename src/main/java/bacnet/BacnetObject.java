@@ -46,7 +46,6 @@ import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.Enumerated;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
-import com.serotonin.bacnet4j.util.RequestUtils;
 
 
 public class BacnetObject extends BacnetProperty {
@@ -146,29 +145,7 @@ public class BacnetObject extends BacnetProperty {
 
 	@SuppressWarnings("unchecked")
 	private SequenceOf<PropertyIdentifier> getPropertyList() {
-		try {
-			device.monitor.checkInReader();
-			if (device.remoteDevice != null) {
-				try {
-					device.conn.monitor.checkInReader();
-					if (device.conn.localDevice != null) {
-						try {
-							return (SequenceOf<PropertyIdentifier>) RequestUtils.sendReadPropertyAllowNull(
-									device.conn.localDevice, device.remoteDevice, oid, PropertyIdentifier.propertyList);
-						} catch (BACnetException e) {
-							LOGGER.debug("", e);
-						}
-					}
-					device.conn.monitor.checkOutReader();
-				} catch (InterruptedException e) {
-
-				}
-			}
-			device.monitor.checkOutReader();
-		} catch (InterruptedException e) {
-
-		}
-		return null;
+		return (SequenceOf<PropertyIdentifier>) Utils.readProperty(device.conn, device, oid, PropertyIdentifier.propertyList, null);
 	}
 	
 	private void initHistory() {
