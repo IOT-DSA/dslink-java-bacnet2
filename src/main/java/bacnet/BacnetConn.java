@@ -4,8 +4,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
@@ -29,7 +31,6 @@ import com.serotonin.bacnet4j.RemoteObject;
 import com.serotonin.bacnet4j.event.DeviceEventListener;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.npdu.Network;
-import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
 import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.service.Service;
 import com.serotonin.bacnet4j.service.unconfirmed.WhoIsRequest;
@@ -65,7 +66,8 @@ public abstract class BacnetConn implements DeviceEventListener {
 	static final String ACTION_RESTART = "restart";
 	static final String ACTION_DISCOVER_DEVICES = "discover devices";
 	static final String ACTION_ADD_DEVICE = "add device";
-	static final String ACTION_ADD_CUSTOM_DEVICE = "add custom device";
+	static final String ACTION_ADD_DEVICE_BY_NUMBER = "add device by number";
+	static final String ACTION_ADD_DEVICE_BY_ADDR = "add device by address";
 	static final String ACTION_ADD_ALL = "add all discovered devices";
 	
 	static final String NODE_LOCAL = "LOCAL";
@@ -245,7 +247,8 @@ public abstract class BacnetConn implements DeviceEventListener {
 			statnode.setValue(new Value(NODE_STATUS_CONNECTED));
 			makeDiscoverAction();
 			makeAddDiscoveredDeviceAction();
-			makeAddCustomDeviceAction();
+			makeAddDeviceByNumberAction();
+			makeAddDeviceByAddressAction();
 			makeAddAllAction();
 		}
 		
@@ -421,7 +424,6 @@ public abstract class BacnetConn implements DeviceEventListener {
 		act.addParameter(new Parameter("Device", ValueType.makeEnum(Utils.getDeviceEnum(discovered))));
 		act.addParameter(new Parameter("Name", ValueType.STRING).setDescription("Optional - will be inferred from device if left blank"));
 		act.addParameter(new Parameter("Polling Interval", ValueType.NUMBER, new Value(5)));
-		//TODO headless polling?
 		act.addParameter(new Parameter("Get Confirmed COV Notifications", ValueType.BOOL, new Value(false)));
 		act.addParameter(new Parameter("COV Lifetime", ValueType.NUMBER, new Value(0)));
 		Node anode = node.getChild(ACTION_ADD_DEVICE, true);
@@ -433,23 +435,44 @@ public abstract class BacnetConn implements DeviceEventListener {
 		}
 	}
 	
-	private void makeAddCustomDeviceAction() {
+	private void makeAddDeviceByNumberAction() {
 		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
 			@Override
 			public void handle(ActionResult event) {
-				addCustomDevice(event);
+				addDeviceByNumber(event);
 			}
 		});
 		
 		act.addParameter(new Parameter("Name", ValueType.STRING));
 		act.addParameter(new Parameter("Instance Number", ValueType.NUMBER));
 		act.addParameter(new Parameter("Polling Interval", ValueType.NUMBER, new Value(5)));
-		//TODO headless polling?
 		act.addParameter(new Parameter("Get Confirmed COV Notifications", ValueType.BOOL, new Value(false)));
 		act.addParameter(new Parameter("COV Lifetime", ValueType.NUMBER, new Value(0)));
-		Node anode = node.getChild(ACTION_ADD_CUSTOM_DEVICE, true);
+		Node anode = node.getChild(ACTION_ADD_DEVICE_BY_NUMBER, true);
 		if (anode == null) {
-			node.createChild(ACTION_ADD_CUSTOM_DEVICE, true).setAction(act).setConfig("actionGroup", new Value("Add Device")).setConfig("actionGroupSubTitle", new Value("By Instance Number")).build().setSerializable(false);
+			node.createChild(ACTION_ADD_DEVICE_BY_NUMBER, true).setAction(act).setConfig("actionGroup", new Value("Add Device")).setConfig("actionGroupSubTitle", new Value("By Instance Number")).build().setSerializable(false);
+		} else {
+			anode.setAction(act);
+		}
+	}
+	
+	private void makeAddDeviceByAddressAction() {
+		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
+			@Override
+			public void handle(ActionResult event) {
+				addDeviceByAddress(event);
+			}	
+		});
+		
+		act.addParameter(new Parameter("Name", ValueType.STRING));
+		act.addParameter(new Parameter("Network Number", ValueType.NUMBER, new Value(0)));
+		act.addParameter(new Parameter("Address", ValueType.STRING));
+		act.addParameter(new Parameter("Polling Interval", ValueType.NUMBER, new Value(5)));
+		act.addParameter(new Parameter("Get Confirmed COV Notifications", ValueType.BOOL, new Value(false)));
+		act.addParameter(new Parameter("COV Lifetime", ValueType.NUMBER, new Value(0)));
+		Node anode = node.getChild(ACTION_ADD_DEVICE_BY_ADDR, true);
+		if (anode == null) {
+			node.createChild(ACTION_ADD_DEVICE_BY_ADDR, true).setAction(act).setConfig("actionGroup", new Value("Add Device")).setConfig("actionGroupSubTitle", new Value("By Address")).build().setSerializable(false);
 		} else {
 			anode.setAction(act);
 		}
@@ -463,7 +486,6 @@ public abstract class BacnetConn implements DeviceEventListener {
 			}
 		});
 		act.addParameter(new Parameter("Polling Interval", ValueType.NUMBER, new Value(5)));
-		//TODO headless polling?
 		act.addParameter(new Parameter("Get Confirmed COV Notifications", ValueType.BOOL, new Value(false)));
 		act.addParameter(new Parameter("COV Lifetime", ValueType.NUMBER, new Value(0)));
 		Node anode = node.getChild(ACTION_ADD_ALL, true);
@@ -503,10 +525,10 @@ public abstract class BacnetConn implements DeviceEventListener {
 		RemoteDevice d = discovered.get(inst);
 		event.getParameters().remove("Device");
 		event.getParameters().put("Instance Number", inst);
-		addDevice(event, d, inst);
+		addDevice(event, d);
 	}
 	
-	private void addCustomDevice(ActionResult event) {
+	private void addDeviceByNumber(ActionResult event) {
 		int inst = event.getParameter("Instance Number", ValueType.NUMBER).getNumber().intValue();
 		RemoteDevice d = null;
 		try {
@@ -522,10 +544,107 @@ public abstract class BacnetConn implements DeviceEventListener {
 		} catch (InterruptedException e) {
 			
 		}
-		addDevice(event, d, inst);
+		addDevice(event, d);
 	}
 	
-	private void addDevice(ActionResult event, RemoteDevice d, int instanceNum) {
+	private void addDeviceByAddress(ActionResult event) {
+		int netNum = event.getParameter("Network Number").getNumber().intValue();
+		String addrStr = event.getParameter("Address", ValueType.STRING).getString();
+		final Address address = Utils.toAddress(netNum, addrStr);
+		RemoteDevice d = findRemoteDeviceByAddress(address);
+		addDevice(event, d);
+	}
+	
+	RemoteDevice findRemoteDeviceByAddress(final Address address) {
+		if (address == null) {
+			return null;
+		}
+		final Queue<RemoteDevice> wrapper = new ConcurrentLinkedQueue<RemoteDevice>();
+		DeviceEventListener listener = new DeviceEventListener() {
+			@Override
+			public void listenerException(Throwable e) {
+			}
+			@Override
+			public void iAmReceived(RemoteDevice d) {
+				if (d.getAddress().equals(address)) {
+					synchronized(this) {
+						wrapper.add(d);
+						this.notifyAll();
+					}
+				}
+			}
+			@Override
+			public boolean allowPropertyWrite(Address from, BACnetObject obj, PropertyValue pv) {
+				return true;
+			}
+			@Override
+			public void propertyWritten(Address from, BACnetObject obj, PropertyValue pv) {
+			}
+			@Override
+			public void iHaveReceived(RemoteDevice d, RemoteObject o) {
+			}
+			@Override
+			public void covNotificationReceived(UnsignedInteger subscriberProcessIdentifier,
+					ObjectIdentifier initiatingDeviceIdentifier, ObjectIdentifier monitoredObjectIdentifier,
+					UnsignedInteger timeRemaining, SequenceOf<PropertyValue> listOfValues) {
+			}
+			@Override
+			public void eventNotificationReceived(UnsignedInteger processIdentifier,
+					ObjectIdentifier initiatingDeviceIdentifier, ObjectIdentifier eventObjectIdentifier,
+					TimeStamp timeStamp, UnsignedInteger notificationClass, UnsignedInteger priority,
+					EventType eventType, CharacterString messageText, NotifyType notifyType,
+					Boolean ackRequired, EventState fromState, EventState toState,
+					NotificationParameters eventValues) {
+			}
+			@Override
+			public void textMessageReceived(ObjectIdentifier textMessageSourceDevice, Choice messageClass,
+					MessagePriority messagePriority, CharacterString message) {
+			}
+			@Override
+			public void synchronizeTime(Address from, DateTime dateTime, boolean utc) {
+			}
+			@Override
+			public void requestReceived(Address from, Service service) {
+			}
+		};
+		boolean disconnected = false;
+		try {
+			monitor.checkInReader();
+			if (localDevice != null) {
+				localDevice.getEventHandler().addListener(listener);
+				localDevice.send(address, new WhoIsRequest());
+			} else {
+				disconnected = true;
+			}
+			monitor.checkOutReader();
+		} catch (InterruptedException e) {
+			
+		}
+		if (disconnected) {
+			return null;
+		}
+		synchronized(listener) {
+			if(wrapper.isEmpty()) {
+				try {
+					listener.wait(timeout + 1000);
+				} catch (InterruptedException e) {
+					
+				}
+			}
+			try {
+				monitor.checkInReader();
+				if (localDevice != null) {
+					localDevice.getEventHandler().removeListener(listener);
+				}
+				monitor.checkOutReader();
+			} catch (InterruptedException e) {
+				
+			}
+			return wrapper.poll();
+		}
+	}
+	
+	private void addDevice(ActionResult event, RemoteDevice d) {
 		
 		String name = null;
 		Value nameVal = event.getParameter("Name");

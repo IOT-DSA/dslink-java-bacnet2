@@ -20,14 +20,18 @@ import org.slf4j.LoggerFactory;
 
 import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.ServiceFuture;
+import com.serotonin.bacnet4j.util.BACnetUtils;
 import com.serotonin.bacnet4j.exception.BACnetException;
+import com.serotonin.bacnet4j.npdu.ip.IpNetworkUtils;
 import com.serotonin.bacnet4j.service.confirmed.ConfirmedRequestService;
 import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.constructed.Address;
 import com.serotonin.bacnet4j.type.constructed.LogRecord;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.Enumerated;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
+import com.serotonin.bacnet4j.type.primitive.OctetString;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.RequestUtils;
 
@@ -387,4 +391,28 @@ public class Utils {
 		return "Any";
 	}
 	
+	public static Address toAddress(int netNum, String mac) {
+		mac = mac.trim();
+		int colon = mac.indexOf(":");
+		try {
+			if (colon == -1) {
+				OctetString os = new OctetString(BACnetUtils.dottedStringToBytes(mac));
+				return new Address(netNum, os);
+			} else {
+				byte[] ip = BACnetUtils.dottedStringToBytes(mac.substring(0, colon));
+				int port = Integer.parseInt(mac.substring(colon + 1));
+				return IpNetworkUtils.toAddress(netNum, ip, port);
+			}
+		} catch (Exception e) {
+			return null;
+		}
+	}
+	
+	public static String getMacString(Address address) {
+		try {
+			return IpNetworkUtils.toIpPortString(address.getMacAddress());
+		} catch (IllegalArgumentException ignore) {
+		}
+		return BACnetUtils.bytesToDottedString(address.getMacAddress().getBytes());
+	}
 }

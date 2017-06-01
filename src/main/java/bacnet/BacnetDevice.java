@@ -42,6 +42,7 @@ import com.serotonin.bacnet4j.service.confirmed.AcknowledgeAlarmRequest;
 import com.serotonin.bacnet4j.service.confirmed.GetEventInformationRequest;
 import com.serotonin.bacnet4j.service.confirmed.SubscribeCOVRequest;
 import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.constructed.Address;
 import com.serotonin.bacnet4j.type.constructed.BACnetArray;
 import com.serotonin.bacnet4j.type.constructed.DateTime;
 import com.serotonin.bacnet4j.type.constructed.EventTransitionBits;
@@ -90,6 +91,8 @@ public class BacnetDevice {
 	ReadWriteMonitor monitor = new ReadWriteMonitor();
 
 	int instanceNumber;
+	private int networkNumber;
+	private String addressString;
 	private double pollingIntervalSeconds;
 	private boolean covConfirmed;
 	private long covLifetime;
@@ -110,8 +113,20 @@ public class BacnetDevice {
 		} catch (InterruptedException e) {
 
 		}
+		
+		int defInst = -1;
+		int defNet = 0;
+		String defAddr = "";
+		if (d != null) {
+			defInst = d.getInstanceNumber();
+			Address address = d.getAddress();
+			defNet = address.getNetworkNumber().intValue();
+			defAddr = Utils.getMacString(address);
+		}
 
-		instanceNumber = Utils.getAndMaybeSetRoConfigNum(node, "Instance Number", 0).intValue();
+		instanceNumber = Utils.getAndMaybeSetRoConfigNum(node, "Instance Number", defInst).intValue();
+		networkNumber = Utils.getAndMaybeSetRoConfigNum(node, "Network Number", defNet).intValue();
+		addressString = Utils.getAndMaybeSetRoConfigString(node, "Address", defAddr);
 		pollingIntervalSeconds = Utils.getAndMaybeSetRoConfigNum(node, "Polling Interval", 5).doubleValue();
 		covConfirmed = Utils.getAndMaybeSetRoConfigBool(node, "Get Confirmed COV Notifications", false);
 		covLifetime = Utils.getAndMaybeSetRoConfigNum(node, "COV Lifetime", 0).longValue();
@@ -124,6 +139,24 @@ public class BacnetDevice {
 		this.eventsnode.setSerializable(false);
 
 		conn.devices.add(this);
+	}
+	
+	private void setLocatingParams() {
+		try {
+			monitor.checkInReader();
+			if (remoteDevice != null) {
+				instanceNumber = remoteDevice.getInstanceNumber();
+				Address address = remoteDevice.getAddress();
+				networkNumber = address.getNetworkNumber().intValue();
+				addressString = Utils.getMacString(address);
+				node.setRoConfig("Instance Number", new Value(instanceNumber));
+				node.setRoConfig("Network Number", new Value(networkNumber));
+				node.setRoConfig("Address", new Value(addressString));
+			}
+			monitor.checkOutReader();
+		} catch (InterruptedException e) {
+			
+		}
 	}
 
 	public void restoreLastSession() {
@@ -162,44 +195,56 @@ public class BacnetDevice {
 			}
 		}
 	}
+	
+	private void findDevice() {
+		try {
+			monitor.checkInWriter();
+			if (remoteDevice == null) {
+				statnode.setValue(new Value("Connecting"));
+				try {
+					conn.monitor.checkInReader();
+					if (conn.localDevice != null) {
+						if (instanceNumber >= 0) {
+							try {
+								remoteDevice = conn.localDevice.getRemoteDeviceBlocking(instanceNumber);
+							} catch (BACnetException e) {
+								LOGGER.debug("", e);
+							}
+						} else {
+							Address address = Utils.toAddress(networkNumber, addressString);
+							remoteDevice = conn.findRemoteDeviceByAddress(address);
+						}
+						if (remoteDevice == null) {
+							statnode.setValue(new Value("Failed to Connect"));
+						}
+					} else {
+						statnode.setValue(new Value("Connection Down"));
+					}
+					conn.monitor.checkOutReader();
+				} catch (InterruptedException e) {
+
+				}
+			}
+			if (remoteDevice != null) {
+				statnode.setValue(new Value("Ready"));
+			}
+			monitor.checkOutWriter();
+		} catch (InterruptedException e) {
+
+		}
+		setLocatingParams();
+		makeEditAction();
+	}
 
 	public void init() {
 		Objects.getDaemonThreadPool().schedule(new Runnable() {
 			@Override
 			public void run() {
-				try {
-					monitor.checkInWriter();
-					if (remoteDevice == null) {
-						statnode.setValue(new Value("Connecting"));
-						try {
-							conn.monitor.checkInReader();
-							if (conn.localDevice != null) {
-								try {
-									remoteDevice = conn.localDevice.getRemoteDeviceBlocking(instanceNumber);
-								} catch (BACnetException e) {
-									statnode.setValue(new Value("Failed to Connect"));
-									LOGGER.debug("", e);
-								}
-							} else {
-								statnode.setValue(new Value("Connection Down"));
-							}
-							conn.monitor.checkOutReader();
-						} catch (InterruptedException e) {
-
-						}
-					}
-					if (remoteDevice != null) {
-						statnode.setValue(new Value("Ready"));
-					}
-					monitor.checkOutWriter();
-				} catch (InterruptedException e) {
-
-				}
+				findDevice();
 			}
 		}, 0, TimeUnit.MILLISECONDS);
 		
 		makeFolderActions(node);
-		makeEditAction();
 		makeStopAction();
 		makeRestartAction();
 		makeEventsNodeActions();
@@ -557,6 +602,8 @@ public class BacnetDevice {
 			}
 		});
 		act.addParameter(new Parameter("Instance Number", ValueType.NUMBER, new Value(instanceNumber)));
+		act.addParameter(new Parameter("Network Number", ValueType.NUMBER, new Value(networkNumber)));
+		act.addParameter(new Parameter("Address", ValueType.STRING, new Value(addressString)));
 		act.addParameter(new Parameter("Polling Interval", ValueType.NUMBER, new Value(pollingIntervalSeconds)));
 		act.addParameter(new Parameter("Get Confirmed COV Notifications", ValueType.BOOL, new Value(covConfirmed)));
 		act.addParameter(new Parameter("COV Lifetime", ValueType.NUMBER, new Value(covLifetime)));
@@ -569,8 +616,13 @@ public class BacnetDevice {
 	}
 
 	private void edit(ActionResult event) {
+		if (event.getParameter("Instance Number") == null) {
+			event.getParameters().put("Instance Number", new Value(-1));
+		}
 		Utils.setConfigsFromActionResult(node, event);
-		instanceNumber = Utils.safeGetRoConfigNum(node, "Instance Number", instanceNumber).intValue();
+		instanceNumber = Utils.getAndMaybeSetRoConfigNum(node, "Instance Number", -1).intValue();
+		networkNumber = Utils.getAndMaybeSetRoConfigNum(node, "Network Number", 0).intValue();
+		addressString = Utils.getAndMaybeSetRoConfigString(node, "Address", "");
 		pollingIntervalSeconds = Utils.safeGetRoConfigNum(node, "Polling Interval", pollingIntervalSeconds)
 				.doubleValue();
 		covConfirmed = Utils.safeGetRoConfigBool(node, "Get Confirmed COV Notifications", covConfirmed);
