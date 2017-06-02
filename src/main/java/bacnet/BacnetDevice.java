@@ -1,5 +1,7 @@
 package bacnet;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.ParsePosition;
@@ -21,12 +23,15 @@ import org.dsa.iot.dslink.node.NodeBuilder;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
 import org.dsa.iot.dslink.node.actions.ActionResult;
+import org.dsa.iot.dslink.node.actions.EditorType;
 import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.actions.ResultType;
 import org.dsa.iot.dslink.node.actions.table.Row;
 import org.dsa.iot.dslink.node.actions.table.Table;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
+import org.dsa.iot.dslink.serializer.Deserializer;
+import org.dsa.iot.dslink.serializer.Serializer;
 import org.dsa.iot.dslink.util.Objects;
 import org.dsa.iot.dslink.util.handler.Handler;
 import org.dsa.iot.dslink.util.json.JsonObject;
@@ -77,6 +82,8 @@ public class BacnetDevice {
 	static final String ACTION_RESTART = "restart";
 	static final String ACTION_CLEAR = "clear";
 	static final String ACTION_GET_EVENTS = "get event information";
+	static final String ACTION_EXPORT = "export";
+	static final String ACTION_IMPORT = "import folder";
 	static final String ACTION_ACKNOWLEDGE_ALARM = "acknowledge alarm";
 	static final String EVENT_ACTION_ACKNOWLEDGE = "acknowledge";
 	static final String EVENT_ACTION_DISMISS = "dismiss";
@@ -407,6 +414,8 @@ public class BacnetDevice {
 		makeAddFolderAction(fnode);
 		makeDiscoverObjectsAction(fnode);
 		makeAddObjectAction(fnode);
+		makeExportAction(fnode);
+		makeImportAction(fnode);
 	}
 
 	private void makeRemoveAction(final Node fnode) {
@@ -644,6 +653,70 @@ public class BacnetDevice {
 			monitor.checkOutWriter();
 		} catch (InterruptedException e) {
 
+		}
+	}
+	
+	private void makeExportAction(final Node fnode) {
+		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
+			@Override
+			public void handle(ActionResult event) {
+				handleExport(fnode, event);
+			}
+		});
+		act.addResult(new Parameter("JSON", ValueType.STRING).setEditorType(EditorType.TEXT_AREA));
+		Node anode = fnode.getChild(ACTION_EXPORT, true);
+		if (anode == null) {
+			fnode.createChild(ACTION_EXPORT, true).setAction(act).build().setSerializable(false);
+		} else {
+			anode.setAction(act);
+		}
+	}
+	
+	
+	private void handleExport(Node fnode, ActionResult event) {
+		try {
+			Method serMethod = Serializer.class.getDeclaredMethod("serializeChildren", JsonObject.class, Node.class);
+			serMethod.setAccessible(true);
+			JsonObject childOut = new JsonObject();
+			serMethod.invoke(conn.link.serializer, childOut, fnode);
+			String retval = childOut.toString();
+			event.getTable().addRow(Row.make(new Value(retval)));
+		} catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+			LOGGER.debug("", e);
+		}
+	}
+	
+	private void makeImportAction(final Node fnode) {
+		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
+			@Override
+			public void handle(ActionResult event) {
+				handleImport(fnode, event);
+			}
+		});
+		act.addParameter(new Parameter("Name", ValueType.STRING));
+		act.addParameter(new Parameter("JSON", ValueType.STRING).setEditorType(EditorType.TEXT_AREA));
+		Node anode = fnode.getChild(ACTION_IMPORT, true);
+		if (anode == null) {
+			fnode.createChild(ACTION_IMPORT, true).setAction(act).build().setSerializable(false);
+		} else {
+			anode.setAction(act);
+		}
+	}
+	
+	private void handleImport(Node fnode, ActionResult event) {
+		String name = event.getParameter("Name", ValueType.STRING).getString();
+		String jsonStr = event.getParameter("JSON", ValueType.STRING).getString();
+		JsonObject children = new JsonObject(jsonStr);
+		Node child = fnode.createChild(name, true).build();
+		try {
+			Method deserMethod = Deserializer.class.getDeclaredMethod("deserializeNode", Node.class, JsonObject.class);
+			deserMethod.setAccessible(true);
+			deserMethod.invoke(conn.link.deserializer, child, children);
+			makeFolderActions(child);
+			restoreFolder(child);
+		} catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+			LOGGER.debug("", e);
+			child.delete(false);
 		}
 	}
 	

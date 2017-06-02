@@ -1,5 +1,7 @@
 package bacnet;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -17,11 +19,16 @@ import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
 import org.dsa.iot.dslink.node.actions.ActionResult;
+import org.dsa.iot.dslink.node.actions.EditorType;
 import org.dsa.iot.dslink.node.actions.Parameter;
+import org.dsa.iot.dslink.node.actions.table.Row;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
+import org.dsa.iot.dslink.serializer.Deserializer;
+import org.dsa.iot.dslink.serializer.Serializer;
 import org.dsa.iot.dslink.util.Objects;
 import org.dsa.iot.dslink.util.handler.Handler;
+import org.dsa.iot.dslink.util.json.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,6 +76,8 @@ public abstract class BacnetConn implements DeviceEventListener {
 	static final String ACTION_ADD_DEVICE_BY_NUMBER = "add device by number";
 	static final String ACTION_ADD_DEVICE_BY_ADDR = "add device by address";
 	static final String ACTION_ADD_ALL = "add all discovered devices";
+	static final String ACTION_EXPORT = "export";
+	static final String ACTION_IMPORT = "import device";
 	
 	static final String NODE_LOCAL = "LOCAL";
 	static final String NODE_STATUS = "STATUS";
@@ -251,6 +260,8 @@ public abstract class BacnetConn implements DeviceEventListener {
 			makeAddDeviceByAddressAction();
 			makeAddAllAction();
 		}
+		makeExportAction();
+		makeImportAction();
 		
 		localController.init();
 		
@@ -662,6 +673,69 @@ public abstract class BacnetConn implements DeviceEventListener {
 		Utils.setConfigsFromActionResult(child, event);
 		BacnetDevice bd = new BacnetDevice(this, child, d);
 		bd.init();
+	}
+	
+	private void makeExportAction() {
+		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
+			@Override
+			public void handle(ActionResult event) {
+				handleExport(event);
+			}
+		});
+		act.addResult(new Parameter("JSON", ValueType.STRING).setEditorType(EditorType.TEXT_AREA));
+		Node anode = node.getChild(ACTION_EXPORT, true);
+		if (anode == null) {
+			node.createChild(ACTION_EXPORT, true).setAction(act).build().setSerializable(false);
+		} else {
+			anode.setAction(act);
+		}
+	}
+	
+	private void handleExport(ActionResult event) {
+		try {
+			Method serMethod = Serializer.class.getDeclaredMethod("serializeChildren", JsonObject.class, Node.class);
+			serMethod.setAccessible(true);
+			JsonObject childOut = new JsonObject();
+			serMethod.invoke(link.serializer, childOut, node);
+			String retval = childOut.toString();
+			event.getTable().addRow(Row.make(new Value(retval)));
+		} catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+			LOGGER.debug("", e);
+		}
+	}
+	
+	private void makeImportAction() {
+		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
+			@Override
+			public void handle(ActionResult event) {
+				handleImport(event);
+			}
+		});
+		act.addParameter(new Parameter("Name", ValueType.STRING));
+		act.addParameter(new Parameter("JSON", ValueType.STRING).setEditorType(EditorType.TEXT_AREA));
+		Node anode = node.getChild(ACTION_IMPORT, true);
+		if (anode == null) {
+			node.createChild(ACTION_IMPORT, true).setAction(act).build().setSerializable(false);
+		} else {
+			anode.setAction(act);
+		}
+	}
+	
+	private void handleImport(ActionResult event) {
+		String name = event.getParameter("Name", ValueType.STRING).getString();
+		String jsonStr = event.getParameter("JSON", ValueType.STRING).getString();
+		JsonObject children = new JsonObject(jsonStr);
+		Node child = node.createChild(name, true).build();
+		try {
+			Method deserMethod = Deserializer.class.getDeclaredMethod("deserializeNode", Node.class, JsonObject.class);
+			deserMethod.setAccessible(true);
+			deserMethod.invoke(link.deserializer, child, children);
+			BacnetDevice bd = new BacnetDevice(this, child, null);
+			bd.restoreLastSession();
+		} catch (SecurityException | IllegalArgumentException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+			LOGGER.debug("", e);
+			child.delete(false);
+		}
 	}
 	
 

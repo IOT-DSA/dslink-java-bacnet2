@@ -1,15 +1,22 @@
 package bacnet;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.Set;
 import org.dsa.iot.dslink.node.Node;
+import org.dsa.iot.dslink.node.NodeManager;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
 import org.dsa.iot.dslink.node.actions.ActionResult;
+import org.dsa.iot.dslink.node.actions.EditorType;
 import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
+import org.dsa.iot.dslink.serializer.Deserializer;
+import org.dsa.iot.dslink.serializer.Serializer;
 import org.dsa.iot.dslink.util.handler.Handler;
+import org.dsa.iot.dslink.util.json.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,13 +25,18 @@ import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
 public class BacnetLink {
 	private static final Logger LOGGER = LoggerFactory.getLogger(BacnetLink.class);
 	
+	static final String ACTION_IMPORT = "import connection";
+	
 	Node node;
+	final Serializer serializer;
+	final Deserializer deserializer;
 	Set<BacnetSerialConn> serialConns = new HashSet<BacnetSerialConn>();
 	
 	private BacnetLink(Node node) {
 		this.node = node;
-		//this.futures = new ConcurrentHashMap<BacnetPoint, ScheduledFuture<?>>();
-		//this.connections = new HashSet<BacnetConn>();
+		NodeManager manager = node.getLink().getDSLink().getNodeManager();
+		this.serializer = new Serializer(manager);
+		this.deserializer = new Deserializer(manager);
 	}
 
 	public static void start(Node node) {
@@ -36,6 +48,7 @@ public class BacnetLink {
 		makeAddIpAction();
 		makeAddSerialAction();
 		makePortScanAction();
+		makeImportAction();
 
 		restoreLastSession();
 	}
@@ -159,8 +172,42 @@ public class BacnetLink {
 		node.createChild("scan for serial ports", true).setAction(act).build().setSerializable(false);
 	}
 	
-
+	private void makeImportAction() {
+		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
+			@Override
+			public void handle(ActionResult event) {
+				handleImport(event);
+			}
+		});
+		act.addParameter(new Parameter("Name", ValueType.STRING));
+		act.addParameter(new Parameter("JSON", ValueType.STRING).setEditorType(EditorType.TEXT_AREA));
+		Node anode = node.getChild(ACTION_IMPORT, true);
+		if (anode == null) {
+			node.createChild(ACTION_IMPORT, true).setAction(act).build().setSerializable(false);
+		} else {
+			anode.setAction(act);
+		}
+	}
 	
-	
+	private void handleImport(ActionResult event) {
+		String name = event.getParameter("Name", ValueType.STRING).getString();
+		String jsonStr = event.getParameter("JSON", ValueType.STRING).getString();
+		JsonObject children = new JsonObject(jsonStr);
+		Node child = node.createChild(name, true).build();
+		try {
+			Method deserMethod = Deserializer.class.getDeclaredMethod("deserializeNode", Node.class, JsonObject.class);
+			deserMethod.setAccessible(true);
+			deserMethod.invoke(deserializer, child, children);
+			BacnetConn bc = BacnetConn.buildConn(this, child);
+			 if (bc != null) {
+				 bc.restoreLastSession();
+			 } else {
+				 child.delete(false);
+			 }
+		} catch (SecurityException | IllegalArgumentException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+			LOGGER.debug("", e);
+			child.delete(false);
+		}
+	}
 
 }
