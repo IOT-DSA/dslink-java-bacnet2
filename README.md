@@ -49,3 +49,8 @@ Use the `Add Connection` action to set up an IP or MSTP connection. This will cr
 	 - BACnet device IDs should be unique within the network
  - `Local Device Name` - a name for this local device
  - `Local Device Vendor` - vendor name property of this local device
+
+### Add devices
+Now that you have a connection set up, its node should have a child called `Connection Status`. If the connection was successful, this should have a value of `Connected`.
+
+Use the connection's `discover devices` action to trigger the connection to discover devices on the network. After this, you can use `Add All Discovered Devices` to add all devices that were discovered into the DSA tree, or use `Add Device` -> `From Discovered` to choose from a drop-down of discovered devices. You can also add a device by its instance number or address instead of discovering.
