@@ -18,24 +18,6 @@ public class Main extends DSLinkHandler {
 
 	public static void main(String[] args) {
 		DSLinkFactory.start(args, new Main());
-		
-//		Reflections reflections = new Reflections("com.serotonin.bacnet4j");
-//		Set<Class<? extends BaseType>> constructedTypes = reflections.getSubTypesOf(BaseType.class);
-//		Set<Class<?>> params = new HashSet<Class<?>>();
-//		for (Class<? extends BaseType> clazz: constructedTypes) {
-//			for (Constructor<?> constr: clazz.getConstructors()) {
-//				for (Class<?> cz: constr.getParameterTypes()) {
-//					if (!Encodable.class.isAssignableFrom(cz) && !cz.isPrimitive() && 
-//							!cz.equals(ByteQueue.class) && !cz.equals(ChoiceOptions.class) && !cz.equals(String.class)) {
-//						System.out.println(cz.toString() + "\t" + clazz.toString());
-//					}
-//				}
-//			}
-//		}
-//		for (Class<?> cz: params) {
-//			System.out.println(cz.toString());
-//		}
-		
 	}
 
 	@Override

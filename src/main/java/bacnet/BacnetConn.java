@@ -389,9 +389,11 @@ public abstract class BacnetConn implements DeviceEventListener {
 		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
 			@Override
 			public void handle(ActionResult event) {
-				discover();
+				discover(event);
 			}
 		});
+		act.addParameter(new Parameter("Device Instance Range Low Limit", ValueType.NUMBER));
+		act.addParameter(new Parameter("Device Instance Range High Limit", ValueType.NUMBER));
 		Node anode = node.getChild(ACTION_DISCOVER_DEVICES, true);
 		if (anode == null) {
 			node.createChild(ACTION_DISCOVER_DEVICES, true).setAction(act).build().setSerializable(false);
@@ -400,15 +402,19 @@ public abstract class BacnetConn implements DeviceEventListener {
 		}
 	}
 	
-	private void discover() {
+	private void discover(ActionResult event) {
+		Value low = event.getParameter("Device Instance Range Low Limit");
+		Value hi = event.getParameter("Device Instance Range High Limit");
+		WhoIsRequest whoIs = (low == null || hi == null) ? new WhoIsRequest()
+				: new WhoIsRequest(low.getNumber().intValue(), hi.getNumber().intValue());
 		try {
 			monitor.checkInReader();
 			if (localDevice != null) {
-				localDevice.sendGlobalBroadcast(new WhoIsRequest());
+				localDevice.sendGlobalBroadcast(whoIs);
 			}
 			monitor.checkOutReader();
 		} catch (InterruptedException e) {
-			
+
 		}
 //		int lastLength = 0;
 //		for (int i=0; i<(timeout/500) + 2; i++) {
