@@ -5,7 +5,7 @@ apply plugin: 'java'
 mainClassName = 'bacnet.Main'
 sourceCompatibility = 1.7
 targetCompatibility = 1.7
-version = '2.0.15-SNAPSHOT'
+version = '2.0.16-SNAPSHOT'
 
 repositories {
     mavenCentral()
@@ -26,7 +26,7 @@ dependencies {
     compile 'org.scream3r:jssc:2.8.0'
 	compile ':sero-scheduler:1.+'
     compile ':sero-warp:1.+'
-    compile ':BACnet4J:4.0.0-7'
+    compile ':BACnet4J:4.1.0'
     compile 'org.reflections:reflections:0.9.11'
 }
 

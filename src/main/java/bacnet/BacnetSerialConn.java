@@ -18,6 +18,11 @@ import com.serotonin.bacnet4j.npdu.Network;
 import com.serotonin.bacnet4j.npdu.mstp.MasterNode;
 import com.serotonin.bacnet4j.npdu.mstp.MstpNetwork;
 import com.serotonin.bacnet4j.transport.Transport;
+import com.serotonin.bacnet4j.util.sero.JsscSerialPortInputStream;
+import com.serotonin.bacnet4j.util.sero.JsscSerialPortOutputStream;
+
+import jssc.SerialPort;
+import jssc.SerialPortException;
 
 public class BacnetSerialConn extends BacnetConn {
 	
@@ -29,7 +34,7 @@ public class BacnetSerialConn extends BacnetConn {
 	int frameErrorRetryCount;
 	int maxInfoFrames;
 	
-	SerialPortWrapperImpl portWrapper;
+	SerialPort serialPort;
 	
 	BacnetSerialConn(BacnetLink link, Node node) {
 		super(link, node);
@@ -37,10 +42,15 @@ public class BacnetSerialConn extends BacnetConn {
 	}
 
 	@Override
-	Network getNetwork() {
-		portWrapper = new SerialPortWrapperImpl(commPort, baud);
-		MasterNode mstpNode = new MasterNode(portWrapper, (byte) station, frameErrorRetryCount);
+	Network getNetwork() throws Exception {
+		serialPort = new SerialPort(commPort);
+		serialPort.openPort();
+		serialPort.setParams(baud, SerialPort.DATABITS_8, SerialPort.STOPBITS_1, SerialPort.PARITY_NONE);
+		JsscSerialPortInputStream in = new JsscSerialPortInputStream(serialPort);
+		JsscSerialPortOutputStream out = new JsscSerialPortOutputStream(serialPort);
+		MasterNode mstpNode = new MasterNode(commPort, in, out, (byte) station, frameErrorRetryCount);
 		mstpNode.setMaxInfoFrames(maxInfoFrames);
+		mstpNode.setUsageTimeout(30); //TODO make this configurable
 		return new MstpNetwork(mstpNode, localNetworkNumber);
 	}
 
@@ -118,14 +128,10 @@ public class BacnetSerialConn extends BacnetConn {
 	@Override
 	protected void stop() {
 		super.stop();
-		Object monitor = portWrapper.getPortCloseMonitor();
-		synchronized(monitor) {
-			if (!portWrapper.isClosed()) {
-				try {
-					monitor.wait(timeout);
-				} catch (InterruptedException e) {
-				}
-			}
+		try {
+			serialPort.closePort();
+		} catch (SerialPortException e) {
+			LOGGER.debug("", e);
 		}
 	}
 

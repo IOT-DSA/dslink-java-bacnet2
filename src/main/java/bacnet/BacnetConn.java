@@ -216,21 +216,21 @@ public abstract class BacnetConn implements DeviceEventListener {
 		
 		try {
 			monitor.checkInWriter();
-			Network network = getNetwork();
-			Transport transport = new DefaultTransport(network);
-			transport.setRetries(retries);
-			transport.setTimeout(timeout);
-			transport.setSegTimeout(segmentTimeout);
-			transport.setSegWindow(segmentWindow);
-			registerAsForeignDevice(transport);
-			localDevice = new LocalDevice(localDeviceId, transport);
 			try {
-				localDevice.writePropertyInternal(PropertyIdentifier.objectName,new CharacterString(localDeviceName));
-				localDevice.writePropertyInternal(PropertyIdentifier.vendorName, new CharacterString(localDeviceVendor));
-			} catch (Exception e1) {
-				LOGGER.debug("", e1);
-			}
-			try {
+				Network network = getNetwork();
+				Transport transport = new DefaultTransport(network);
+				transport.setRetries(retries);
+				transport.setTimeout(timeout);
+				transport.setSegTimeout(segmentTimeout);
+				transport.setSegWindow(segmentWindow);
+				registerAsForeignDevice(transport);
+				localDevice = new LocalDevice(localDeviceId, transport);
+				try {
+					localDevice.writePropertyInternal(PropertyIdentifier.objectName,new CharacterString(localDeviceName));
+					localDevice.writePropertyInternal(PropertyIdentifier.vendorName, new CharacterString(localDeviceVendor));
+				} catch (Exception e1) {
+					LOGGER.debug("", e1);
+				}
 				localDevice.getEventHandler().addListener(this);
 				localDevice.initialize();
 				localDevice.sendGlobalBroadcast(localDevice.getIAm());
@@ -239,8 +239,10 @@ public abstract class BacnetConn implements DeviceEventListener {
 			} catch (Exception e) {
 				LOGGER.debug("", e);
 				statnode.setValue(new Value("Error in initializing local device :" + e.getMessage()));
-				localDevice.terminate();
-				localDevice = null;
+				if (localDevice != null) {
+					localDevice.terminate();
+					localDevice = null;
+				}
 			}
 			monitor.checkOutWriter();
 		} catch (InterruptedException e) {
@@ -269,7 +271,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 	
 	abstract void registerAsForeignDevice(Transport transport);
 	
-	abstract Network getNetwork();
+	abstract Network getNetwork() throws Exception;
 	
 	void restoreLastSession() {
 		init();
