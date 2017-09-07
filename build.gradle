@@ -11,9 +11,6 @@ repositories {
     mavenCentral()
     flatDir { dirs 'external' }
     maven {
-    	url 'http://mangoautomation.net:9902/maven-repo/'
-    }
-    maven {
         url 'https://oss.sonatype.org/content/repositories/snapshots/'
     }
 }
