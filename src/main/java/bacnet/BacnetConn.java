@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -97,6 +98,9 @@ public abstract class BacnetConn implements DeviceEventListener {
 	ReadWriteMonitor monitor = new ReadWriteMonitor();
 	
 	Set<BacnetDevice> devices = new HashSet<BacnetDevice>();
+	private Map<Long, BacnetObject> covSubs = new ConcurrentHashMap<Long, BacnetObject>();
+	Object covSubsLock = new Object();
+	private Random random = new Random();
 	
 	final Map<Integer, OctetString> networkRouters = new HashMap<Integer, OctetString>();
 	final Map<String, Integer> bbmdIpToPort = new HashMap<String, Integer>();
@@ -111,15 +115,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 	String localDeviceVendor;
 	long defaultInterval;
 	
-	static int count = 0;
-	final int subscriberId;
-	final private static Object countLock = new Object();
-	
 	protected BacnetConn(BacnetLink link, Node node) {
-		synchronized(countLock) {
-			count += 1;
-			subscriberId = count;
-		}
 		this.link = link;
 		this.node = node;
 		
@@ -759,7 +755,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 
 	@Override
 	public void iAmReceived(final RemoteDevice d) {
-		LOGGER.trace("iAm recieved: " + d);
+		LOGGER.debug("iAm recieved: " + d);
 		discovered.put(d.getInstanceNumber(), d);
 		Objects.getDaemonThreadPool().schedule(new Runnable() {
 			@Override
@@ -800,6 +796,23 @@ public abstract class BacnetConn implements DeviceEventListener {
 //		}
 		
 	}
+	
+	public long addCovSub(BacnetObject obj) {
+		synchronized(covSubsLock) {
+			long id = random.nextLong();
+			while (covSubs.containsKey(id)) {
+				id = random.nextLong();
+			}
+			covSubs.put(id, obj);
+			return id;
+		}
+	}
+	
+	public void removeCovSub(long id) {
+		synchronized(covSubsLock) {
+			covSubs.remove(id);
+		}
+	}
 
 	@Override
 	public boolean allowPropertyWrite(Address from, BACnetObject obj, PropertyValue pv) {
@@ -826,16 +839,10 @@ public abstract class BacnetConn implements DeviceEventListener {
 //		LOGGER.info("got COV notification for sub id " + subscriberProcessIdentifier + ", device " 
 //			+ initiatingDeviceIdentifier.getInstanceNumber() + ", object " + monitoredObjectIdentifier + ": "
 //			+ listOfValues + " (remaining time: " + timeRemaining + ")");
-		if (subscriberProcessIdentifier.intValue() != subscriberId) {
-			return;
+		BacnetObject obj = covSubs.get(subscriberProcessIdentifier.longValue());
+		if (obj != null) {
+			obj.covNotificationReceived(timeRemaining, listOfValues);
 		}
-		
-		for (BacnetDevice dev: devices) {
-			if (initiatingDeviceIdentifier.getInstanceNumber() == dev.instanceNumber) {
-				dev.covNotificationReceived(monitoredObjectIdentifier, timeRemaining, listOfValues);
-			}
-		}
-		
 	}
 
 	@Override

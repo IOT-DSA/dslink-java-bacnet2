@@ -10,6 +10,8 @@ import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValuePair;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.util.handler.Handler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.serotonin.bacnet4j.ServiceFuture;
 import com.serotonin.bacnet4j.obj.ObjectProperties;
@@ -19,11 +21,9 @@ import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.Null;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
-import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 
 public class BacnetProperty {
-	// private static final Logger LOGGER =
-	// LoggerFactory.getLogger(BacnetProperty.class);
+	 private static final Logger LOGGER = LoggerFactory.getLogger(BacnetProperty.class);
 
 	static final String ACTION_REMOVE = "remove";
 
@@ -164,6 +164,7 @@ public class BacnetProperty {
 			return;
 		}
 		Value newval = event.getCurrent();
+//		LOGGER.debug("Handling set :" + newval.toString() + " on " + node.getPath());
 		write(newval);
 	}
 
@@ -172,6 +173,7 @@ public class BacnetProperty {
 		if (enc == null) {
 			return;
 		}
+//		LOGGER.debug("Sending write request : (" + oid.toString() + ", " + pid.toString() + ", null, " + enc.toString() + ", null)");
 		sendWriteRequest(new WritePropertyRequest(oid, pid, null, enc, null));
 	}
 

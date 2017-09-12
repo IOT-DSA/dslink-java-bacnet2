@@ -52,7 +52,6 @@ import com.serotonin.bacnet4j.type.constructed.BACnetArray;
 import com.serotonin.bacnet4j.type.constructed.DateTime;
 import com.serotonin.bacnet4j.type.constructed.EventTransitionBits;
 import com.serotonin.bacnet4j.type.constructed.ObjectPropertyReference;
-import com.serotonin.bacnet4j.type.constructed.PropertyValue;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.constructed.TimeStamp;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
@@ -282,9 +281,10 @@ public class BacnetDevice {
 				try {
 					conn.monitor.checkInReader();
 					if (conn.localDevice != null) {
+						obj.covId = conn.addCovSub(obj);
 						LOGGER.info("subscribing to cov for device " + node.getName() + ", object " + obj.oid);
 						conn.localDevice.send(remoteDevice,
-								new SubscribeCOVRequest(new UnsignedInteger(conn.subscriberId), obj.oid,
+								new SubscribeCOVRequest(new UnsignedInteger(obj.covId), obj.oid,
 										Boolean.valueOf(covConfirmed), new UnsignedInteger(covLifetime)));
 					}
 					conn.monitor.checkOutReader();
@@ -305,9 +305,11 @@ public class BacnetDevice {
 				try {
 					conn.monitor.checkInReader();
 					if (conn.localDevice != null) {
+						conn.removeCovSub(obj.covId);
 						LOGGER.info("unsubscribing from cov for device " + node.getName() + ", object " + obj.oid);
 						conn.localDevice.send(remoteDevice,
-								new SubscribeCOVRequest(new UnsignedInteger(conn.subscriberId), obj.oid, null, null));
+								new SubscribeCOVRequest(new UnsignedInteger(obj.covId), obj.oid, null, null));
+						obj.covId = -1;
 					}
 					conn.monitor.checkOutReader();
 				} catch (InterruptedException e) {
@@ -317,15 +319,6 @@ public class BacnetDevice {
 			monitor.checkOutReader();
 		} catch (InterruptedException e) {
 
-		}
-	}
-
-	public void covNotificationReceived(ObjectIdentifier monitoredObjectIdentifier, UnsignedInteger timeRemaining,
-			SequenceOf<PropertyValue> listOfValues) {
-		for (BacnetObject obj : objects) {
-			if (monitoredObjectIdentifier.equals(obj.oid)) {
-				obj.covNotificationReceived(timeRemaining, listOfValues);
-			}
 		}
 	}
 

@@ -64,6 +64,7 @@ public class BacnetObject extends BacnetProperty {
 
 	Set<BacnetProperty> properties = new HashSet<BacnetProperty>();
 	private int covSubCount = 0;
+	long covId = -1;
 	Object lock = new Object();
 
 	private List<String> stateText = new ArrayList<String>(2);
@@ -217,6 +218,7 @@ public class BacnetObject extends BacnetProperty {
 		if (enc == null) {
 			return;
 		}
+		//LOGGER.debug("Sending write request : (" + oid.toString() + ", " + pid.toString() + ", null, " + enc.toString() + ", " + priority + ")");
 		ServiceFuture sf = sendWriteRequest(new WritePropertyRequest(oid, pid, null, enc, new UnsignedInteger(priority)));
 
 		if (!useCov) {
