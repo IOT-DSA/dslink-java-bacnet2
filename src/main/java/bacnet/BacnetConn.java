@@ -175,7 +175,6 @@ public abstract class BacnetConn implements DeviceEventListener {
 				iconn.localBindAddress = localBindAddress.getString();
 				iconn.isRegisteredAsForeignDevice = isRegisteredAsForeignDevice.getBool();
 				iconn.bbmdIpList = bbmdIpList.getString();
-				iconn.parseBroadcastManagementDevice();
 				conn = iconn;
 			} else if (commPort != null && baud != null && station != null && ferc != null && maxInfoFrames != null) {
 				BacnetSerialConn sconn = new BacnetSerialConn(link, node);
@@ -196,7 +195,9 @@ public abstract class BacnetConn implements DeviceEventListener {
 			conn.localDeviceId = localDeviceId.getNumber().intValue();
 			conn.localDeviceName = localDeviceName.getString();
 			conn.localDeviceVendor = localDeviceVendor.getString();
-			
+			if (conn instanceof BacnetIpConn) {
+				((BacnetIpConn) conn).parseBroadcastManagementDevice();
+			}
 			return conn;
 
 		} else {
@@ -215,6 +216,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 			try {
 				Network network = getNetwork();
 				Transport transport = new DefaultTransport(network);
+				network.setTransport(transport);
 				transport.setRetries(retries);
 				transport.setTimeout(timeout);
 				transport.setSegTimeout(segmentTimeout);
@@ -235,10 +237,10 @@ public abstract class BacnetConn implements DeviceEventListener {
 			} catch (Exception e) {
 				LOGGER.debug("", e);
 				statnode.setValue(new Value("Error in initializing local device :" + e.getMessage()));
-				if (localDevice != null) {
+				if (localDevice != null && localDevice.isInitialized()) {
 					localDevice.terminate();
-					localDevice = null;
 				}
+				localDevice = null;
 			}
 			monitor.checkOutWriter();
 		} catch (InterruptedException e) {
@@ -346,13 +348,10 @@ public abstract class BacnetConn implements DeviceEventListener {
 		statnode.setValue(new Value(NODE_STATUS_STOPPED));
 		try {
 			monitor.checkInWriter();
-			if (localDevice != null) {
+			if (localDevice != null && localDevice.isInitialized()) {
 				localDevice.terminate();
-				localDevice = null;
-//				node.removeChild(ACTION_STOP, false);
-//				node.removeChild(ACTION_DISCOVER_DEVICES, false);
-//				node.removeChild(ACTION_ADD_DEVICE, false);
 			}
+			localDevice = null;
 			monitor.checkOutWriter();
 		} catch (InterruptedException e) {
 			

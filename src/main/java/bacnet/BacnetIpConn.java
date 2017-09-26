@@ -4,9 +4,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
@@ -66,23 +63,22 @@ public class BacnetIpConn extends BacnetConn {
 	}
 	
 	void parseBroadcastManagementDevice() {
-		String bbmdIp = null;
-		int bbmdPort = IpNetwork.DEFAULT_PORT;
-		int networkNumber = 0;
+		int nextNeworkNumber = localNetworkNumber + 1;
 		for (String entry : bbmdIpList.split(",")) {
 			entry = entry.trim();
 			if (!entry.isEmpty()) {
-				Pattern p = Pattern.compile("^\\s*(.*?):(\\d+):(\\d+)$");
-				Matcher m = p.matcher(entry);
-				if (m.matches()) {
-					bbmdIp = m.group(1);
-					bbmdPort = Integer.parseInt(m.group(2));
-					networkNumber = Integer.parseInt(m.group(3));
-					if (!bbmdIp.isEmpty()) {
-						bbmdIpToPort.put(bbmdIp, bbmdPort);
-						OctetString os = IpNetworkUtils.toOctetString(bbmdIp, bbmdPort);
-						networkRouters.put(networkNumber, os);
-					}
+				String[] splitEntry = entry.split(":");
+				String bbmdIp = splitEntry.length > 0 ? splitEntry[0] : "";
+				String bbmdPortStr = splitEntry.length > 1 ? splitEntry[1]: "";
+				String networkNumberStr = splitEntry.length > 2 ? splitEntry[2]: "";
+				
+				int bbmdPort = bbmdPortStr.matches("\\d+") ? Integer.parseInt(bbmdPortStr) : IpNetwork.DEFAULT_PORT;
+				int networkNumber = networkNumberStr.matches("\\d+") ? Integer.parseInt(networkNumberStr) : nextNeworkNumber;
+				nextNeworkNumber = networkNumber + 1;
+				if (!bbmdIp.isEmpty()) {
+					bbmdIpToPort.put(bbmdIp, bbmdPort);
+					OctetString os = IpNetworkUtils.toOctetString(bbmdIp, bbmdPort);
+					networkRouters.put(networkNumber, os);
 				}
 			}
 		}
