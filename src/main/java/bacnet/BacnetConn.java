@@ -219,8 +219,8 @@ public abstract class BacnetConn implements DeviceEventListener {
 				transport.setTimeout(timeout);
 				transport.setSegTimeout(segmentTimeout);
 				transport.setSegWindow(segmentWindow);
-				registerAsForeignDevice(transport);
 				localDevice = new LocalDevice(localDeviceId, transport);
+				registerAsForeignDevice(transport);
 				try {
 					localDevice.writePropertyInternal(PropertyIdentifier.objectName,new CharacterString(localDeviceName));
 					localDevice.writePropertyInternal(PropertyIdentifier.vendorName, new CharacterString(localDeviceVendor));
