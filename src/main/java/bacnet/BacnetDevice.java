@@ -8,6 +8,7 @@ import java.text.ParsePosition;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -351,7 +352,7 @@ public class BacnetDevice {
 	private void readProperties() {
 		List<ObjectPropertyReference> oprs = new ArrayList<ObjectPropertyReference>(subscribed.size());
 		List<BacnetProperty> props = new ArrayList<BacnetProperty>(subscribed.size());
-		for (Entry<BacnetProperty, ObjectPropertyReference> entry : subscribed.entrySet()) {
+		for (Entry<BacnetProperty, ObjectPropertyReference> entry : new HashMap<BacnetProperty, ObjectPropertyReference>(subscribed).entrySet()) {
 			oprs.add(entry.getValue());
 			props.add(entry.getKey());
 		}
