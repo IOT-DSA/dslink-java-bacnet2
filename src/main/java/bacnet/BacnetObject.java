@@ -440,7 +440,7 @@ public class BacnetObject extends BacnetProperty {
 				i = ((UnsignedInteger) value).intValue();
 			}
 			if (i >= 0) {
-				if (stateText.size() > 0) {
+				if (stateText.size() > i) {
 					vt = ValueType.makeEnum(stateText);
 					v = new Value(stateText.get(i));
 				} else {
