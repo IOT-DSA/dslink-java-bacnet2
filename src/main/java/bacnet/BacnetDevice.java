@@ -216,8 +216,10 @@ public class BacnetDevice {
 								remoteDevice = conn.localDevice.getRemoteDeviceBlocking(instanceNumber);
 							} catch (BACnetException e) {
 								LOGGER.debug("", e);
+								LOGGER.debug("Failed to get device by instance number, trying by address");
 							}
-						} else {
+						} 
+						if (remoteDevice == null) {
 							Address address = Utils.toAddress(networkNumber, addressString);
 							remoteDevice = conn.findRemoteDeviceByAddress(address);
 						}
