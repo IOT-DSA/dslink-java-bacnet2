@@ -222,7 +222,6 @@ public abstract class BacnetConn implements DeviceEventListener {
 				transport.setSegTimeout(segmentTimeout);
 				transport.setSegWindow(segmentWindow);
 				localDevice = new LocalDevice(localDeviceId, transport);
-				registerAsForeignDevice(transport);
 				try {
 					localDevice.writePropertyInternal(PropertyIdentifier.objectName,new CharacterString(localDeviceName));
 					localDevice.writePropertyInternal(PropertyIdentifier.vendorName, new CharacterString(localDeviceVendor));
@@ -231,6 +230,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 				}
 				localDevice.getEventHandler().addListener(this);
 				localDevice.initialize();
+				registerAsForeignDevice(transport);
 				localDevice.sendGlobalBroadcast(localDevice.getIAm());
 				LOGGER.info("sent IAm - " + localDevice.getInstanceNumber());
 //				localDevice.sendGlobalBroadcast(new WhoIsRequest());
