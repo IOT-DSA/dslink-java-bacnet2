@@ -535,6 +535,7 @@ public class BacnetDevice {
 			BacnetObject bo = new BacnetObject(this, b.getChild(), oid);
 			bo.init();
 			b.build();
+			subscribeProperty(new OneTimeNameProperty(this, bo, oid));
 		}
 	}
 
@@ -567,6 +568,7 @@ public class BacnetDevice {
 		BacnetObject bo = new BacnetObject(this, b.getChild(), oid);
 		bo.init();
 		b.build();
+		subscribeProperty(new OneTimeNameProperty(this, bo, oid));
 	}
 
 	private void makeStopAction() {

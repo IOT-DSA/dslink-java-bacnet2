@@ -69,7 +69,7 @@ public class BacnetObject extends BacnetProperty {
 
 	private List<String> stateText = new ArrayList<String>(2);
 
-	private BacnetProperty hiddenNameProp;
+	//private BacnetProperty hiddenNameProp;
 	private BacnetProperty hiddenStateTextProp;
 	private BacnetProperty hiddenActiveTextProp;
 	private BacnetProperty hiddenInactiveTextProp;
@@ -82,7 +82,7 @@ public class BacnetObject extends BacnetProperty {
 		useCov = Utils.getAndMaybeSetRoConfigBool(node, "Use COV", false);
 		headlessPolling = Utils.getAndMaybeSetRoConfigBool(node, "Enable Headless Polling", false);
 		writePriority = Utils.getAndMaybeSetRoConfigNum(node, "Write Priority", 16).intValue();
-		this.hiddenNameProp = new HiddenProperty(device, this, oid, PropertyIdentifier.objectName);
+		//this.hiddenNameProp = new HiddenProperty(device, this, oid, PropertyIdentifier.objectName);
 		this.hiddenStateTextProp = new HiddenProperty(device, this, oid, PropertyIdentifier.stateText);
 		this.hiddenActiveTextProp = new HiddenProperty(device, this, oid, PropertyIdentifier.activeText);
 		this.hiddenInactiveTextProp = new HiddenProperty(device, this, oid, PropertyIdentifier.inactiveText);
@@ -371,7 +371,7 @@ public class BacnetObject extends BacnetProperty {
 	protected void subscribe() {
 		super.subscribe();
 		ObjectType type = oid.getObjectType();
-		device.subscribeProperty(hiddenNameProp);
+		//device.subscribeProperty(hiddenNameProp);
 		if (Utils.isOneOf(type, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
 			device.subscribeProperty(hiddenActiveTextProp);
 			device.subscribeProperty(hiddenInactiveTextProp);
@@ -387,7 +387,7 @@ public class BacnetObject extends BacnetProperty {
 	protected void unsubscribe() {
 		super.unsubscribe();
 		ObjectType type = oid.getObjectType();
-		device.unsubscribeProperty(hiddenNameProp);
+		//device.unsubscribeProperty(hiddenNameProp);
 		if (Utils.isOneOf(type, ObjectType.binaryInput, ObjectType.binaryOutput, ObjectType.binaryValue)) {
 			device.unsubscribeProperty(hiddenActiveTextProp);
 			device.unsubscribeProperty(hiddenInactiveTextProp);
