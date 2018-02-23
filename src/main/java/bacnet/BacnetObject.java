@@ -472,6 +472,7 @@ public class BacnetObject extends BacnetProperty {
 		}
 		if (PropertyIdentifier.objectName.equals(propid)) {
 			node.setDisplayName(value.toString());
+			node.getLink().getSubscriptionManager().postChildUpdate(node, false);
 		} else if (PropertyIdentifier.stateText.equals(propid) || PropertyIdentifier.actionText.equals(propid)) {
 			@SuppressWarnings("unchecked")
 			SequenceOf<CharacterString> states = (SequenceOf<CharacterString>) value;
