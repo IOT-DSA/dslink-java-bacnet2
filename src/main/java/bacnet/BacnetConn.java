@@ -2,7 +2,6 @@ package bacnet;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -60,7 +59,6 @@ import com.serotonin.bacnet4j.type.notificationParameters.NotificationParameters
 import com.serotonin.bacnet4j.type.primitive.Boolean;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
-import com.serotonin.bacnet4j.type.primitive.OctetString;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.RequestUtils;
 
@@ -80,6 +78,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 	static final String ACTION_EXPORT = "export";
 	static final String ACTION_IMPORT = "import device";
 	
+	static final String NODE_ROUTERS = "ROUTERS";
 	static final String NODE_LOCAL = "LOCAL";
 	static final String NODE_STATUS = "STATUS";
 	static final String NODE_STATUS_SETTING_UP_CONNECTION = "Setting up connection";
@@ -95,6 +94,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 	private final Map<Integer, RemoteDevice> discovered = new ConcurrentHashMap<Integer, RemoteDevice>();
 	Lock discoveryLock = new ReentrantLock();
 	LocalDevice localDevice = null;
+	Transport transport = null;
 	ReadWriteMonitor monitor = new ReadWriteMonitor();
 	
 	Set<BacnetDevice> devices = new HashSet<BacnetDevice>();
@@ -102,8 +102,8 @@ public abstract class BacnetConn implements DeviceEventListener {
 	Object covSubsLock = new Object();
 	private Random random = new Random();
 	
-	final Map<Integer, OctetString> networkRouters = new HashMap<Integer, OctetString>();
-	final Map<String, Integer> bbmdIpToPort = new HashMap<String, Integer>();
+//	final Map<Integer, OctetString> networkRouters = new HashMap<Integer, OctetString>();
+//	final Map<String, Integer> bbmdIpToPort = new HashMap<String, Integer>();
 	
 	int localNetworkNumber;
 	int timeout;
@@ -138,13 +138,13 @@ public abstract class BacnetConn implements DeviceEventListener {
 		Value isRegisteredAsForeignDevice = node.getRoConfig("Register As Foreign Device In BBMD");
 		if (isRegisteredAsForeignDevice == null) {
 			isRegisteredAsForeignDevice = new Value(false);
-			node.setRoConfig("Register As Foreign Device In BBMD", isRegisteredAsForeignDevice);
 		}
+		node.removeRoConfig("Register As Foreign Device In BBMD");
 		Value bbmdIpList = node.getRoConfig("BBMD IPs With Network Number");
 		if (bbmdIpList == null) {
 			bbmdIpList = new Value("");
-			node.setRoConfig("BBMD IPs With Network Number", bbmdIpList);
 		}
+		node.removeRoConfig("BBMD IPs With Network Number");
 		
 		// MSTP transport
 		Value commPort = node.getRoConfig("Comm Port ID");
@@ -196,7 +196,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 			conn.localDeviceName = localDeviceName.getString();
 			conn.localDeviceVendor = localDeviceVendor.getString();
 			if (conn instanceof BacnetIpConn) {
-				((BacnetIpConn) conn).parseBroadcastManagementDevice();
+				((BacnetIpConn) conn).initializeRoutersNode();
 			}
 			return conn;
 
@@ -215,7 +215,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 			monitor.checkInWriter();
 			try {
 				Network network = getNetwork();
-				Transport transport = new DefaultTransport(network);
+				transport = new DefaultTransport(network);
 				network.setTransport(transport);
 				transport.setRetries(retries);
 				transport.setTimeout(timeout);
@@ -230,7 +230,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 				}
 				localDevice.getEventHandler().addListener(this);
 				localDevice.initialize();
-				registerAsForeignDevice(transport);
+				setupRouters();
 				localDevice.sendGlobalBroadcast(localDevice.getIAm());
 				LOGGER.info("sent IAm - " + localDevice.getInstanceNumber());
 //				localDevice.sendGlobalBroadcast(new WhoIsRequest());
@@ -241,6 +241,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 					localDevice.terminate();
 				}
 				localDevice = null;
+				transport = null;
 			}
 			monitor.checkOutWriter();
 		} catch (InterruptedException e) {
@@ -267,7 +268,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 		
 	}
 	
-	abstract void registerAsForeignDevice(Transport transport);
+	abstract void setupRouters();
 	
 	abstract Network getNetwork() throws Exception;
 	
@@ -278,7 +279,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 		}
 
 		for (Node child : node.getChildren().values()) {
-			if (child.getAction() == null && !child.getName().equals(NODE_STATUS) && !child.getName().equals(NODE_LOCAL)) {
+			if (child.getAction() == null && !child.getName().equals(NODE_STATUS) && !child.getName().equals(NODE_LOCAL) && !child.getName().equals(NODE_ROUTERS)) {
 				BacnetDevice bd = new BacnetDevice(this, child, null);
 				bd.restoreLastSession();
 			}
@@ -352,6 +353,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 				localDevice.terminate();
 			}
 			localDevice = null;
+			transport = null;
 			monitor.checkOutWriter();
 		} catch (InterruptedException e) {
 			

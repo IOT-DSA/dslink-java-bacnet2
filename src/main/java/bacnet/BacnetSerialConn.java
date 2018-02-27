@@ -17,7 +17,6 @@ import org.slf4j.LoggerFactory;
 import com.serotonin.bacnet4j.npdu.Network;
 import com.serotonin.bacnet4j.npdu.mstp.MasterNode;
 import com.serotonin.bacnet4j.npdu.mstp.MstpNetwork;
-import com.serotonin.bacnet4j.transport.Transport;
 import com.serotonin.bacnet4j.util.sero.JsscSerialPortInputStream;
 import com.serotonin.bacnet4j.util.sero.JsscSerialPortOutputStream;
 
@@ -55,7 +54,7 @@ public class BacnetSerialConn extends BacnetConn {
 	}
 
 	@Override
-	void registerAsForeignDevice(Transport transport) {
+	void setupRouters() {
 		//No-op
 	}
 	
