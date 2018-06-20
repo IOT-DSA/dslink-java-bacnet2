@@ -44,6 +44,7 @@ import com.serotonin.bacnet4j.type.error.BACnetError;
 import com.serotonin.bacnet4j.type.error.BaseError;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.Enumerated;
+import com.serotonin.bacnet4j.type.primitive.Null;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 
@@ -195,24 +196,28 @@ public class BacnetObject extends BacnetProperty {
 
 	private void write(Value newval, int priority) {
 		Encodable enc = null;
-		DataType type = getDataType();
-		switch (type) {
-		case BINARY: {
-			enc = (newval.getBool() != null && newval.getBool()) ? BinaryPV.active : BinaryPV.inactive;
-			break;
-		}
-		case MULTISTATE: {
-			if (newval.getNumber() != null) {
-				enc = new UnsignedInteger(newval.getNumber().intValue());
-			} else if (newval.getString() != null) {
-				int i = stateText.indexOf(newval.getString());
-				enc = new UnsignedInteger(i);
+		if (newval != null) {
+			DataType type = getDataType();
+			switch (type) {
+			case BINARY: {
+				enc = (newval.getBool() != null && newval.getBool()) ? BinaryPV.active : BinaryPV.inactive;
+				break;
 			}
-			break;
-		}
-		case OTHER:
-			enc = encodableFromValue(newval);
-			break;
+			case MULTISTATE: {
+				if (newval.getNumber() != null) {
+					enc = new UnsignedInteger(newval.getNumber().intValue());
+				} else if (newval.getString() != null) {
+					int i = stateText.indexOf(newval.getString());
+					enc = new UnsignedInteger(i);
+				}
+				break;
+			}
+			case OTHER:
+				enc = encodableFromValue(newval);
+				break;
+			}
+		} else {
+			enc = Null.instance;
 		}
 		
 		if (enc == null) {
