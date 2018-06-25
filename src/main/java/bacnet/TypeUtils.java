@@ -272,6 +272,9 @@ public class TypeUtils {
 	
 	public static JsonArray parseSequenceOf(SequenceOf<? extends Encodable> enc, int maxDepth) {
 		JsonArray jarr = new JsonArray();
+		if (enc instanceof PriorityArray) {
+			jarr.add("");
+		}
 		for (Encodable item: enc) {
 			Pair<ValueType, Value> p = parseEncodable(item, maxDepth);
 			ValueType vt = p.getLeft();
@@ -306,6 +309,9 @@ public class TypeUtils {
 					}
 				}
 				if (ja != null) {
+					if (ja.size() == 17) {
+						ja.remove(0);
+					}
 					for (int i=0; i<16; i++) {
 						if (ja.size() > i && ja.get(i) != null) {
 							pa.put(i+1, formatBaseType(PriorityValue.class, ValueUtils.toValue(ja.get(i)), ot, pid));
