@@ -1,30 +1,30 @@
 apply plugin: 'application'
 apply plugin: 'findbugs'
-apply plugin: 'java'
+apply plugin: 'java-library'
 
 mainClassName = 'bacnet.Main'
 sourceCompatibility = 1.7
 targetCompatibility = 1.7
-version = '2.1.8-SNAPSHOT'
+version = '2.1.9-SNAPSHOT'
 
 repositories {
     mavenCentral()
-    flatDir { dirs 'external' }
     maven {
         url 'https://oss.sonatype.org/content/repositories/snapshots/'
     }
+    flatDir { dirs 'external' }
 }
  
 dependencies {
-    compile 'org.iot-dsa:dslink:0.20.1'
-    compile 'org.iot-dsa:historian:0.20.1'
-    compile 'org.apache.commons:commons-lang3:3.0'
-    compile 'commons-logging:commons-logging:1.1.1'
-    compile 'org.scream3r:jssc:2.8.0'
-	compile ':sero-scheduler:1.+'
-    compile ':sero-warp:1.+'
-    compile ':BACnet4J:4.1.0'
-    compile 'org.reflections:reflections:0.9.11'
+    api 'org.iot-dsa:historian:0.20.1'
+
+    implementation 'commons-logging:commons-logging:1.2'
+    implementation 'org.apache.commons:commons-lang3:3.8'
+    implementation 'org.reflections:reflections:0.9.11'
+    implementation 'org.scream3r:jssc:2.8.0'
+	implementation ':sero-scheduler:1.+'
+    implementation ':sero-warp:1.+'
+    implementation ':BACnet4J:4.1.0'
 }
 
 run {
@@ -42,6 +42,10 @@ tasks.withType(FindBugs) {
         xml.enabled = false
         html.enabled = true
     }
+}
+
+wrapper {
+    gradleVersion = '4.10'
 }
 
 applicationDistribution.from new File(project.projectDir, "/dslink.json")
