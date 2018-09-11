@@ -31,6 +31,7 @@ public class BacnetIpConn extends BacnetConn {
 	String subnetMask;
 	int port;
 	String localBindAddress;
+	boolean useWildcard;
 	boolean isRegisteredAsForeignDevice;
 	String bbmdIpList;
 	Node routersNode;
@@ -50,7 +51,14 @@ public class BacnetIpConn extends BacnetConn {
 			} catch (UnknownHostException e) {
 			}
 		}
-		return new IpNetworkBuilder().withSubnet(subnetAddr, getNetworkPrefixLength(subnetMask)).withPort(port).withLocalBindAddress(localBindAddress).withLocalNetworkNumber(localNetworkNumber).build();
+		IpNetworkBuilder networkBuilder = new IpNetworkBuilder()
+				.withSubnet(subnetAddr, getNetworkPrefixLength(subnetMask))
+				.withPort(port)
+				.withLocalNetworkNumber(localNetworkNumber);
+		if (!useWildcard) {
+			networkBuilder.withLocalBindAddress(localBindAddress);
+		}
+		return networkBuilder.build();
 	}
 	
 	int getNetworkPrefixLength(String subnetMask) {
@@ -211,6 +219,7 @@ public class BacnetIpConn extends BacnetConn {
 		act.addParameter(new Parameter("Subnet Mask", ValueType.STRING, new Value(subnetMask)));
 		act.addParameter(new Parameter("Port", ValueType.NUMBER, new Value(port)));
 		act.addParameter(new Parameter("Local Bind Address", ValueType.STRING, new Value(localBindAddress)));
+		act.addParameter(new Parameter("Use Wildcard Address for Binding", ValueType.BOOL, new Value(useWildcard)));
 		act.addParameter(new Parameter("Local Network Number", ValueType.NUMBER, new Value(localNetworkNumber)));
 //		act.addParameter(new Parameter("Register As Foreign Device In BBMD", ValueType.BOOL, new Value(isRegisteredAsForeignDevice)));
 //		act.addParameter(new Parameter("BBMD IPs With Network Number", ValueType.STRING, new Value(bbmdIpList)));
@@ -237,6 +246,7 @@ public class BacnetIpConn extends BacnetConn {
 		subnetMask = Utils.safeGetRoConfigString(node, "Subnet Mask", subnetMask);
 		port = Utils.safeGetRoConfigNum(node, "Port", port).intValue();
 		localBindAddress = Utils.safeGetRoConfigString(node, "Local Bind Address", localBindAddress);
+		useWildcard = Utils.safeGetRoConfigBool(node, "Use Wildcard Address for Binding", useWildcard);
 //		isRegisteredAsForeignDevice = Utils.safeGetRoConfigBool(node, "Register As Foreign Device In BBMD", isRegisteredAsForeignDevice);
 //		bbmdIpList = Utils.safeGetRoConfigString(node, "BBMD IPs With Network Number", bbmdIpList);
 //		parseRouterListConfig();

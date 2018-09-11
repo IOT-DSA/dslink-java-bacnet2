@@ -5,14 +5,20 @@ apply plugin: 'java-library'
 mainClassName = 'bacnet.Main'
 sourceCompatibility = 1.7
 targetCompatibility = 1.7
-version = '2.1.9-SNAPSHOT'
+version = '2.2.0'
 
 repositories {
     mavenCentral()
     maven {
         url 'https://oss.sonatype.org/content/repositories/snapshots/'
     }
-    flatDir { dirs 'external' }
+    //flatDir { dirs 'external' }
+    //maven {
+    //	url 'https://maven.mangoautomation.net/repository/ias-snapshot/'
+    //}
+    maven {
+    	url 'https://maven.mangoautomation.net/repository/ias-release/'
+    }
 }
  
 dependencies {
@@ -22,9 +28,7 @@ dependencies {
     implementation 'org.apache.commons:commons-lang3:3.8'
     implementation 'org.reflections:reflections:0.9.11'
     implementation 'org.scream3r:jssc:2.8.0'
-	implementation ':sero-scheduler:1.+'
-    implementation ':sero-warp:1.+'
-    implementation ':BACnet4J:4.1.0'
+    implementation 'com.serotonin:bacnet4j:4.1.6'
 }
 
 run {

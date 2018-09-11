@@ -135,6 +135,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 		}
 		Value port = node.getRoConfig("Port");
 		Value localBindAddress = node.getRoConfig("Local Bind Address");
+		Value useWildcard = node.getRoConfig("Use Wildcard Address for Binding");
 		Value isRegisteredAsForeignDevice = node.getRoConfig("Register As Foreign Device In BBMD");
 		if (isRegisteredAsForeignDevice == null) {
 			isRegisteredAsForeignDevice = new Value(false);
@@ -169,10 +170,15 @@ public abstract class BacnetConn implements DeviceEventListener {
 				&& segmentWindow != null && retries != null && localDeviceId != null && localDeviceName != null
 				&& localDeviceVendor != null) {
 			if (subnetMask != null && port != null && localBindAddress != null) {
+				if (useWildcard == null) {
+					useWildcard = new Value(true);
+					node.setRoConfig("Use Wildcard Address for Binding", useWildcard);
+				}
 				BacnetIpConn iconn = new BacnetIpConn(link, node);
 				iconn.subnetMask = subnetMask.getString();
 				iconn.port = port.getNumber().intValue();
 				iconn.localBindAddress = localBindAddress.getString();
+				iconn.useWildcard = useWildcard.getBool();
 				iconn.isRegisteredAsForeignDevice = isRegisteredAsForeignDevice.getBool();
 				iconn.bbmdIpList = bbmdIpList.getString();
 				conn = iconn;
