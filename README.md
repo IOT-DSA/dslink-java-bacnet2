@@ -16,6 +16,7 @@ Use the `Add Connection` action to set up an IP or MSTP connection. This will cr
 	 - Used with the local bind address to determine the broadcast IP
  - `Port` - port to be used for BACnet communication - 47808 is protocol standard
  - `Local Bind Address` - IP address of this machine on the network
+ - `Use Wildcard Address for Binding` - Whether to bind the UDP socket to the wildcard address (On many systems, this is required in order to receive broadcast messages)
  - `Local Network Number` - network number of the network
  - `Register As Foreign Device in BBMD` - Set this to true if it's a remote network behind a BBMD (DEPRECATED - see `Routers`)
  - `BBMD IPs With Network Number` - If the network is behind a BBMD, set this to the BBMD's address, in the format `host:port:network number` (e.g. `74.110.102.112:47808:0`) (DEPRECATED - see `Routers`)
