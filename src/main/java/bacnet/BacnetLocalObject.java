@@ -118,6 +118,11 @@ public class BacnetLocalObject implements BACnetObjectListener {
 			if (device.conn.localDevice != null) {
 				obj = new BACnetObject(device.conn.localDevice, oid, node.getName());
 				obj.addListener(this);
+				try {
+					device.conn.localDevice.addObject(obj);
+				} catch (BACnetServiceException e) {
+					LOGGER.warn("", e);
+				}
 			}
 			device.conn.monitor.checkOutReader();
 		} catch (InterruptedException e) {
