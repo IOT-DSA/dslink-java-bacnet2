@@ -208,7 +208,7 @@ public class BacnetObject extends BacnetProperty {
 					enc = new UnsignedInteger(newval.getNumber().intValue());
 				} else if (newval.getString() != null) {
 					int i = stateText.indexOf(newval.getString());
-					enc = new UnsignedInteger(i);
+					enc = new UnsignedInteger(i + 1);
 				}
 				break;
 			}
@@ -438,16 +438,16 @@ public class BacnetObject extends BacnetProperty {
 //			break;
 //		}
 		case MULTISTATE: {
-			int i = -1;
+			int i = 0;
 			if (value instanceof Enumerated) {
 				i = ((Enumerated) value).intValue();
 			} else if (value instanceof UnsignedInteger) {
 				i = ((UnsignedInteger) value).intValue();
 			}
-			if (i >= 0) {
-				if (stateText.size() > i) {
+			if (i > 0) {
+				if (stateText.size() >= i) {
 					vt = ValueType.makeEnum(stateText);
-					v = new Value(stateText.get(i));
+					v = new Value(stateText.get(i - 1));
 				} else {
 					vt = ValueType.NUMBER;
 					v = new Value(i);
