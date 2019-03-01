@@ -5,7 +5,7 @@ apply plugin: 'java-library'
 mainClassName = 'bacnet.Main'
 sourceCompatibility = 1.7
 targetCompatibility = 1.7
-version = '2.2.2'
+version = '2.2.3'
 
 repositories {
     mavenCentral()
@@ -28,7 +28,7 @@ dependencies {
     implementation 'org.apache.commons:commons-lang3:3.8'
     implementation 'org.reflections:reflections:0.9.11'
     implementation 'org.scream3r:jssc:2.8.0'
-    implementation 'com.serotonin:bacnet4j:4.1.6'
+    implementation 'com.serotonin:bacnet4j:+'
 }
 
 run {

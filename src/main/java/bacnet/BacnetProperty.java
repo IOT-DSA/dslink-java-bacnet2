@@ -6,6 +6,7 @@ import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.Writable;
 import org.dsa.iot.dslink.node.actions.Action;
 import org.dsa.iot.dslink.node.actions.ActionResult;
+import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValuePair;
 import org.dsa.iot.dslink.node.value.ValueType;
@@ -26,6 +27,8 @@ public class BacnetProperty {
 	 private static final Logger LOGGER = LoggerFactory.getLogger(BacnetProperty.class);
 
 	static final String ACTION_REMOVE = "remove";
+	static final String ACTION_EDIT = "edit";
+	static final String CONFIG_WRITABLE = "Writable";
 
 	BacnetDevice device;
 	BacnetObject object;
@@ -39,6 +42,9 @@ public class BacnetProperty {
 		this.node = node;
 		this.oid = oid;
 		this.pid = pid;
+		if (node != null && node.getRoConfig(CONFIG_WRITABLE) == null) {
+		    node.setRoConfig(CONFIG_WRITABLE, new Value(shouldBeSettable()));
+		}
 	}
 
 	BacnetProperty(BacnetDevice device, BacnetObject object, Node node, ObjectIdentifier oid, PropertyIdentifier pid) {
@@ -73,10 +79,20 @@ public class BacnetProperty {
 			}
 		});
 		makeSettable();
+		makeEditAction();
+	}
+	
+	protected boolean isWritable() {
+	    return node.getRoConfig(CONFIG_WRITABLE).getBool();
+	}
+	
+	protected void setWritable(boolean writable) {
+	    node.setRoConfig(CONFIG_WRITABLE, new Value(writable));
+	    makeSettable();
 	}
 
 	private void makeSettable() {
-		if (shouldBeSettable()) {
+		if (isWritable()) {
 			node.setWritable(Writable.WRITE);
 			node.getListener().setValueHandler(new Handler<ValuePair>() {
 				@Override
@@ -84,6 +100,8 @@ public class BacnetProperty {
 					handleSet(event);
 				}
 			});
+		} else {
+		    node.setWritable(Writable.NEVER);
 		}
 	}
 
@@ -256,6 +274,28 @@ public class BacnetProperty {
 	protected void remove() {
 		object.properties.remove(this);
 		node.delete(false);
+	}
+	
+	protected void makeEditAction() {
+	    Action act = new Action(Permission.READ, new Handler<ActionResult>() {
+            @Override
+            public void handle(ActionResult event) {
+                edit(event);
+            }
+        });
+        act.addParameter(new Parameter(CONFIG_WRITABLE, ValueType.BOOL, node.getRoConfig(CONFIG_WRITABLE)));
+        Node anode = node.getChild(ACTION_EDIT, true);
+        if (anode == null) {
+            node.createChild(ACTION_EDIT, true).setAction(act).build().setSerializable(false);
+        } else {
+            anode.setAction(act);
+        }
+	}
+	
+	private void edit(ActionResult event) {
+	    boolean newWritable = event.getParameter(CONFIG_WRITABLE, ValueType.BOOL).getBool();
+	    setWritable(newWritable);
+        makeEditAction();
 	}
 
 }

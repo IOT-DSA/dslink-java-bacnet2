@@ -54,7 +54,6 @@ public class BacnetObject extends BacnetProperty {
 
 	static final String ACTION_DISCOVER_PROPERTIES = "discover properties";
 	static final String ACTION_ADD_PROPERTY = "add property";
-	static final String ACTION_EDIT = "edit";
 	static final String ACTION_WRITE = "write";
 	static final String ACTION_RELINQUISH = "relinquish";
 
@@ -115,7 +114,6 @@ public class BacnetObject extends BacnetProperty {
 		makeRelinquishAction();
 		makeDiscoverAction();
 		makeAddPropertyAction();
-		makeEditAction();
 		initHistory();
 	}
 
@@ -293,7 +291,8 @@ public class BacnetObject extends BacnetProperty {
 		addProperty(propid);
 	}
 
-	private void makeEditAction() {
+	@Override
+	protected void makeEditAction() {
 		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
 			@Override
 			public void handle(ActionResult event) {
@@ -303,6 +302,7 @@ public class BacnetObject extends BacnetProperty {
 		act.addParameter(new Parameter("Use COV", ValueType.BOOL, new Value(useCov)));
 		act.addParameter(new Parameter("Enable Headless Polling", ValueType.BOOL, new Value(headlessPolling)));
 		act.addParameter(new Parameter("Write Priority", ValueType.NUMBER, new Value(writePriority)));
+		act.addParameter(new Parameter(CONFIG_WRITABLE, ValueType.BOOL, node.getRoConfig(CONFIG_WRITABLE)));
 		Node anode = node.getChild(ACTION_EDIT, true);
 		if (anode == null) {
 			node.createChild(ACTION_EDIT, true).setAction(act).build().setSerializable(false);
@@ -315,6 +315,7 @@ public class BacnetObject extends BacnetProperty {
 		boolean newCovUse = event.getParameter("Use COV", ValueType.BOOL).getBool();
 		boolean headless = event.getParameter("Enable Headless Polling", ValueType.BOOL).getBool();
 		int newPriority = event.getParameter("Write Priority", ValueType.NUMBER).getNumber().intValue();
+		boolean newWritable = event.getParameter(CONFIG_WRITABLE, ValueType.BOOL).getBool();
 		if (newPriority < 1) {
 			newPriority = 1;
 		} else if (newPriority > 16) {
@@ -324,8 +325,8 @@ public class BacnetObject extends BacnetProperty {
 		node.setRoConfig("Write Priority", new Value(writePriority));
 
 		setCov(newCovUse);
-
 		setHeadless(headless);
+		setWritable(newWritable);
 
 		makeEditAction();
 		makeRelinquishAction();
