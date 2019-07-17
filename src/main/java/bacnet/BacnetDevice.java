@@ -368,7 +368,7 @@ public class BacnetDevice {
 						try {
 							// LOGGER.info("Sending Read Properties Request to
 							// Device: " + node.getName());
-							results = RequestUtils.readProperties(conn.localDevice, remoteDevice, oprs, null);
+							results = RequestUtils.readProperties(conn.localDevice, remoteDevice, oprs, true, null);
 							// if (results != null) LOGGER.info("Recieved Read
 							// Properties Response from Device: " +
 							// node.getName());

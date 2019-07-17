@@ -5,7 +5,7 @@ apply plugin: 'java-library'
 mainClassName = 'bacnet.Main'
 sourceCompatibility = 1.7
 targetCompatibility = 1.7
-version = '2.2.3'
+version = '2.3.0'
 
 repositories {
     mavenCentral()
@@ -28,7 +28,8 @@ dependencies {
     implementation 'org.apache.commons:commons-lang3:3.8'
     implementation 'org.reflections:reflections:0.9.11'
     implementation 'org.scream3r:jssc:2.8.0'
-    implementation 'com.serotonin:bacnet4j:+'
+    //implementation 'com.serotonin:bacnet4j:+'
+    implementation 'com.infiniteautomation:bacnet4j:+'
 }
 
 run {
@@ -40,6 +41,10 @@ task sourcesJar(group: 'build', type: Jar, dependsOn: classes) {
     classifier = 'sources'
     from sourceSets.main.allSource
 }
+
+//tasks.withType(JavaCompile) {
+	//options.compilerArgs << "-parameters"
+//}
 
 tasks.withType(FindBugs) {
     reports {
