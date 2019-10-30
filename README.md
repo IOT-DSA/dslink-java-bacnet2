@@ -72,3 +72,11 @@ If you have BACnet devices behind some sort of BACnet router, you will need to a
  - `IP` - The address of the router device
  - `Port` - The port of the router device
  - `Register as Foreign Device` - Set this to `true` if the router is a BBMD, to have the BACnet DSLink be registered in it as a foreign device
+ 
+### Troubleshooting
+
+   - Verify that the subnet mask is set to the subnet mask of the network containing the machine running the DSLink and the BACnet device(s) (This information can usually be found by running ipconfig or ifconfig from command line)
+   - Verify that the local bind address is set to the IP (in that network) of  *the machine running the BACnet DSLink* 
+   - Are some or all of the BACnet devices you're ttrying to connect to behind some sort of BACnet router (this could be a BBMD, but not necessarily). If yes, ensure that the router is added to the ROUTERS node as described above.
+   - Connect to the devices with some third party tool, such as YABE (https://sourceforge.net/projects/yetanotherbacnetexplorer/) to verify that they communicate properly. If YABE (or other tool) is unable to talk to the devices, then the problem is with setup, not the DSLink.
+
