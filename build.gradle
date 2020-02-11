@@ -1,28 +1,25 @@
 apply plugin: 'application'
-apply plugin: 'findbugs'
 apply plugin: 'java-library'
 
 mainClassName = 'bacnet.Main'
 sourceCompatibility = 1.7
 targetCompatibility = 1.7
-version = '2.3.0'
+version = '2.4.0-SNAPSHOT'
 
 repositories {
-    mavenCentral()
+    jcenter()
+    /*
     maven {
         url 'https://oss.sonatype.org/content/repositories/snapshots/'
     }
-    //flatDir { dirs 'external' }
-    //maven {
-    //	url 'https://maven.mangoautomation.net/repository/ias-snapshot/'
-    //}
+    */
     maven {
     	url 'https://maven.mangoautomation.net/repository/ias-release/'
     }
 }
  
 dependencies {
-    api 'org.iot-dsa:historian:0.20.1'
+    api 'org.iot-dsa:historian:0.23.1'
 
     implementation 'commons-logging:commons-logging:1.2'
     implementation 'org.apache.commons:commons-lang3:3.8'
@@ -42,19 +39,8 @@ task sourcesJar(group: 'build', type: Jar, dependsOn: classes) {
     from sourceSets.main.allSource
 }
 
-//tasks.withType(JavaCompile) {
-	//options.compilerArgs << "-parameters"
-//}
-
-tasks.withType(FindBugs) {
-    reports {
-        xml.enabled = false
-        html.enabled = true
-    }
-}
-
 wrapper {
-    gradleVersion = '4.10'
+    gradleVersion = '6.1'
 }
 
 applicationDistribution.from new File(project.projectDir, "/dslink.json")
