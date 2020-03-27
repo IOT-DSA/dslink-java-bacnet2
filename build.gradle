@@ -4,7 +4,7 @@ apply plugin: 'java-library'
 mainClassName = 'bacnet.Main'
 sourceCompatibility = 1.7
 targetCompatibility = 1.7
-version = '2.4.0'
+version = '2.4.1'
 
 repositories {
     jcenter()

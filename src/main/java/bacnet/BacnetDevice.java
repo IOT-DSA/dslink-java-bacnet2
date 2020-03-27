@@ -194,6 +194,9 @@ public class BacnetDevice {
 				if (oid != null) {
 					BacnetObject bo = new BacnetObject(this, child, oid);
 					bo.restoreLastSession();
+					if (child.getDisplayName() == null) {
+						subscribeProperty(new OneTimeNameProperty(this, bo, oid));
+					}
 				} else {
 					child.delete(false);
 				}
@@ -525,17 +528,22 @@ public class BacnetDevice {
 		}
 		for (ObjectIdentifier oid : oids) {
 			String name = oid.toString();
-			NodeBuilder b = fnode.createChild(name, true).setRoConfig("restoreAs", new Value("object"))
-					.setRoConfig("Object Type", new Value(oid.getObjectType().toString()))
-					.setRoConfig("Instance Number", new Value(oid.getInstanceNumber()))
-					.setRoConfig("Use COV", new Value(false))
-					.setRoConfig("Enable Headless Polling", new Value(false))
-					.setRoConfig("Write Priority", new Value(16))
-					.setValueType(ValueType.STRING).setValue(new Value(""));
-			BacnetObject bo = new BacnetObject(this, b.getChild(), oid);
-			bo.init();
-			b.build();
-			subscribeProperty(new OneTimeNameProperty(this, bo, oid));
+			if (fnode.getChild(name, true) == null) {
+				NodeBuilder b = fnode.createChild(name, true)
+									 .setRoConfig("restoreAs", new Value("object"))
+									 .setRoConfig("Object Type",
+												  new Value(oid.getObjectType().toString()))
+									 .setRoConfig("Instance Number",
+												  new Value(oid.getInstanceNumber()))
+									 .setRoConfig("Use COV", new Value(false))
+									 .setRoConfig("Enable Headless Polling", new Value(false))
+									 .setRoConfig("Write Priority", new Value(16))
+									 .setValueType(ValueType.STRING).setValue(new Value(""));
+				BacnetObject bo = new BacnetObject(this, b.getChild(), oid);
+				bo.init();
+				b.build();
+				subscribeProperty(new OneTimeNameProperty(this, bo, oid));
+			}
 		}
 	}
 
