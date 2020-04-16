@@ -4,7 +4,7 @@ apply plugin: 'java-library'
 mainClassName = 'bacnet.Main'
 sourceCompatibility = 1.7
 targetCompatibility = 1.7
-version = '2.4.0'
+version = '2.4.1'
 
 repositories {
     jcenter()
@@ -19,7 +19,7 @@ repositories {
 }
  
 dependencies {
-    api 'org.iot-dsa:historian:0.23.1'
+    api 'org.iot-dsa:historian:0.23.2'
 
     implementation 'commons-logging:commons-logging:1.2'
     implementation 'org.apache.commons:commons-lang3:3.8'
