@@ -1,17 +1,5 @@
 package bacnet;
 
-import java.util.HashMap;
-import java.util.Map;
-import org.dsa.iot.dslink.node.Node;
-import org.dsa.iot.dslink.node.Permission;
-import org.dsa.iot.dslink.node.actions.Action;
-import org.dsa.iot.dslink.node.actions.ActionResult;
-import org.dsa.iot.dslink.node.actions.Parameter;
-import org.dsa.iot.dslink.node.value.ValueType;
-import org.dsa.iot.dslink.util.handler.Handler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.serotonin.bacnet4j.exception.BACnetServiceException;
 import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.obj.BACnetObjectListener;
@@ -21,6 +9,16 @@ import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
+import java.util.HashMap;
+import java.util.Map;
+import org.dsa.iot.dslink.node.Node;
+import org.dsa.iot.dslink.node.Permission;
+import org.dsa.iot.dslink.node.actions.Action;
+import org.dsa.iot.dslink.node.actions.ActionResult;
+import org.dsa.iot.dslink.node.actions.Parameter;
+import org.dsa.iot.dslink.node.value.ValueType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BacnetLocalObject implements BACnetObjectListener {
 	private static final Logger LOGGER = LoggerFactory.getLogger(BacnetLocalObject.class);
@@ -28,13 +26,13 @@ public class BacnetLocalObject implements BACnetObjectListener {
 	static final String ACTION_REMOVE = "remove";
 	static final String ACTION_ADD_PROPERTY = "add property";
 	
-	BacnetLocalDevice device;
-	Node node;
-	ObjectIdentifier oid;
+	final BacnetLocalDevice device;
+	final Node node;
+	final ObjectIdentifier oid;
 	BACnetObject obj;
 	final ReadWriteMonitor monitor = new ReadWriteMonitor();
 	
-	Map<PropertyIdentifier, BacnetLocalProperty> properties = new HashMap<PropertyIdentifier, BacnetLocalProperty>();
+	final Map<PropertyIdentifier, BacnetLocalProperty> properties = new HashMap<>();
 	
 	BacnetLocalObject(BacnetLocalDevice device, Node node, ObjectIdentifier oid) {
 		this.device = device;
@@ -65,7 +63,7 @@ public class BacnetLocalObject implements BACnetObjectListener {
 			monitor.checkInWriter();
 			initObj();
 			monitor.checkOutWriter();
-		} catch (InterruptedException e1) {
+		} catch (InterruptedException ignored) {
 		}
 		
 		
@@ -84,7 +82,7 @@ public class BacnetLocalObject implements BACnetObjectListener {
 				}
 			}
 			monitor.checkOutReader();
-		} catch (InterruptedException e1) {
+		} catch (InterruptedException ignored) {
 		}
 		
 		for (ObjectPropertyTypeDefinition defn: ObjectProperties.getRequiredObjectPropertyTypeDefinitions(oid.getObjectType())) {
@@ -125,7 +123,7 @@ public class BacnetLocalObject implements BACnetObjectListener {
 				}
 			}
 			device.conn.monitor.checkOutReader();
-		} catch (InterruptedException e) {
+		} catch (InterruptedException ignored) {
 			
 		}
 	}
@@ -136,17 +134,12 @@ public class BacnetLocalObject implements BACnetObjectListener {
 			obj = null;
 			initObj();
 			monitor.checkOutWriter();
-		} catch (InterruptedException e) {	
+		} catch (InterruptedException ignored) {
 		}
 	}
 	
 	private void makeRemoveAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				remove();
-			}
-		});
+		Action act = new Action(Permission.READ, event -> remove());
 		Node anode = node.getChild(ACTION_REMOVE, true);
 		if (anode == null) {
 			node.createChild(ACTION_REMOVE, true).setAction(act).build().setSerializable(false);
@@ -166,19 +159,14 @@ public class BacnetLocalObject implements BACnetObjectListener {
 				}
 			}
 			device.conn.monitor.checkOutReader();
-		} catch (InterruptedException e) {
+		} catch (InterruptedException ignored) {
 			
 		}
 		node.delete(false);
 	}
 	
 	private void makeAddPropertyAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				addProperty(event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> addProperty(event));
 		act.addParameter(new Parameter("Property Identifier", ValueType.makeEnum(Utils.getPropertyList())));
 		Node anode = node.getChild(ACTION_ADD_PROPERTY, true);
 		if (anode == null) {

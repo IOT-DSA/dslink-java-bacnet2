@@ -55,7 +55,6 @@ import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.serializer.Deserializer;
 import org.dsa.iot.dslink.serializer.Serializer;
 import org.dsa.iot.dslink.util.Objects;
-import org.dsa.iot.dslink.util.handler.Handler;
 import org.dsa.iot.dslink.util.json.JsonArray;
 import org.dsa.iot.dslink.util.json.JsonObject;
 import org.slf4j.Logger;
@@ -86,23 +85,23 @@ public abstract class BacnetConn implements DeviceEventListener {
     static final String NODE_STATUS_STOPPED = "Stopped";
     static final String NODE_DISCOVERED = "Discovered";
 
-    protected Node node;
-    protected BacnetLink link;
+    protected final Node node;
+    protected final BacnetLink link;
     private final Node statnode;
     private final Node discoveredNode;
     private final BacnetLocalDevice localController;
     private final ScheduledThreadPoolExecutor stpe = Objects.createDaemonThreadPool();
 
-    private final Map<Integer, RemoteDevice> discovered = new ConcurrentHashMap<Integer, RemoteDevice>();
+    private final Map<Integer, RemoteDevice> discovered = new ConcurrentHashMap<>();
     Lock discoveryLock = new ReentrantLock();
     LocalDevice localDevice = null;
     Transport transport = null;
-    ReadWriteMonitor monitor = new ReadWriteMonitor();
+    final ReadWriteMonitor monitor = new ReadWriteMonitor();
 
-    Set<BacnetDevice> devices = new HashSet<BacnetDevice>();
-    private Map<Long, BacnetObject> covSubs = new ConcurrentHashMap<Long, BacnetObject>();
-    Object covSubsLock = new Object();
-    private Random random = new Random();
+    final Set<BacnetDevice> devices = new HashSet<>();
+    private final Map<Long, BacnetObject> covSubs = new ConcurrentHashMap<>();
+    final Object covSubsLock = new Object();
+    private final Random random = new Random();
 
 //	final Map<Integer, OctetString> networkRouters = new HashMap<Integer, OctetString>();
 //	final Map<String, Integer> bbmdIpToPort = new HashMap<String, Integer>();
@@ -263,7 +262,7 @@ public abstract class BacnetConn implements DeviceEventListener {
                 transport = null;
             }
             monitor.checkOutWriter();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException ignored) {
 
         }
 
@@ -315,12 +314,7 @@ public abstract class BacnetConn implements DeviceEventListener {
     /////////////////////////////////////////////////////////////////////////////////////////
 
     private void makeRemoveAction() {
-        Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-            @Override
-            public void handle(ActionResult event) {
-                remove();
-            }
-        });
+        Action act = new Action(Permission.READ, event -> remove());
         Node anode = node.getChild(ACTION_REMOVE, true);
         if (anode == null) {
             node.createChild(ACTION_REMOVE, true).setAction(act).build().setSerializable(false);
@@ -330,12 +324,7 @@ public abstract class BacnetConn implements DeviceEventListener {
     }
 
     private void makeStopAction() {
-        Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-            @Override
-            public void handle(ActionResult event) {
-                stop();
-            }
-        });
+        Action act = new Action(Permission.READ, event -> stop());
         Node anode = node.getChild(ACTION_STOP, true);
         if (anode == null) {
             node.createChild(ACTION_STOP, true).setAction(act).build().setSerializable(false);
@@ -345,12 +334,7 @@ public abstract class BacnetConn implements DeviceEventListener {
     }
 
     private void makeRestartAction() {
-        Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-            @Override
-            public void handle(ActionResult event) {
-                restart();
-            }
-        });
+        Action act = new Action(Permission.READ, event -> restart());
         Node anode = node.getChild(ACTION_RESTART, true);
         if (anode == null) {
             node.createChild(ACTION_RESTART, true).setAction(act).build().setSerializable(false);
@@ -374,7 +358,7 @@ public abstract class BacnetConn implements DeviceEventListener {
             localDevice = null;
             transport = null;
             monitor.checkOutWriter();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException ignored) {
 
         }
     }
@@ -407,12 +391,7 @@ public abstract class BacnetConn implements DeviceEventListener {
     }
 
     private void makeDiscoverAction() {
-        Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-            @Override
-            public void handle(ActionResult event) {
-                discover(event);
-            }
-        });
+        Action act = new Action(Permission.READ, event -> discover(event));
         act.addParameter(new Parameter("Device Instance Range Low Limit", ValueType.NUMBER));
         act.addParameter(new Parameter("Device Instance Range High Limit", ValueType.NUMBER));
         Node anode = node.getChild(ACTION_DISCOVER_DEVICES, true);
@@ -435,7 +414,7 @@ public abstract class BacnetConn implements DeviceEventListener {
                 localDevice.sendGlobalBroadcast(whoIs);
             }
             monitor.checkOutReader();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException ignored) {
 
         }
 //		int lastLength = 0;
@@ -453,12 +432,7 @@ public abstract class BacnetConn implements DeviceEventListener {
 
     private void makeAddDiscoveredDeviceAction() {
 //		LOGGER.info("updating add discovered device action");
-        Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-            @Override
-            public void handle(ActionResult event) {
-                addDiscoveredDevice(event);
-            }
-        });
+        Action act = new Action(Permission.READ, event -> addDiscoveredDevice(event));
 
         Set<String> enums = Utils.getDeviceEnum(discovered);
         JsonArray ary = new JsonArray();
@@ -486,12 +460,7 @@ public abstract class BacnetConn implements DeviceEventListener {
     }
 
     private void makeAddDeviceByNumberAction() {
-        Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-            @Override
-            public void handle(ActionResult event) {
-                addDeviceByNumber(event);
-            }
-        });
+        Action act = new Action(Permission.READ, event -> addDeviceByNumber(event));
 
         act.addParameter(new Parameter("Name", ValueType.STRING));
         act.addParameter(new Parameter("Instance Number", ValueType.NUMBER));
@@ -511,12 +480,7 @@ public abstract class BacnetConn implements DeviceEventListener {
     }
 
     private void makeAddDeviceByAddressAction() {
-        Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-            @Override
-            public void handle(ActionResult event) {
-                addDeviceByAddress(event);
-            }
-        });
+        Action act = new Action(Permission.READ, event -> addDeviceByAddress(event));
 
         act.addParameter(new Parameter("Name", ValueType.STRING));
         act.addParameter(new Parameter("Network Number", ValueType.NUMBER, new Value(0)));
@@ -537,12 +501,7 @@ public abstract class BacnetConn implements DeviceEventListener {
     }
 
     private void makeAddAllAction() {
-        Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-            @Override
-            public void handle(ActionResult event) {
-                addAllDiscovered(event);
-            }
-        });
+        Action act = new Action(Permission.READ, event -> addAllDiscovered(event));
         act.addParameter(new Parameter("Polling Interval", ValueType.NUMBER, new Value(5)));
         act.addParameter(
                 new Parameter("Get Confirmed COV Notifications", ValueType.BOOL, new Value(false)));
@@ -601,7 +560,7 @@ public abstract class BacnetConn implements DeviceEventListener {
                 }
             }
             monitor.checkOutReader();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException ignored) {
 
         }
         addDevice(event, d);
@@ -619,7 +578,7 @@ public abstract class BacnetConn implements DeviceEventListener {
         if (address == null) {
             return null;
         }
-        final Queue<RemoteDevice> wrapper = new ConcurrentLinkedQueue<RemoteDevice>();
+        final Queue<RemoteDevice> wrapper = new ConcurrentLinkedQueue<>();
         DeviceEventListener listener = new DeviceEventListener() {
             @Override
             public void listenerException(Throwable e) {
@@ -695,7 +654,7 @@ public abstract class BacnetConn implements DeviceEventListener {
                 disconnected = true;
             }
             monitor.checkOutReader();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException ignored) {
 
         }
         if (disconnected) {
@@ -705,7 +664,7 @@ public abstract class BacnetConn implements DeviceEventListener {
             if (wrapper.isEmpty()) {
                 try {
                     listener.wait(timeout + 1000);
-                } catch (InterruptedException e) {
+                } catch (InterruptedException ignored) {
 
                 }
             }
@@ -715,7 +674,7 @@ public abstract class BacnetConn implements DeviceEventListener {
                     localDevice.getEventHandler().removeListener(listener);
                 }
                 monitor.checkOutReader();
-            } catch (InterruptedException e) {
+            } catch (InterruptedException ignored) {
 
             }
             return wrapper.poll();
@@ -744,12 +703,7 @@ public abstract class BacnetConn implements DeviceEventListener {
     }
 
     private void makeExportAction() {
-        Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-            @Override
-            public void handle(ActionResult event) {
-                handleExport(event);
-            }
-        });
+        Action act = new Action(Permission.READ, event -> handleExport(event));
         act.addResult(new Parameter("JSON", ValueType.STRING).setEditorType(EditorType.TEXT_AREA));
         Node anode = node.getChild(ACTION_EXPORT, true);
         if (anode == null) {
@@ -774,12 +728,7 @@ public abstract class BacnetConn implements DeviceEventListener {
     }
 
     private void makeImportAction() {
-        Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-            @Override
-            public void handle(ActionResult event) {
-                handleImport(event);
-            }
-        });
+        Action act = new Action(Permission.READ, event -> handleImport(event));
         act.addParameter(new Parameter("Name", ValueType.STRING));
         act.addParameter(
                 new Parameter("JSON", ValueType.STRING).setEditorType(EditorType.TEXT_AREA));
@@ -823,12 +772,7 @@ public abstract class BacnetConn implements DeviceEventListener {
     public void iAmReceived(final RemoteDevice d) {
         LOGGER.debug("iAm recieved: " + d);
         discovered.put(d.getInstanceNumber(), d);
-        Objects.getDaemonThreadPool().schedule(new Runnable() {
-            @Override
-            public void run() {
-                deviceDiscovered(d);
-            }
-        }, 0, TimeUnit.MILLISECONDS);
+        Objects.getDaemonThreadPool().schedule(() -> deviceDiscovered(d), 0, TimeUnit.MILLISECONDS);
     }
 
     private void deviceDiscovered(RemoteDevice d) {
@@ -846,7 +790,7 @@ public abstract class BacnetConn implements DeviceEventListener {
                 LOGGER.debug("", e);
             }
             monitor.checkOutReader();
-        } catch (InterruptedException e1) {
+        } catch (InterruptedException ignored) {
         }
         if (enc != null) {
             d.setDeviceProperty(PropertyIdentifier.objectName, enc);

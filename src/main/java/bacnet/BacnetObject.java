@@ -1,28 +1,5 @@
 package bacnet;
 
-import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
-import org.apache.commons.lang3.tuple.Pair;
-import org.dsa.iot.dslink.node.Node;
-import org.dsa.iot.dslink.node.Permission;
-import org.dsa.iot.dslink.node.actions.Action;
-import org.dsa.iot.dslink.node.actions.ActionResult;
-import org.dsa.iot.dslink.node.actions.Parameter;
-import org.dsa.iot.dslink.node.value.Value;
-import org.dsa.iot.dslink.node.value.ValueType;
-import org.dsa.iot.dslink.util.handler.CompleteHandler;
-import org.dsa.iot.dslink.util.handler.Handler;
-import org.dsa.iot.dslink.util.json.JsonObject;
-import org.dsa.iot.historian.database.Database;
-import org.dsa.iot.historian.stats.GetHistory;
-import org.dsa.iot.historian.utils.QueryData;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.serotonin.bacnet4j.ServiceFuture;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.service.acknowledgement.ReadRangeAck;
@@ -47,6 +24,26 @@ import com.serotonin.bacnet4j.type.primitive.Enumerated;
 import com.serotonin.bacnet4j.type.primitive.Null;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
+import org.dsa.iot.dslink.node.Node;
+import org.dsa.iot.dslink.node.Permission;
+import org.dsa.iot.dslink.node.actions.Action;
+import org.dsa.iot.dslink.node.actions.ActionResult;
+import org.dsa.iot.dslink.node.actions.Parameter;
+import org.dsa.iot.dslink.node.value.Value;
+import org.dsa.iot.dslink.node.value.ValueType;
+import org.dsa.iot.dslink.util.handler.CompleteHandler;
+import org.dsa.iot.dslink.util.json.JsonObject;
+import org.dsa.iot.historian.database.Database;
+import org.dsa.iot.historian.stats.GetHistory;
+import org.dsa.iot.historian.utils.QueryData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class BacnetObject extends BacnetProperty {
@@ -62,18 +59,18 @@ public class BacnetObject extends BacnetProperty {
 	boolean headlessPolling;
 	int writePriority;
 
-	Set<BacnetProperty> properties = new HashSet<BacnetProperty>();
+	final Set<BacnetProperty> properties = new HashSet<>();
 	private int covSubCount = 0;
 	long covId = -1;
-	Object lock = new Object();
+	final Object lock = new Object();
 
-	private List<String> stateText = new ArrayList<String>(2);
+	private List<String> stateText = new ArrayList<>(2);
 
 	//private BacnetProperty hiddenNameProp;
-	private BacnetProperty hiddenStateTextProp;
-	private BacnetProperty hiddenActiveTextProp;
-	private BacnetProperty hiddenInactiveTextProp;
-	private BacnetProperty hiddenActionTextProp;
+	private final BacnetProperty hiddenStateTextProp;
+	private final BacnetProperty hiddenActiveTextProp;
+	private final BacnetProperty hiddenInactiveTextProp;
+	private final BacnetProperty hiddenActionTextProp;
 
 	BacnetObject(BacnetDevice device, Node node, ObjectIdentifier oid) {
 		super(device, node, oid, PropertyIdentifier.presentValue);
@@ -155,12 +152,7 @@ public class BacnetObject extends BacnetProperty {
 	}
 
 	private void makeRelinquishAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				handleRelinquish(event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> handleRelinquish(event));
 		act.addParameter(new Parameter("Priority", ValueType.NUMBER, new Value(writePriority)));
 		Node anode = node.getChild(ACTION_RELINQUISH, true);
 		if (anode == null) {
@@ -250,12 +242,7 @@ public class BacnetObject extends BacnetProperty {
 	}
 
 	private void makeDiscoverAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				addProperties();
-			}
-		});
+		Action act = new Action(Permission.READ, event -> addProperties());
 		Node anode = node.getChild(ACTION_DISCOVER_PROPERTIES, true);
 		if (anode == null) {
 			node.createChild(ACTION_DISCOVER_PROPERTIES, true).setAction(act).build().setSerializable(false);
@@ -265,12 +252,7 @@ public class BacnetObject extends BacnetProperty {
 	}
 
 	private void makeAddPropertyAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				addProperty(event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> addProperty(event));
 		act.addParameter(new Parameter("Property Identifier", ValueType.makeEnum(Utils.getPropertyList())));
 		Node anode = node.getChild(ACTION_ADD_PROPERTY, true);
 		if (anode == null) {
@@ -293,12 +275,7 @@ public class BacnetObject extends BacnetProperty {
 
 	@Override
 	protected void makeEditAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				edit(event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> edit(event));
 		act.addParameter(new Parameter("Use COV", ValueType.BOOL, new Value(useCov)));
 		act.addParameter(new Parameter("Enable Headless Polling", ValueType.BOOL, new Value(headlessPolling)));
 		act.addParameter(new Parameter("Write Priority", ValueType.NUMBER, new Value(writePriority)));
@@ -482,7 +459,7 @@ public class BacnetObject extends BacnetProperty {
 		} else if (PropertyIdentifier.stateText.equals(propid) || PropertyIdentifier.actionText.equals(propid)) {
 			@SuppressWarnings("unchecked")
 			SequenceOf<CharacterString> states = (SequenceOf<CharacterString>) value;
-			ArrayList<String> newstates = new ArrayList<String>();
+			ArrayList<String> newstates = new ArrayList<>();
 			for (CharacterString state : states) {
 				newstates.add(state.getValue());
 			}
@@ -515,7 +492,7 @@ public class BacnetObject extends BacnetProperty {
 			covSubCount = 0;
 			return;
 		}
-		covSubCount -= 1;
+		covSubCount--;
 		if (covSubCount <= 0) {
 			covSubCount = 0;
 			device.unsubscribeObjectCov(this);
@@ -623,7 +600,7 @@ public class BacnetObject extends BacnetProperty {
 				try {
 					DateTime dt = (DateTime) record.getClass().getMethod("getTimestamp").invoke(record);
 					return dt.getGC().getTimeInMillis();
-				} catch (ClassCastException | NullPointerException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchMethodException | SecurityException e) {
+				} catch (ClassCastException | NullPointerException | IllegalAccessException | IllegalArgumentException | InvocationTargetException | NoSuchMethodException | SecurityException ignored) {
 				}
 			}
 			return -1;
@@ -668,13 +645,13 @@ public class BacnetObject extends BacnetProperty {
 		}
 
 		@Override
-		public void close() throws Exception {
+		public void close() {
 			// TODO Auto-generated method stub
 			
 		}
 
 		@Override
-		protected void performConnect() throws Exception {
+		protected void performConnect() {
 			// TODO Auto-generated method stub
 			
 		}

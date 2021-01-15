@@ -2,31 +2,25 @@ apply plugin: 'application'
 apply plugin: 'java-library'
 
 mainClassName = 'bacnet.Main'
-sourceCompatibility = 1.7
-targetCompatibility = 1.7
-version = '2.4.1'
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+version = '2.4.2'
 
 repositories {
     jcenter()
-    /*
-    maven {
-        url 'https://oss.sonatype.org/content/repositories/snapshots/'
-    }
-    */
     maven {
     	url 'https://maven.mangoautomation.net/repository/ias-release/'
     }
 }
  
 dependencies {
-    api 'org.iot-dsa:historian:0.23.2'
+    api 'org.iot-dsa:historian:0.24.1'
 
     implementation 'commons-logging:commons-logging:1.2'
-    implementation 'org.apache.commons:commons-lang3:3.8'
-    implementation 'org.reflections:reflections:0.9.11'
+    implementation 'org.apache.commons:commons-lang3:3.8.1'
+    implementation 'org.reflections:reflections:0.9.12'
     implementation 'org.scream3r:jssc:2.8.0'
-    //implementation 'com.serotonin:bacnet4j:+'
-    implementation 'com.infiniteautomation:bacnet4j:+'
+    implementation 'com.infiniteautomation:bacnet4j:5.0.2'
 }
 
 run {
@@ -40,7 +34,7 @@ task sourcesJar(group: 'build', type: Jar, dependsOn: classes) {
 }
 
 wrapper {
-    gradleVersion = '6.1'
+    gradleVersion = '6.8'
 }
 
 applicationDistribution.from new File(project.projectDir, "/dslink.json")

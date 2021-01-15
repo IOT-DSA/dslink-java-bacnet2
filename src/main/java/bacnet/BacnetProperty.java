@@ -1,5 +1,13 @@
 package bacnet;
 
+import com.serotonin.bacnet4j.ServiceFuture;
+import com.serotonin.bacnet4j.obj.ObjectProperties;
+import com.serotonin.bacnet4j.service.confirmed.WritePropertyRequest;
+import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.enumerated.ObjectType;
+import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
+import com.serotonin.bacnet4j.type.primitive.Null;
+import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import org.apache.commons.lang3.tuple.Pair;
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
@@ -10,18 +18,8 @@ import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValuePair;
 import org.dsa.iot.dslink.node.value.ValueType;
-import org.dsa.iot.dslink.util.handler.Handler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.serotonin.bacnet4j.ServiceFuture;
-import com.serotonin.bacnet4j.obj.ObjectProperties;
-import com.serotonin.bacnet4j.service.confirmed.WritePropertyRequest;
-import com.serotonin.bacnet4j.type.Encodable;
-import com.serotonin.bacnet4j.type.enumerated.ObjectType;
-import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
-import com.serotonin.bacnet4j.type.primitive.Null;
-import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 
 public class BacnetProperty {
 	 private static final Logger LOGGER = LoggerFactory.getLogger(BacnetProperty.class);
@@ -30,11 +28,11 @@ public class BacnetProperty {
 	static final String ACTION_EDIT = "edit";
 	static final String CONFIG_WRITABLE = "Writable";
 
-	BacnetDevice device;
+	final BacnetDevice device;
 	BacnetObject object;
-	Node node;
-	ObjectIdentifier oid;
-	PropertyIdentifier pid;
+	final Node node;
+	final ObjectIdentifier oid;
+	final PropertyIdentifier pid;
 	private boolean covSubscribed = false;
 
 	BacnetProperty(BacnetDevice device, Node node, ObjectIdentifier oid, PropertyIdentifier pid) {
@@ -53,11 +51,7 @@ public class BacnetProperty {
 	}
 
 	protected void updateHeadless() {
-		if (object.headlessPolling) {
-			node.setShouldPostCachedValue(false);
-		} else {
-			node.setShouldPostCachedValue(true);
-		}
+		node.setShouldPostCachedValue(!object.headlessPolling);
 	}
 
 	protected void setup() {
@@ -66,18 +60,8 @@ public class BacnetProperty {
 
 		updateHeadless();
 
-		node.getListener().setOnSubscribeHandler(new Handler<Node>() {
-			@Override
-			public void handle(Node event) {
-				subscribe();
-			}
-		});
-		node.getListener().setOnUnsubscribeHandler(new Handler<Node>() {
-			@Override
-			public void handle(Node event) {
-				unsubscribe();
-			}
-		});
+		node.getListener().setOnSubscribeHandler(event -> subscribe());
+		node.getListener().setOnUnsubscribeHandler(event -> unsubscribe());
 		makeSettable();
 		makeEditAction();
 	}
@@ -94,12 +78,7 @@ public class BacnetProperty {
 	private void makeSettable() {
 		if (isWritable()) {
 			node.setWritable(Writable.WRITE);
-			node.getListener().setValueHandler(new Handler<ValuePair>() {
-				@Override
-				public void handle(ValuePair event) {
-					handleSet(event);
-				}
-			});
+			node.getListener().setValueHandler(event -> handleSet(event));
 		} else {
 		    node.setWritable(Writable.NEVER);
 		}
@@ -257,12 +236,7 @@ public class BacnetProperty {
 	}
 
 	protected void makeRemoveAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				remove();
-			}
-		});
+		Action act = new Action(Permission.READ, event -> remove());
 		Node anode = node.getChild(ACTION_REMOVE, true);
 		if (anode == null) {
 			node.createChild(ACTION_REMOVE, true).setAction(act).build().setSerializable(false);
@@ -277,12 +251,7 @@ public class BacnetProperty {
 	}
 	
 	protected void makeEditAction() {
-	    Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-            @Override
-            public void handle(ActionResult event) {
-                edit(event);
-            }
-        });
+	    Action act = new Action(Permission.READ, event -> edit(event));
         act.addParameter(new Parameter(CONFIG_WRITABLE, ValueType.BOOL, node.getRoConfig(CONFIG_WRITABLE)));
         Node anode = node.getChild(ACTION_EDIT, true);
         if (anode == null) {

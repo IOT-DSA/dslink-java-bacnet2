@@ -7,15 +7,14 @@ import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
-import org.dsa.iot.dslink.util.handler.Handler;
 
 public class BacnetRouter {
 	
 	static final String ACTION_REMOVE = "remove";
 	static final String ACTION_EDIT = "edit";
 	
-	BacnetIpConn conn;
-	Node node;
+	final BacnetIpConn conn;
+	final Node node;
 	
 	public BacnetRouter(BacnetIpConn conn, Node node) {
 		this.conn = conn;
@@ -26,12 +25,7 @@ public class BacnetRouter {
 	}
 
 	private void makeRemoveAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				remove();
-			}
-		});
+		Action act = new Action(Permission.READ, event -> remove());
 		Node anode = node.getChild(ACTION_REMOVE, true);
 		if (anode == null) {
 			node.createChild(ACTION_REMOVE, true).setAction(act).build().setSerializable(false);
@@ -41,12 +35,7 @@ public class BacnetRouter {
 	}
 	
 	private void makeEditAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				edit(event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> edit(event));
 		act.addParameter(new Parameter("Network Number", ValueType.NUMBER, new Value(getNetworkNumber())));
 		act.addParameter(new Parameter("IP", ValueType.STRING, new Value(getIp())));
 		act.addParameter(new Parameter("Port", ValueType.NUMBER, new Value(getPort())));

@@ -1,32 +1,5 @@
 package bacnet;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-
-import org.apache.commons.lang3.tuple.Pair;
-import org.dsa.iot.dslink.node.value.Value;
-import org.dsa.iot.dslink.node.value.ValueType;
-import org.dsa.iot.dslink.node.value.ValueUtils;
-import org.dsa.iot.dslink.util.json.JsonArray;
-import org.dsa.iot.dslink.util.json.JsonObject;
-import org.reflections.Reflections;
-import org.reflections.scanners.MethodParameterNamesScanner;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.serotonin.bacnet4j.enums.DayOfWeek;
 import com.serotonin.bacnet4j.enums.Month;
 import com.serotonin.bacnet4j.npdu.NPCI.NetworkPriority;
@@ -77,6 +50,31 @@ import com.serotonin.bacnet4j.type.primitive.SignedInteger;
 import com.serotonin.bacnet4j.type.primitive.Time;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.sero.ArrayUtils;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
+import org.dsa.iot.dslink.node.value.Value;
+import org.dsa.iot.dslink.node.value.ValueType;
+import org.dsa.iot.dslink.node.value.ValueUtils;
+import org.dsa.iot.dslink.util.json.JsonArray;
+import org.dsa.iot.dslink.util.json.JsonObject;
+import org.reflections.Reflections;
+import org.reflections.scanners.MethodParameterNamesScanner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TypeUtils {
 	private static final int MAX_RECURSION_DEPTH = 20; //In case of infinite loops, generally should not be necessary
@@ -163,7 +161,7 @@ public class TypeUtils {
 	@SuppressWarnings("unchecked")
 	public static BaseType formatBaseType(Class<? extends BaseType> clazz, Value val, ObjectType ot, PropertyIdentifier pid) {
 		if (SequenceOf.class.isAssignableFrom(clazz)) {
-			return formatSequenceOf((Class<? extends SequenceOf<? extends Encodable>>) clazz, val, ot, pid);
+			return formatSequenceOf(clazz, val, ot, pid);
 		} else if (ChannelValue.class.isAssignableFrom(clazz)) {
 			JsonObject jo = getMap(val);
 			if (jo == null) {
@@ -171,14 +169,15 @@ public class TypeUtils {
 			}
 			Value v = ValueUtils.toValue(jo.get("Value"));
 			try {
-				Class<? extends Encodable> clz = (Class<? extends Encodable>) Class.forName((String) jo.get("_type"));
+				Class<? extends Encodable> clz = (Class<? extends Encodable>) Class.forName(
+						jo.get("_type"));
 				for (Constructor<?> constr: ChannelValue.class.getConstructors()) {
 					Class<?>[] params = constr.getParameterTypes();
 					if (params.length == 1 && params[0].isAssignableFrom(clz)) {
 						return (ChannelValue) constr.newInstance(formatEncodable(clz, v));
 					}
 				}
-			} catch (InstantiationException | IllegalAccessException | InvocationTargetException | ClassNotFoundException | ClassCastException | NullPointerException e) {
+			} catch (InstantiationException | IllegalAccessException | InvocationTargetException | ClassNotFoundException | ClassCastException | NullPointerException ignored) {
 			}
 			return null;
 		} else if (PriorityValue.class.isAssignableFrom(clazz)) {
@@ -214,7 +213,7 @@ public class TypeUtils {
 		} else if (enc instanceof Null) {
 			return Pair.of(ValueType.STRING, null);
 		} else if (enc instanceof ObjectIdentifier) {
-			return Pair.of(ValueType.STRING, new Value(((ObjectIdentifier) enc).toString()));
+			return Pair.of(ValueType.STRING, new Value(enc.toString()));
 		} else if (enc instanceof OctetString) {
 			return parseOctetString((OctetString) enc);
 		} else if (enc instanceof Real) {
@@ -378,18 +377,18 @@ public class TypeUtils {
 	    JsonArray ja = getArray(val);
         if (ja != null) {
             int size = ja.size();
-            BACnetArray<Encodable> arr = new BACnetArray<Encodable>(size, null);
+            BACnetArray<Encodable> arr = new BACnetArray<>(size, null);
             for (int i=1; i <= size; i++) {
                 arr.setBase1(i, formatEncodable(clazz, ValueUtils.toValue(ja.get(i - 1))));
             }
             return arr;
         } else {
-            return new BACnetArray<Encodable>();
+            return new BACnetArray<>();
         }
 	}
 	
 	private static SequenceOf<? extends Encodable> formatList(Class<? extends Encodable> clazz, Value val) {
-		SequenceOf<Encodable> seq = new SequenceOf<Encodable>();
+		SequenceOf<Encodable> seq = new SequenceOf<>();
 		JsonArray ja = getArray(val);
 		if (ja != null) {
 			for (Object o: ja) {
@@ -445,11 +444,11 @@ public class TypeUtils {
 			if (s != null) {
 				try {
 					return new OptionalBinaryPV(BinaryPV.forName(s));
-				} catch (Exception e) {
+				} catch (Exception ignored) {
 					
 				}
 			} else if (b != null) {
-				return new OptionalBinaryPV(b.booleanValue() ? BinaryPV.active : BinaryPV.inactive);
+				return new OptionalBinaryPV(b ? BinaryPV.active : BinaryPV.inactive);
 			}
 			return new OptionalBinaryPV();
 		} else if (clazz.equals(OptionalCharacterString.class)) {
@@ -475,8 +474,8 @@ public class TypeUtils {
 	@SuppressWarnings("unchecked")
 	public static JsonObject parseNonSequenceConstructed(BaseType enc, int maxDepth) {
 		Class<? extends BaseType> clazz = enc.getClass();
-		Set<Method> gets = new HashSet<Method>();
-		Map<String, Method> ises = new HashMap<String, Method>();
+		Set<Method> gets = new HashSet<>();
+		Map<String, Method> ises = new HashMap<>();
 		for (Method method: clazz.getMethods()) {
 			String name = method.getName();
 			if (!method.getDeclaringClass().equals(Object.class) && method.getParameterCount() == 0) {
@@ -537,11 +536,11 @@ public class TypeUtils {
 				} else if (o instanceof List) {
 					jobj.put(key, listToJsonArray((List<? extends BaseType>) o, maxDepth));
 				} else if (o instanceof NetworkPriority) {
-					jobj.put(key, ((NetworkPriority) o).toString());
+					jobj.put(key, o.toString());
 				} else if (o instanceof Number) {
-					jobj.put(key, (Number) o);
+					jobj.put(key, o);
 				} else if (o instanceof String) {
-					jobj.put(key, (String) o);
+					jobj.put(key, o);
 				}
 			} catch (Exception e) {
 				LOGGER.debug("", e);
@@ -582,14 +581,14 @@ public class TypeUtils {
 				return null;
 			}
 		}
-		Set<String> keyset = new HashSet<String>();
+		Set<String> keyset = new HashSet<>();
 		for (Entry<String, Object> entry: jobj) {
 			if (entry.getValue() != null) {
 				keyset.add(entry.getKey());
 			}
 		}
 		
-		Map<String, Method> sets = new HashMap<String, Method>();
+		Map<String, Method> sets = new HashMap<>();
 		for (Method method: clazz.getMethods()) {
 			String name = method.getName();
 			if (!method.getDeclaringClass().equals(Object.class) && method.getParameterCount() == 1 && name.startsWith("set")) {
@@ -602,8 +601,8 @@ public class TypeUtils {
 		int bestMatchCount = -1;
 //		Set<Constructor<?>> constrsWithOneBadParam = new HashSet<Constructor<?>>();
 		for (Constructor<?> constr: clazz.getConstructors()) {
-			List<String> paramList = new ArrayList<String>();
-			Set<String> keysetcpy = new HashSet<String>(keyset);
+			List<String> paramList = new ArrayList<>();
+			Set<String> keysetcpy = new HashSet<>(keyset);
 			int badParamCount = 0;
 			for (String paramName: reflections.getConstructorParamNames(constr)) {
 //			    LOGGER.info(param.getName());
@@ -655,7 +654,7 @@ public class TypeUtils {
 					Object param = formatSomething(setMeth.getParameterTypes()[0], ValueUtils.toValue(jobj.get(bestParamList.get(i))));
 					try {
 						setMeth.invoke(instance, param);
-					} catch (Exception e) {
+					} catch (Exception ignored) {
 					}
 				}
 			}
@@ -667,7 +666,7 @@ public class TypeUtils {
 	
 	@SuppressWarnings("unchecked")
 	private static Object formatSomething(Type type, Value val) {
-	    Class<?> clazz = null;
+	    Class<?> clazz;
 	    Class<? extends Encodable> paramClazz = null;
 	    if (type instanceof ParameterizedType) {
 	        clazz = (Class<?>) ((ParameterizedType) type).getRawType();
@@ -740,13 +739,13 @@ public class TypeUtils {
 			for (int i = 0; i < labels.size(); i++) {
 				String l = labels.get(i);
 				boolean b = enc.getArrayValue(i);
-				jobj.put(l, Boolean.valueOf(b));
+				jobj.put(l, b);
 			}
 			return Pair.of(ValueType.MAP, new Value(jobj));
 		} else {
 			JsonArray jarr = new JsonArray();
 			for (boolean b : enc.getValue()) {
-				jarr.add(Boolean.valueOf(b));
+				jarr.add(b);
 			}
 			return Pair.of(ValueType.ARRAY, new Value(jarr));
 		}
@@ -771,6 +770,9 @@ public class TypeUtils {
 			return formatServicesSupported(val);
 		} else {
 			List<String> labels = getBitStringLabels(clazz);
+			if (labels == null) {
+				return null;
+			}
 			Class<?>[] parameterTypes = new Class<?>[labels.size()];
 			Boolean[] params = new Boolean[labels.size()];
 			JsonObject jobj = val.getMap();
@@ -886,7 +888,7 @@ public class TypeUtils {
 		Boolean b = val.getBool();
 		String s = val.getString();
 		if (n == null && b != null) {
-			n = b.booleanValue() ? 1 : 0;
+			n = b ? 1 : 0;
 		}
 		if (n != null) {
 			try {
@@ -894,7 +896,7 @@ public class TypeUtils {
 				if (Modifier.isStatic(meth.getModifiers()) && clazz.equals(meth.getReturnType())) {
 					return (Enumerated) meth.invoke(null, n.intValue());
 				}
-			} catch (ClassCastException | NullPointerException | NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+			} catch (ClassCastException | NullPointerException | NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ignored) {
 			}
 		} else if (s != null) {
 			try {
@@ -902,7 +904,7 @@ public class TypeUtils {
 				if (Modifier.isStatic(meth.getModifiers()) && clazz.equals(meth.getReturnType())) {
 					return (Enumerated) meth.invoke(null, s);
 				}
-			} catch (ClassCastException | NullPointerException | NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+			} catch (ClassCastException | NullPointerException | NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ignored) {
 			}
 		}
 		return new Enumerated(val.getNumber().intValue());
@@ -913,7 +915,7 @@ public class TypeUtils {
 		if (enc instanceof WeekNDay) {
 			return Pair.of(ValueType.MAP, new Value(parseWeekNDay((WeekNDay) enc)));
 		} else {
-			String val = ArrayUtils.toPlainHexString(((OctetString) enc).getBytes());
+			String val = ArrayUtils.toPlainHexString(enc.getBytes());
 			return Pair.of(ValueType.STRING, new Value(val));
 		}
 	}
@@ -1000,6 +1002,9 @@ public class TypeUtils {
 		}
 		List<String> labels = getBitStringLabels(clazz);
 		BitString obj = clazz.getConstructor().newInstance();
+		if (labels == null) {
+		    return obj;
+		}
 		for (String label: labels) {
 			try {
 				clazz.getMethod("set" + label, boolean.class).invoke(obj, jobj.get(label, false));
@@ -1017,6 +1022,9 @@ public class TypeUtils {
 		}
 		List<String> labels = getBitStringLabels(ObjectTypesSupported.class);
 		ObjectTypesSupported ots = new ObjectTypesSupported();
+		if (labels == null) {
+			return ots;
+		}
 		for (String label: labels) {
 			ots.set(ObjectType.forName(label), jobj.get(label, false));
 		}

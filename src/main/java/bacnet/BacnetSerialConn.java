@@ -1,27 +1,23 @@
 package bacnet;
 
-import java.util.HashSet;
-import java.util.Set;
-
-import org.dsa.iot.dslink.node.Node;
-import org.dsa.iot.dslink.node.Permission;
-import org.dsa.iot.dslink.node.actions.Action;
-import org.dsa.iot.dslink.node.actions.ActionResult;
-import org.dsa.iot.dslink.node.actions.Parameter;
-import org.dsa.iot.dslink.node.value.Value;
-import org.dsa.iot.dslink.node.value.ValueType;
-import org.dsa.iot.dslink.util.handler.Handler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.serotonin.bacnet4j.npdu.Network;
 import com.serotonin.bacnet4j.npdu.mstp.MasterNode;
 import com.serotonin.bacnet4j.npdu.mstp.MstpNetwork;
 import com.serotonin.bacnet4j.util.sero.JsscSerialPortInputStream;
 import com.serotonin.bacnet4j.util.sero.JsscSerialPortOutputStream;
-
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import jssc.SerialPort;
 import jssc.SerialPortException;
+import org.dsa.iot.dslink.node.Node;
+import org.dsa.iot.dslink.node.Permission;
+import org.dsa.iot.dslink.node.actions.Action;
+import org.dsa.iot.dslink.node.actions.Parameter;
+import org.dsa.iot.dslink.node.value.Value;
+import org.dsa.iot.dslink.node.value.ValueType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BacnetSerialConn extends BacnetConn {
 	
@@ -60,18 +56,11 @@ public class BacnetSerialConn extends BacnetConn {
 	
 	@Override
 	protected void makeEditAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
-			@Override
-			public void handle(ActionResult event) {
-				edit(event);
-			}
-		});
-		Set<String> portids = new HashSet<String>();
+		Action act = new Action(Permission.READ, event -> edit(event));
+		Set<String> portids = new HashSet<>();
 		try {
 			String[] cports = Utils.getCommPorts();
-			for (String port : cports) {
-				portids.add(port);
-			}
+			portids.addAll(Arrays.asList(cports));
 		} catch (Exception e) {
 			LOGGER.debug("", e);
 		}

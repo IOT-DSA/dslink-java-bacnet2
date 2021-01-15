@@ -1,5 +1,7 @@
 package bacnet;
 
+import com.serotonin.bacnet4j.type.enumerated.ObjectType;
+import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.NodeBuilder;
 import org.dsa.iot.dslink.node.Permission;
@@ -8,10 +10,6 @@ import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
-import org.dsa.iot.dslink.util.handler.Handler;
-
-import com.serotonin.bacnet4j.type.enumerated.ObjectType;
-import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 
 public class BacnetLocalDevice {
 	
@@ -49,7 +47,7 @@ public class BacnetLocalDevice {
 					try {
 						ObjectType type = ObjectType.forName(typestr);
 						oid = new ObjectIdentifier(type, instnum.intValue());
-					} catch (Exception e) {
+					} catch (Exception ignored) {
 					}
 				}
 				if (oid != null) {
@@ -74,12 +72,7 @@ public class BacnetLocalDevice {
 		if (fnode == node) {
 			return;
 		}
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				remove(fnode);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> remove(fnode));
 		Node anode = fnode.getChild(ACTION_REMOVE, true);
 		if (anode == null) {
 			fnode.createChild(ACTION_REMOVE, true).setAction(act).build().setSerializable(false);
@@ -93,12 +86,7 @@ public class BacnetLocalDevice {
 	}
 	
 	private void makeAddFolderAction(final Node fnode) {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				addFolder(fnode, event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> addFolder(fnode, event));
 		act.addParameter(new Parameter("Name", ValueType.STRING));
 		Node anode = fnode.getChild(ACTION_ADD_FOLDER, true);
 		if (anode == null) {
@@ -115,12 +103,7 @@ public class BacnetLocalDevice {
 	}
 	
 	private void makeAddObjectAction(final Node fnode) {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				addObject(fnode, event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> addObject(fnode, event));
 		act.addParameter(new Parameter("Name", ValueType.STRING));
 		act.addParameter(new Parameter("Object Type", ValueType.makeEnum(Utils.getObjectTypeList())));
 		act.addParameter(new Parameter("Instance Number", ValueType.NUMBER));

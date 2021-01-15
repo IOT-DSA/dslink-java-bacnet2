@@ -1,26 +1,7 @@
 package bacnet;
 
-import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.regex.Pattern;
-
-import org.dsa.iot.dslink.node.Node;
-import org.dsa.iot.dslink.node.actions.ActionResult;
-import org.dsa.iot.dslink.node.value.Value;
-import org.dsa.iot.dslink.node.value.ValueType;
-import org.dsa.iot.dslink.node.value.ValueUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.ServiceFuture;
-import com.serotonin.bacnet4j.util.BACnetUtils;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.npdu.ip.IpNetworkUtils;
 import com.serotonin.bacnet4j.service.confirmed.ConfirmedRequestService;
@@ -33,16 +14,32 @@ import com.serotonin.bacnet4j.type.primitive.Enumerated;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.OctetString;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
+import com.serotonin.bacnet4j.util.BACnetUtils;
 import com.serotonin.bacnet4j.util.RequestUtils;
-
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.regex.Pattern;
 import jssc.SerialNativeInterface;
 import jssc.SerialPortList;
+import org.dsa.iot.dslink.node.Node;
+import org.dsa.iot.dslink.node.actions.ActionResult;
+import org.dsa.iot.dslink.node.value.Value;
+import org.dsa.iot.dslink.node.value.ValueType;
+import org.dsa.iot.dslink.node.value.ValueUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Utils {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
 
-	private static final Map<Class<? extends Enumerated>, List<String>> stateLists = new HashMap<Class<? extends Enumerated>, List<String>>();
+	private static final Map<Class<? extends Enumerated>, List<String>> stateLists = new HashMap<>();
 
 	static {
 		getObjectTypeList();
@@ -81,12 +78,12 @@ public class Utils {
 						sf = conn.localDevice.send(device.remoteDevice, request);
 					}
 					conn.monitor.checkOutReader();
-				} catch (InterruptedException e) {
+				} catch (InterruptedException ignored) {
 
 				}
 			}
 			device.monitor.checkOutReader();
-		} catch (InterruptedException e) {
+		} catch (InterruptedException ignored) {
 
 		}
 		return sf;
@@ -107,12 +104,12 @@ public class Utils {
 						}
 					}
 					conn.monitor.checkOutReader();
-				} catch (InterruptedException e) {
+				} catch (InterruptedException ignored) {
 
 				}
 			}
 			device.monitor.checkOutReader();
-		} catch (InterruptedException e) {
+		} catch (InterruptedException ignored) {
 
 		}
 		return enc;
@@ -183,7 +180,7 @@ public class Utils {
 
 	public static boolean safeGetRoConfigBool(Node node, String config, boolean def) {
 		Value val = node.getRoConfig(config);
-		return (val != null && val.getBool() != null) ? val.getBool().booleanValue() : def;
+		return (val != null && val.getBool() != null) ? val.getBool() : def;
 	}
 
 	public static String getAndMaybeSetRoConfigString(Node node, String config, String def) {
@@ -213,7 +210,7 @@ public class Utils {
 	}
 
 	public static Set<String> getDeviceEnum(Map<Integer, RemoteDevice> devices) {
-		Set<String> devStringSet = new HashSet<String>();
+		Set<String> devStringSet = new HashSet<>();
 		for (Entry<Integer, RemoteDevice> entry : devices.entrySet()) {
 			int id = entry.getKey();
 			RemoteDevice d = entry.getValue();
@@ -347,7 +344,7 @@ public class Utils {
 
 	public static List<String> getEnumeratedStateList(Class<? extends Enumerated> clazz) {
 		if (!stateLists.containsKey(clazz)) {
-			List<String> lst = new ArrayList<String>();
+			List<String> lst = new ArrayList<>();
 			try {
 				int size = (int) clazz.getMethod("size").invoke(null);
 				for (int i = 0; i < size; i++) {

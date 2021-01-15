@@ -1,5 +1,11 @@
 package bacnet;
 
+import com.serotonin.bacnet4j.npdu.Network;
+import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
+import com.serotonin.bacnet4j.npdu.ip.IpNetworkBuilder;
+import com.serotonin.bacnet4j.npdu.ip.IpNetworkUtils;
+import com.serotonin.bacnet4j.type.primitive.OctetString;
+import com.serotonin.bacnet4j.util.BACnetUtils;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -10,17 +16,8 @@ import org.dsa.iot.dslink.node.actions.ActionResult;
 import org.dsa.iot.dslink.node.actions.Parameter;
 import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
-import org.dsa.iot.dslink.util.handler.Handler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.serotonin.bacnet4j.exception.BACnetException;
-import com.serotonin.bacnet4j.npdu.Network;
-import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
-import com.serotonin.bacnet4j.npdu.ip.IpNetworkBuilder;
-import com.serotonin.bacnet4j.npdu.ip.IpNetworkUtils;
-import com.serotonin.bacnet4j.type.primitive.OctetString;
-import com.serotonin.bacnet4j.util.BACnetUtils;
 
 public class BacnetIpConn extends BacnetConn {
 	
@@ -48,7 +45,7 @@ public class BacnetIpConn extends BacnetConn {
 		if (subnetAddr.equals(IpNetwork.DEFAULT_BIND_IP)) {
 			try {
 				subnetAddr = InetAddress.getLocalHost().getHostAddress();
-			} catch (UnknownHostException e) {
+			} catch (UnknownHostException ignored) {
 			}
 		}
 		IpNetworkBuilder networkBuilder = new IpNetworkBuilder()
@@ -89,12 +86,12 @@ public class BacnetIpConn extends BacnetConn {
 				if (splname.length == 2) {
 					try {
 						num = Integer.parseInt(splname[1]);
-					} catch (NumberFormatException e) {}
+					} catch (NumberFormatException ignored) {}
 				}
 				if (ip != null && port != null && netnum != null && register != null && num >= 0) {
 					new BacnetRouter(this, child);
 					if (num > lastRouter) {
-						num = lastRouter;
+						lastRouter = num;
 					}
 				} else if (child.getAction() == null) {
 					child.delete(false);
@@ -147,9 +144,7 @@ public class BacnetIpConn extends BacnetConn {
 			try {
 				((IpNetwork) network).registerAsForeignDevice(
 						new InetSocketAddress(InetAddress.getByName(routerIp), routerPort), 100);
-			} catch (UnknownHostException e) {
-				LOGGER.debug("", e);
-			} catch (BACnetException e) {
+			} catch (Exception e) {
 				LOGGER.debug("", e);
 			}
 		}
@@ -165,12 +160,7 @@ public class BacnetIpConn extends BacnetConn {
 	}
 	
 	private void makeRouterAddAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				addRouterNode(event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> addRouterNode(event));
 		act.addParameter(new Parameter("Network Number", ValueType.NUMBER, new Value(0)));
 		act.addParameter(new Parameter("IP", ValueType.STRING));
 		act.addParameter(new Parameter("Port", ValueType.NUMBER, new Value(IpNetwork.DEFAULT_PORT)));
@@ -210,12 +200,7 @@ public class BacnetIpConn extends BacnetConn {
 	
 	@Override
 	protected void makeEditAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
-			@Override
-			public void handle(ActionResult event) {
-				edit(event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> edit(event));
 		act.addParameter(new Parameter("Subnet Mask", ValueType.STRING, new Value(subnetMask)));
 		act.addParameter(new Parameter("Port", ValueType.NUMBER, new Value(port)));
 		act.addParameter(new Parameter("Local Bind Address", ValueType.STRING, new Value(localBindAddress)));

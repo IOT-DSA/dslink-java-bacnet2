@@ -1,44 +1,5 @@
 package bacnet;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.ParsePosition;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.lang3.tuple.Pair;
-import org.dsa.iot.dslink.node.Node;
-import org.dsa.iot.dslink.node.NodeBuilder;
-import org.dsa.iot.dslink.node.Permission;
-import org.dsa.iot.dslink.node.actions.Action;
-import org.dsa.iot.dslink.node.actions.ActionResult;
-import org.dsa.iot.dslink.node.actions.EditorType;
-import org.dsa.iot.dslink.node.actions.Parameter;
-import org.dsa.iot.dslink.node.actions.ResultType;
-import org.dsa.iot.dslink.node.actions.table.Row;
-import org.dsa.iot.dslink.node.actions.table.Table;
-import org.dsa.iot.dslink.node.value.Value;
-import org.dsa.iot.dslink.node.value.ValueType;
-import org.dsa.iot.dslink.serializer.Deserializer;
-import org.dsa.iot.dslink.serializer.Serializer;
-import org.dsa.iot.dslink.util.Objects;
-import org.dsa.iot.dslink.util.handler.Handler;
-import org.dsa.iot.dslink.util.json.JsonObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.ServiceFuture;
 import com.serotonin.bacnet4j.exception.BACnetException;
@@ -60,12 +21,48 @@ import com.serotonin.bacnet4j.type.enumerated.EventType;
 import com.serotonin.bacnet4j.type.enumerated.NotifyType;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.notificationParameters.NotificationParameters;
+import com.serotonin.bacnet4j.type.primitive.Boolean;
+import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.Time;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
-import com.serotonin.bacnet4j.type.primitive.Boolean;
-import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.util.RequestUtils;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.ParsePosition;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.tuple.Pair;
+import org.dsa.iot.dslink.node.Node;
+import org.dsa.iot.dslink.node.NodeBuilder;
+import org.dsa.iot.dslink.node.Permission;
+import org.dsa.iot.dslink.node.actions.Action;
+import org.dsa.iot.dslink.node.actions.ActionResult;
+import org.dsa.iot.dslink.node.actions.EditorType;
+import org.dsa.iot.dslink.node.actions.Parameter;
+import org.dsa.iot.dslink.node.actions.ResultType;
+import org.dsa.iot.dslink.node.actions.table.Row;
+import org.dsa.iot.dslink.node.actions.table.Table;
+import org.dsa.iot.dslink.node.value.Value;
+import org.dsa.iot.dslink.node.value.ValueType;
+import org.dsa.iot.dslink.serializer.Deserializer;
+import org.dsa.iot.dslink.serializer.Serializer;
+import org.dsa.iot.dslink.util.Objects;
+import org.dsa.iot.dslink.util.json.JsonObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class BacnetDevice {
@@ -88,14 +85,14 @@ public class BacnetDevice {
 	static final String EVENT_ACTION_ACKNOWLEDGE = "acknowledge";
 	static final String EVENT_ACTION_DISMISS = "dismiss";
 
-	BacnetConn conn;
-	private Node node;
+	final BacnetConn conn;
+	private final Node node;
 	private final Node statnode;
 	private final Node eventsnode;
 	private int eventCount = 0;
 
 	RemoteDevice remoteDevice;
-	ReadWriteMonitor monitor = new ReadWriteMonitor();
+	final ReadWriteMonitor monitor = new ReadWriteMonitor();
 
 	int instanceNumber;
 	private int networkNumber;
@@ -104,10 +101,10 @@ public class BacnetDevice {
 	private boolean covConfirmed;
 	private long covLifetime;
 
-	Set<BacnetObject> objects = new HashSet<BacnetObject>();
-	private Map<BacnetProperty, ObjectPropertyReference> subscribed = new ConcurrentHashMap<BacnetProperty, ObjectPropertyReference>();
+	final Set<BacnetObject> objects = new HashSet<>();
+	private final Map<BacnetProperty, ObjectPropertyReference> subscribed = new ConcurrentHashMap<>();
 	private ScheduledFuture<?> pollingFuture = null;
-	Object futureLock = new Object();
+	final Object futureLock = new Object();
 
 	public BacnetDevice(BacnetConn conn, Node node, RemoteDevice d) {
 		this.conn = conn;
@@ -117,7 +114,7 @@ public class BacnetDevice {
 			monitor.checkInWriter();
 			this.remoteDevice = d;
 			monitor.checkOutWriter();
-		} catch (InterruptedException e) {
+		} catch (InterruptedException ignored) {
 
 		}
 		
@@ -161,7 +158,7 @@ public class BacnetDevice {
 				node.setRoConfig("Address", new Value(addressString));
 			}
 			monitor.checkOutReader();
-		} catch (InterruptedException e) {
+		} catch (InterruptedException ignored) {
 			
 		}
 	}
@@ -188,7 +185,7 @@ public class BacnetDevice {
 					try {
 						ObjectType type = ObjectType.forName(typestr);
 						oid = new ObjectIdentifier(type, instnum.intValue());
-					} catch (Exception e) {
+					} catch (Exception ignored) {
 					}
 				}
 				if (oid != null) {
@@ -233,7 +230,7 @@ public class BacnetDevice {
 						statnode.setValue(new Value("Connection Down"));
 					}
 					conn.monitor.checkOutReader();
-				} catch (InterruptedException e) {
+				} catch (InterruptedException ignored) {
 
 				}
 			}
@@ -241,7 +238,7 @@ public class BacnetDevice {
 				statnode.setValue(new Value("Ready"));
 			}
 			monitor.checkOutWriter();
-		} catch (InterruptedException e) {
+		} catch (InterruptedException ignored) {
 
 		}
 		setLocatingParams();
@@ -249,12 +246,7 @@ public class BacnetDevice {
 	}
 
 	public void init() {
-		Objects.getDaemonThreadPool().schedule(new Runnable() {
-			@Override
-			public void run() {
-				findDevice();
-			}
-		}, 0, TimeUnit.MILLISECONDS);
+		Objects.getDaemonThreadPool().schedule(() -> findDevice(), 0, TimeUnit.MILLISECONDS);
 		
 		makeFolderActions(node);
 		makeStopAction();
@@ -294,12 +286,12 @@ public class BacnetDevice {
 										Boolean.valueOf(covConfirmed), new UnsignedInteger(covLifetime)));
 					}
 					conn.monitor.checkOutReader();
-				} catch (InterruptedException e) {
+				} catch (InterruptedException ignored) {
 
 				}
 			}
 			monitor.checkOutReader();
-		} catch (InterruptedException e) {
+		} catch (InterruptedException ignored) {
 
 		}
 	}
@@ -318,12 +310,12 @@ public class BacnetDevice {
 						obj.covId = -1;
 					}
 					conn.monitor.checkOutReader();
-				} catch (InterruptedException e) {
+				} catch (InterruptedException ignored) {
 
 				}
 			}
 			monitor.checkOutReader();
-		} catch (InterruptedException e) {
+		} catch (InterruptedException ignored) {
 
 		}
 	}
@@ -334,14 +326,7 @@ public class BacnetDevice {
 				return;
 			}
 			long interval = (long) (pollingIntervalSeconds * 1000);
-			pollingFuture = conn.getStpe().scheduleWithFixedDelay(new Runnable() {
-
-				@Override
-				public void run() {
-					readProperties();
-				}
-
-			}, 0, interval, TimeUnit.MILLISECONDS);
+			pollingFuture = conn.getStpe().scheduleWithFixedDelay(() -> readProperties(), 0, interval, TimeUnit.MILLISECONDS);
 		}
 	}
 
@@ -355,9 +340,9 @@ public class BacnetDevice {
 	}
 
 	private void readProperties() {
-		List<ObjectPropertyReference> oprs = new ArrayList<ObjectPropertyReference>(subscribed.size());
-		List<BacnetProperty> props = new ArrayList<BacnetProperty>(subscribed.size());
-		for (Entry<BacnetProperty, ObjectPropertyReference> entry : new HashMap<BacnetProperty, ObjectPropertyReference>(subscribed).entrySet()) {
+		List<ObjectPropertyReference> oprs = new ArrayList<>(subscribed.size());
+		List<BacnetProperty> props = new ArrayList<>(subscribed.size());
+		for (Entry<BacnetProperty, ObjectPropertyReference> entry : new HashMap<>(subscribed).entrySet()) {
 			oprs.add(entry.getValue());
 			props.add(entry.getKey());
 		}
@@ -380,12 +365,12 @@ public class BacnetDevice {
 						}
 					}
 					conn.monitor.checkOutReader();
-				} catch (InterruptedException e) {
+				} catch (InterruptedException ignored) {
 
 				}
 			}
 			monitor.checkOutReader();
-		} catch (InterruptedException e) {
+		} catch (InterruptedException ignored) {
 
 		}
 		if (results == null) {
@@ -418,12 +403,7 @@ public class BacnetDevice {
 	}
 
 	private void makeRemoveAction(final Node fnode) {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				remove(fnode);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> remove(fnode));
 		Node anode = fnode.getChild(ACTION_REMOVE, true);
 		if (anode == null) {
 			fnode.createChild(ACTION_REMOVE, true).setAction(act).build().setSerializable(false);
@@ -441,12 +421,7 @@ public class BacnetDevice {
 	}
 
 	private void makeAddFolderAction(final Node fnode) {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				addFolder(fnode, event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> addFolder(fnode, event));
 		act.addParameter(new Parameter("Name", ValueType.STRING));
 		Node anode = fnode.getChild(ACTION_ADD_FOLDER, true);
 		if (anode == null) {
@@ -463,12 +438,7 @@ public class BacnetDevice {
 	}
 
 	private void makeDiscoverObjectsAction(final Node fnode) {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				discoverObjects(fnode);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> discoverObjects(fnode));
 		Node anode = fnode.getChild(ACTION_DISCOVER_OBJECTS, true);
 		if (anode == null) {
 			fnode.createChild(ACTION_DISCOVER_OBJECTS, true).setAction(act).build().setSerializable(false);
@@ -478,12 +448,7 @@ public class BacnetDevice {
 	}
 
 	private void makeAddObjectAction(final Node fnode) {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				addObject(fnode, event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> addObject(fnode, event));
 		act.addParameter(new Parameter("Object Type", ValueType.makeEnum(Utils.getObjectTypeList())));
 		act.addParameter(new Parameter("Instance Number", ValueType.NUMBER));
 		act.addParameter(new Parameter("Use COV", ValueType.BOOL));
@@ -515,12 +480,12 @@ public class BacnetDevice {
 						}
 					}
 					conn.monitor.checkOutReader();
-				} catch (InterruptedException e) {
+				} catch (InterruptedException ignored) {
 
 				}
 			}
 			monitor.checkOutReader();
-		} catch (InterruptedException e) {
+		} catch (InterruptedException ignored) {
 
 		}
 		if (oids == null) {
@@ -580,12 +545,7 @@ public class BacnetDevice {
 	}
 
 	private void makeStopAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				stop();
-			}
-		});
+		Action act = new Action(Permission.READ, event -> stop());
 		Node anode = node.getChild(ACTION_STOP, true);
 		if (anode == null) {
 			node.createChild(ACTION_STOP, true).setAction(act).build().setSerializable(false);
@@ -595,12 +555,7 @@ public class BacnetDevice {
 	}
 
 	private void makeRestartAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				restart();
-			}
-		});
+		Action act = new Action(Permission.READ, event -> restart());
 		Node anode = node.getChild(ACTION_RESTART, true);
 		if (anode == null) {
 			node.createChild(ACTION_RESTART, true).setAction(act).build().setSerializable(false);
@@ -610,12 +565,7 @@ public class BacnetDevice {
 	}
 
 	private void makeEditAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				edit(event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> edit(event));
 		act.addParameter(new Parameter("Instance Number", ValueType.NUMBER, new Value(instanceNumber)));
 		act.addParameter(new Parameter("Network Number", ValueType.NUMBER, new Value(networkNumber)));
 		act.addParameter(new Parameter("Address", ValueType.STRING, new Value(addressString)));
@@ -657,18 +607,13 @@ public class BacnetDevice {
 			remoteDevice = null;
 			statnode.setValue(new Value("Stopped"));
 			monitor.checkOutWriter();
-		} catch (InterruptedException e) {
+		} catch (InterruptedException ignored) {
 
 		}
 	}
 	
 	private void makeExportAction(final Node fnode) {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
-			@Override
-			public void handle(ActionResult event) {
-				handleExport(fnode, event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> handleExport(fnode, event));
 		act.addResult(new Parameter("JSON", ValueType.STRING).setEditorType(EditorType.TEXT_AREA));
 		Node anode = fnode.getChild(ACTION_EXPORT, true);
 		if (anode == null) {
@@ -693,12 +638,7 @@ public class BacnetDevice {
 	}
 	
 	private void makeImportAction(final Node fnode) {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
-			@Override
-			public void handle(ActionResult event) {
-				handleImport(fnode, event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> handleImport(fnode, event));
 		act.addParameter(new Parameter("Name", ValueType.STRING));
 		act.addParameter(new Parameter("JSON", ValueType.STRING).setEditorType(EditorType.TEXT_AREA));
 		Node anode = fnode.getChild(ACTION_IMPORT, true);
@@ -733,12 +673,7 @@ public class BacnetDevice {
 	}
 	
 	private void makeGetEventInfoAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				getEventInfo(event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> getEventInfo(event));
 		act.addResult(new Parameter("Object Identifier", ValueType.STRING));
 		act.addResult(new Parameter("Event State", ValueType.STRING));
 		act.addResult(new Parameter("Notify Type", ValueType.STRING));
@@ -805,12 +740,7 @@ public class BacnetDevice {
 	}
 	
 	private void makeAcknowledgeAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				acknowledge(event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> acknowledge(event));
 		act.addParameter(new Parameter("Acknowledging Process Identifier", ValueType.NUMBER));
 		act.addParameter(new Parameter("Event Object Type", ValueType.makeEnum(Utils.getObjectTypeList())));
 		act.addParameter(new Parameter("Event Object Instance", ValueType.NUMBER));
@@ -831,14 +761,14 @@ public class BacnetDevice {
 		try {
 			int i = Integer.parseUnsignedInt(tsstr);
 			timeStamp = new TimeStamp(new UnsignedInteger(i));
-		} catch (NumberFormatException e) {
+		} catch (NumberFormatException ignored) {
 		}
 		if (timeStamp == null) {
 			DateFormat dateFormat = new W3CDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
 			try {
 				Date d = dateFormat.parse(tsstr);
 				timeStamp = new TimeStamp(new DateTime(d.getTime()));
-			} catch (ParseException e) {
+			} catch (ParseException ignored) {
 			}
 		}
 		if (timeStamp == null) {
@@ -853,12 +783,7 @@ public class BacnetDevice {
 	}
 	
 	private void makeClearEventsAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				clearEvents();
-			}		
-		});
+		Action act = new Action(Permission.READ, event -> clearEvents());
 		eventsnode.createChild(ACTION_CLEAR, true).setAction(act).build().setSerializable(false);
 	}
 	
@@ -882,12 +807,7 @@ public class BacnetDevice {
 	}
 	
 	private void makeAcknowledgeAction(final Node enode) {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				acknowledge(enode, event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> acknowledge(enode, event));
 		act.addParameter(new Parameter("Acknowledging Process Identifier", ValueType.NUMBER));
 		act.addParameter(new Parameter("Acknowledgement Source", ValueType.STRING));
 		enode.createChild(EVENT_ACTION_ACKNOWLEDGE, true).setAction(act).build().setSerializable(false);
@@ -909,12 +829,7 @@ public class BacnetDevice {
 	}
 	
 	private void makeDismissAction(final Node enode) {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			@Override
-			public void handle(ActionResult event) {
-				dismissEvent(enode);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> dismissEvent(enode));
 		enode.createChild(EVENT_ACTION_DISMISS, true).setAction(act).build().setSerializable(false);
 	}
 	

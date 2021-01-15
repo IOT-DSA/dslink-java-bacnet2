@@ -1,7 +1,9 @@
 package bacnet;
 
+import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import org.dsa.iot.dslink.node.Node;
@@ -15,22 +17,19 @@ import org.dsa.iot.dslink.node.value.Value;
 import org.dsa.iot.dslink.node.value.ValueType;
 import org.dsa.iot.dslink.serializer.Deserializer;
 import org.dsa.iot.dslink.serializer.Serializer;
-import org.dsa.iot.dslink.util.handler.Handler;
 import org.dsa.iot.dslink.util.json.JsonObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.serotonin.bacnet4j.npdu.ip.IpNetwork;
 
 public class BacnetLink {
 	private static final Logger LOGGER = LoggerFactory.getLogger(BacnetLink.class);
 	
 	static final String ACTION_IMPORT = "import connection";
 	
-	Node node;
+	final Node node;
 	final Serializer serializer;
 	final Deserializer deserializer;
-	Set<BacnetSerialConn> serialConns = new HashSet<BacnetSerialConn>();
+	final Set<BacnetSerialConn> serialConns = new HashSet<>();
 	
 	private BacnetLink(Node node) {
 		this.node = node;
@@ -76,12 +75,7 @@ public class BacnetLink {
 	/////////////////////////////////////////////////////////////////////////////////////////
 	
 	private void makeAddIpAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
-			@Override
-			public void handle(ActionResult event) {
-				addConn(event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> addConn(event));
 		act.addParameter(new Parameter("Name", ValueType.STRING));
 		act.addParameter(new Parameter("Subnet Mask", ValueType.STRING, new Value("0.0.0.0")));
 		act.addParameter(new Parameter("Port", ValueType.NUMBER, new Value(IpNetwork.DEFAULT_PORT)));
@@ -103,19 +97,12 @@ public class BacnetLink {
 	}
 	
 	private void makeAddSerialAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
-			@Override
-			public void handle(ActionResult event) {
-				addConn(event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> addConn(event));
 		act.addParameter(new Parameter("Name", ValueType.STRING));
-		Set<String> portids = new HashSet<String>();
+		Set<String> portids = new HashSet<>();
 		try {
 			String[] cports = Utils.getCommPorts();
-			for (String port : cports) {
-				portids.add(port);
-			}
+			portids.addAll(Arrays.asList(cports));
 		} catch (Exception e) {
 			LOGGER.debug("", e);
 		}
@@ -160,26 +147,18 @@ public class BacnetLink {
 
 	
 	private void makePortScanAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
-			@Override
-			public void handle(ActionResult event) {
-				makeAddSerialAction();
+		Action act = new Action(Permission.READ, event -> {
+			makeAddSerialAction();
 
-				for (BacnetSerialConn conn : serialConns) {
-					conn.makeEditAction();
-				}
-			}	
+			for (BacnetSerialConn conn : serialConns) {
+				conn.makeEditAction();
+			}
 		});
 		node.createChild("scan for serial ports", true).setAction(act).build().setSerializable(false);
 	}
 	
 	private void makeImportAction() {
-		Action act = new Action(Permission.READ, new Handler<ActionResult>(){
-			@Override
-			public void handle(ActionResult event) {
-				handleImport(event);
-			}
-		});
+		Action act = new Action(Permission.READ, event -> handleImport(event));
 		act.addParameter(new Parameter("Name", ValueType.STRING));
 		act.addParameter(new Parameter("JSON", ValueType.STRING).setEditorType(EditorType.TEXT_AREA));
 		Node anode = node.getChild(ACTION_IMPORT, true);

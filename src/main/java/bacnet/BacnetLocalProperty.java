@@ -1,20 +1,5 @@
 package bacnet;
 
-import java.util.List;
-
-import org.apache.commons.lang3.tuple.Pair;
-import org.dsa.iot.dslink.node.Node;
-import org.dsa.iot.dslink.node.Writable;
-import org.dsa.iot.dslink.node.value.Value;
-import org.dsa.iot.dslink.node.value.ValuePair;
-import org.dsa.iot.dslink.node.value.ValueType;
-import org.dsa.iot.dslink.node.value.ValueUtils;
-import org.dsa.iot.dslink.util.handler.Handler;
-import org.dsa.iot.dslink.util.json.JsonArray;
-import org.dsa.iot.dslink.util.json.JsonObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.serotonin.bacnet4j.enums.DayOfWeek;
 import com.serotonin.bacnet4j.enums.Month;
 import com.serotonin.bacnet4j.exception.BACnetServiceException;
@@ -40,13 +25,24 @@ import com.serotonin.bacnet4j.type.primitive.Real;
 import com.serotonin.bacnet4j.type.primitive.SignedInteger;
 import com.serotonin.bacnet4j.type.primitive.Time;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
+import java.util.List;
+import org.apache.commons.lang3.tuple.Pair;
+import org.dsa.iot.dslink.node.Node;
+import org.dsa.iot.dslink.node.Writable;
+import org.dsa.iot.dslink.node.value.Value;
+import org.dsa.iot.dslink.node.value.ValueType;
+import org.dsa.iot.dslink.node.value.ValueUtils;
+import org.dsa.iot.dslink.util.json.JsonArray;
+import org.dsa.iot.dslink.util.json.JsonObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BacnetLocalProperty {
 	private static final Logger LOGGER = LoggerFactory.getLogger(BacnetLocalProperty.class);
 	
-	private BacnetLocalObject object;
-	private Node node;
-	private PropertyIdentifier pid;
+	private final BacnetLocalObject object;
+	private final Node node;
+	private final PropertyIdentifier pid;
 	
 	BacnetLocalProperty(BacnetLocalObject object, Node node, PropertyIdentifier pid) {
 		this.object = object;
@@ -70,12 +66,9 @@ public class BacnetLocalProperty {
 		}
 		
 		node.setWritable(Writable.WRITE);
-		node.getListener().setValueHandler(new Handler<ValuePair>(){
-			@Override
-			public void handle(ValuePair event) {
-				if (event.isFromExternalSource()) {
-					set(event.getCurrent());
-				}
+		node.getListener().setValueHandler(event -> {
+			if (event.isFromExternalSource()) {
+				set(event.getCurrent());
 			}
 		});
 		
