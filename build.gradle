@@ -4,7 +4,7 @@ apply plugin: 'java-library'
 mainClassName = 'bacnet.Main'
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
-version = '2.5.0'
+version = '2.6.0'
 
 repositories {
     mavenCentral()
@@ -20,14 +20,10 @@ dependencies {
     implementation 'commons-logging:commons-logging:1.2'
     implementation 'org.apache.commons:commons-lang3:3.8.1'
     implementation 'org.reflections:reflections:0.9.12'
-    implementation 'org.scream3r:jssc:2.8.0'
-    implementation 'com.infiniteautomation:bacnet4j:5.0.2'
-    /* todo Potential fix for Windows illegal access crash
     implementation 'io.github.java-native:jssc:2.9.2'
     implementation ('com.infiniteautomation:bacnet4j:5.0.2') {
         exclude group: 'org.scream3r'
     }
-    */
 }
 
 run {
